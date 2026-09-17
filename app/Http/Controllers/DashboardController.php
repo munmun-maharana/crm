@@ -4,22 +4,24 @@ namespace App\Http\Controllers;
 
 use App\Models\Customer;
 use Carbon\Carbon;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 class DashboardController extends Controller
 {
-    public function index(): View
+    public function index(Request $request): View
     {
         $today = Carbon::today();
+        $leads = fn () => Customer::query()->visibleTo($request->user());
 
         $stats = [
-            'total' => Customer::count(),
-            'interested' => Customer::where('status', 'interested')->count(),
-            'requests' => Customer::where('status', 'request')->count(),
-            'converted' => Customer::where('status', 'converted')->count(),
-            'lost' => Customer::where('status', 'lost')->count(),
-            'today' => Customer::whereDate('created_at', $today)->count(),
+            'total' => $leads()->count(),
+            'interested' => $leads()->where('status', 'interested')->count(),
+            'requests' => $leads()->where('status', 'request')->count(),
+            'converted' => $leads()->where('status', 'converted')->count(),
+            'lost' => $leads()->where('status', 'lost')->count(),
+            'today' => $leads()->whereDate('created_at', $today)->count(),
         ];
 
         $dayLabels = [];
@@ -27,7 +29,7 @@ class DashboardController extends Controller
         for ($i = 6; $i >= 0; $i--) {
             $date = $today->copy()->subDays($i);
             $dayLabels[] = $date->format('D');
-            $dayData[] = Customer::whereDate('created_at', $date)->count();
+            $dayData[] = $leads()->whereDate('created_at', $date)->count();
         }
 
         $monthLabels = [];
@@ -35,7 +37,7 @@ class DashboardController extends Controller
         for ($i = 11; $i >= 0; $i--) {
             $date = $today->copy()->subMonths($i);
             $monthLabels[] = $date->format('M');
-            $monthData[] = Customer::whereYear('created_at', $date->year)
+            $monthData[] = $leads()->whereYear('created_at', $date->year)
                 ->whereMonth('created_at', $date->month)
                 ->count();
         }
@@ -45,10 +47,10 @@ class DashboardController extends Controller
         for ($i = 4; $i >= 0; $i--) {
             $year = $today->year - $i;
             $yearLabels[] = (string) $year;
-            $yearData[] = Customer::whereYear('created_at', $year)->count();
+            $yearData[] = $leads()->whereYear('created_at', $year)->count();
         }
 
-        $statusCounts = Customer::select('status', DB::raw('count(*) as total'))
+        $statusCounts = $leads()->select('status', DB::raw('count(*) as total'))
             ->groupBy('status')
             ->pluck('total', 'status');
 
@@ -60,7 +62,7 @@ class DashboardController extends Controller
             (int) ($statusCounts['lost'] ?? 0),
         ];
 
-        $recent = Customer::with('assignee')->latest()->take(8)->get();
+        $recent = $leads()->with('assignee')->latest()->take(8)->get();
 
         return view('dashboard', compact(
             'stats',

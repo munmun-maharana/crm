@@ -85,7 +85,7 @@
                                         @click="selectCustomer({{ $c->id }})">
                                     <div class="flex items-start justify-between gap-2">
                                         <div class="font-semibold text-[14px] truncate">{{ $c->name }}</div>
-                                        <div class="text-[11px] text-slate-400 shrink-0">{{ $c->updated_at?->format('g:i A') }}</div>
+                                        <div class="text-[11px] text-slate-500 shrink-0 truncate max-w-[110px]">{{ $c->assignee?->name ?: 'Unassigned' }}</div>
                                     </div>
                                     <div class="text-[12px] text-slate-500 truncate mt-0.5">{{ $c->company ?: ($c->phone ?: '—') }}</div>
                                     <div class="mt-1.5 flex items-center gap-2">

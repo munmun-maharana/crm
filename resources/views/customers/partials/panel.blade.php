@@ -56,10 +56,6 @@
         </div>
     </div>
 
-    @if($customer->notes)
-        <div class="rounded border border-line bg-mist/60 px-3 py-2 text-[13px] text-slate-700">{{ $customer->notes }}</div>
-    @endif
-
     @if(!empty($customer->meta))
         <div class="rounded border border-line p-3 grid grid-cols-2 gap-2 text-[12px]">
             @foreach($customer->meta as $k => $v)

@@ -49,7 +49,7 @@ class DatabaseSeeder extends Seeder
             'role' => 'admin',
         ]);
 
-        User::create([
+        $agent = User::create([
             'name' => 'Agent One',
             'username' => 'agent',
             'email' => 'agent@crm.local',
@@ -71,8 +71,8 @@ class DatabaseSeeder extends Seeder
         foreach ($samples as $i => $row) {
             $customer = Customer::create([
                 ...$row,
-                'notes' => 'Sample lead for CRM demo.',
-                'assigned_to' => $admin->id,
+                'notes' => null,
+                'assigned_to' => $i % 2 === 0 ? $admin->id : $agent->id,
                 'last_contact_at' => now()->subDays($i),
                 'created_at' => now()->subDays($i * 3),
                 'updated_at' => now()->subDays($i),

@@ -6,6 +6,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\FieldController;
 use App\Http\Controllers\NoteTemplateController;
 use App\Http\Controllers\UploadController;
+use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
 
@@ -22,6 +23,7 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/customers', [CustomerController::class, 'index'])->name('customers.index');
     Route::post('/customers', [CustomerController::class, 'store'])->name('customers.store');
+    Route::post('/customers/bulk-map', [CustomerController::class, 'bulkMap'])->name('customers.bulk-map')->middleware('admin');
     Route::get('/customers/{customer}', [CustomerController::class, 'show'])->name('customers.show');
     Route::put('/customers/{customer}', [CustomerController::class, 'update'])->name('customers.update');
     Route::delete('/customers/{customer}', [CustomerController::class, 'destroy'])->name('customers.destroy');
@@ -31,23 +33,27 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/requests', [CustomerController::class, 'requests'])->name('requests.index');
 
-    Route::get('/fields', [FieldController::class, 'index'])->name('fields.index');
-    Route::post('/fields', [FieldController::class, 'store'])->name('fields.store');
-    Route::post('/fields/reorder', [FieldController::class, 'reorder'])->name('fields.reorder');
-    Route::put('/fields/{field}', [FieldController::class, 'update'])->name('fields.update');
-    Route::delete('/fields/{field}', [FieldController::class, 'destroy'])->name('fields.destroy');
-
-    Route::get('/note-templates', [NoteTemplateController::class, 'index'])->name('note-templates.index');
-    Route::post('/note-templates', [NoteTemplateController::class, 'store'])->name('note-templates.store');
-    Route::put('/note-templates/{noteTemplate}', [NoteTemplateController::class, 'update'])->name('note-templates.update');
-    Route::delete('/note-templates/{noteTemplate}', [NoteTemplateController::class, 'destroy'])->name('note-templates.destroy');
-
-    Route::get('/users', [UserController::class, 'index'])->name('users.index');
-    Route::post('/users', [UserController::class, 'store'])->name('users.store');
-    Route::put('/users/{user}', [UserController::class, 'update'])->name('users.update');
-    Route::delete('/users/{user}', [UserController::class, 'destroy'])->name('users.destroy');
-
     Route::get('/upload', [UploadController::class, 'index'])->name('upload.index');
     Route::get('/upload/demo', [UploadController::class, 'demo'])->name('upload.demo');
     Route::post('/upload', [UploadController::class, 'store'])->name('upload.store');
+
+    Route::middleware('admin')->group(function () {
+        Route::get('/crm-setting', [SettingsController::class, 'index'])->name('settings.index');
+
+        Route::get('/fields', fn () => redirect()->route('settings.index', ['tab' => 'fields']))->name('fields.index');
+        Route::post('/fields', [FieldController::class, 'store'])->name('fields.store');
+        Route::post('/fields/reorder', [FieldController::class, 'reorder'])->name('fields.reorder');
+        Route::put('/fields/{field}', [FieldController::class, 'update'])->name('fields.update');
+        Route::delete('/fields/{field}', [FieldController::class, 'destroy'])->name('fields.destroy');
+
+        Route::get('/note-templates', fn () => redirect()->route('settings.index', ['tab' => 'notes']))->name('note-templates.index');
+        Route::post('/note-templates', [NoteTemplateController::class, 'store'])->name('note-templates.store');
+        Route::put('/note-templates/{noteTemplate}', [NoteTemplateController::class, 'update'])->name('note-templates.update');
+        Route::delete('/note-templates/{noteTemplate}', [NoteTemplateController::class, 'destroy'])->name('note-templates.destroy');
+
+        Route::get('/users', [UserController::class, 'index'])->name('users.index');
+        Route::post('/users', [UserController::class, 'store'])->name('users.store');
+        Route::put('/users/{user}', [UserController::class, 'update'])->name('users.update');
+        Route::delete('/users/{user}', [UserController::class, 'destroy'])->name('users.destroy');
+    });
 });

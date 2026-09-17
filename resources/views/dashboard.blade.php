@@ -2,7 +2,7 @@
 
 @section('title', 'Dashboard')
 @section('heading', 'Dashboard')
-@section('subheading', 'Day · Month · Year · Falloff overview')
+@section('subheading', auth()->user()->isAdmin() ? 'All mapped CRM data' : 'Only leads mapped to you')
 
 @section('content')
 <div class="grid grid-cols-2 xl:grid-cols-6 gap-3 mb-5">

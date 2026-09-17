@@ -54,6 +54,20 @@ class Customer extends Model
         return $this->belongsTo(User::class, 'assigned_to');
     }
 
+    public function scopeVisibleTo($query, User $user)
+    {
+        if ($user->isAdmin()) {
+            return $query;
+        }
+
+        return $query->where('assigned_to', $user->id);
+    }
+
+    public function accessibleBy(User $user): bool
+    {
+        return $user->isAdmin() || (int) $this->assigned_to === (int) $user->id;
+    }
+
     public function activities(): HasMany
     {
         return $this->hasMany(CustomerActivity::class)->latest();

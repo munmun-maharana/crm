@@ -21,18 +21,21 @@ class CustomerController extends Controller
         $q = $request->string('q')->toString();
         $status = $request->string('status')->toString();
         $filter = $request->string('filter')->toString();
+        $assignedTo = $request->integer('assigned_to') ?: null;
 
         if ($filter === 'interested' && $status === '') {
             $status = 'interested';
         }
 
-        $customers = Customer::with('assignee')
+        $customers = $this->mappedCustomers($request)
+            ->with('assignee')
             ->when($q, fn ($query) => $query->where(function ($inner) use ($q) {
                 $inner->where('name', 'like', "%{$q}%")
                     ->orWhere('email', 'like', "%{$q}%")
                     ->orWhere('phone', 'like', "%{$q}%")
                     ->orWhere('company', 'like', "%{$q}%");
             }))
+            ->when($request->user()->isAdmin() && $assignedTo, fn ($query) => $query->where('assigned_to', $assignedTo))
             ->when($filter === 'follow_up_today', function ($query) {
                 $query->where('follow_up', true)
                     ->whereDate('follow_up_at', today())
@@ -46,14 +49,18 @@ class CustomerController extends Controller
 
         $agents = User::orderBy('name')->get(['id', 'name']);
         $formFields = $this->fields->formFields();
+        if (! $request->user()->isAdmin()) {
+            $formFields = $formFields->reject(fn ($field) => $field->key === 'assigned_to')->values();
+        }
         $tableFields = $this->fields->tableFields();
 
-        return view('customers.index', compact('customers', 'agents', 'q', 'status', 'filter', 'formFields', 'tableFields'));
+        return view('customers.index', compact('customers', 'agents', 'q', 'status', 'filter', 'assignedTo', 'formFields', 'tableFields'));
     }
 
     public function requests(Request $request): View
     {
-        $customers = Customer::with('assignee')
+        $customers = $this->mappedCustomers($request)
+            ->with('assignee')
             ->whereIn('status', ['interested', 'request'])
             ->latest()
             ->paginate(15);
@@ -66,6 +73,7 @@ class CustomerController extends Controller
         $fields = $this->fields->formFields();
         $request->validate($this->fields->validationRules($fields));
         [$core, $meta] = $this->fields->splitPayload($request, $fields);
+        $core = $this->applyAssignment($request, $core);
 
         $customer = Customer::create([...$core, 'meta' => $meta ?: null]);
 
@@ -80,8 +88,9 @@ class CustomerController extends Controller
         return back()->with('success', 'Customer created.');
     }
 
-    public function show(Customer $customer): JsonResponse
+    public function show(Request $request, Customer $customer): JsonResponse
     {
+        $this->authorizeMapped($request, $customer);
         $customer->load(['assignee', 'activities.user']);
         $formFields = $this->fields->formFields();
         $noteTemplates = NoteTemplate::active()->ordered()->get(['id', 'title', 'body']);
@@ -94,9 +103,11 @@ class CustomerController extends Controller
 
     public function update(Request $request, Customer $customer): RedirectResponse
     {
+        $this->authorizeMapped($request, $customer);
         $fields = $this->fields->formFields();
         $request->validate($this->fields->validationRules($fields));
         [$core, $meta] = $this->fields->splitPayload($request, $fields);
+        $core = $this->applyAssignment($request, $core, $customer);
 
         $oldStatus = $customer->status;
         $customer->update([...$core, 'meta' => array_merge($customer->meta ?? [], $meta)]);
@@ -116,6 +127,7 @@ class CustomerController extends Controller
 
     public function addActivity(Request $request, Customer $customer): RedirectResponse|JsonResponse
     {
+        $this->authorizeMapped($request, $customer);
         $statuses = ['new', 'interested', 'contacted', 'converted', 'lost', 'request'];
         $data = $request->validate([
             'type' => ['required', 'in:note,call,whatsapp,email,sms'],
@@ -232,6 +244,7 @@ class CustomerController extends Controller
 
     public function autoAction(Request $request, Customer $customer, string $channel): JsonResponse
     {
+        $this->authorizeMapped($request, $customer);
         $channel = strtolower($channel);
         abort_unless($channel === 'call', 404);
 
@@ -265,6 +278,7 @@ class CustomerController extends Controller
 
     public function compose(Request $request, Customer $customer): JsonResponse
     {
+        $this->authorizeMapped($request, $customer);
         if ($request->input('link') === '') {
             $request->merge(['link' => null]);
         }
@@ -353,10 +367,60 @@ class CustomerController extends Controller
         ]);
     }
 
-    public function destroy(Customer $customer): RedirectResponse
+    public function destroy(Request $request, Customer $customer): RedirectResponse
     {
+        $this->authorizeMapped($request, $customer);
         $customer->delete();
 
         return back()->with('success', 'Customer deleted.');
+    }
+
+    public function bulkMap(Request $request): RedirectResponse
+    {
+        abort_unless($request->user()->isAdmin(), 403);
+
+        $data = $request->validate([
+            'ids' => ['required', 'array', 'min:1'],
+            'ids.*' => ['integer', 'exists:customers,id'],
+            'assigned_to' => ['required', 'exists:users,id'],
+        ]);
+
+        $agent = User::findOrFail($data['assigned_to']);
+        $ids = collect($data['ids'])->unique()->values();
+
+        Customer::whereIn('id', $ids)->update(['assigned_to' => $agent->id]);
+
+        foreach ($ids as $id) {
+            CustomerActivity::create([
+                'customer_id' => $id,
+                'user_id' => $request->user()->id,
+                'type' => 'system',
+                'title' => 'User mapping updated',
+                'body' => "Bulk mapped to {$agent->name}.",
+            ]);
+        }
+
+        return back()->with('success', "Mapped {$ids->count()} customers to {$agent->name}.");
+    }
+
+    private function mappedCustomers(Request $request)
+    {
+        return Customer::query()->visibleTo($request->user());
+    }
+
+    private function authorizeMapped(Request $request, Customer $customer): void
+    {
+        abort_unless($customer->accessibleBy($request->user()), 403);
+    }
+
+    private function applyAssignment(Request $request, array $core, ?Customer $customer = null): array
+    {
+        if ($request->user()->isAdmin()) {
+            return $core;
+        }
+
+        $core['assigned_to'] = $customer?->assigned_to ?: $request->user()->id;
+
+        return $core;
     }
 }

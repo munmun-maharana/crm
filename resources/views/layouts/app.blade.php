@@ -52,6 +52,17 @@
         .table-row-press{transition: background .15s ease, transform .15s ease}
         .table-row-press:active{transform:scale(.995)}
         tr.table-row-press{cursor:pointer}
+        .crm-check{width:18px;height:18px;border-radius:4px;border:1.5px solid #c8c6c4;background:#fff;display:inline-flex;align-items:center;justify-content:center;padding:0;cursor:pointer}
+        .crm-check.on{background:#0f6cbd;border-color:#0f6cbd}
+        .crm-check svg{width:12px;height:12px;color:#fff;opacity:0}
+        .crm-check.on svg{opacity:1}
+        .crm-toolbar-group{display:flex;align-items:center;flex:1;min-width:0;max-width:760px;height:38px;background:#f3f2f1;border:1px solid #edebe9;border-radius:10px;overflow:hidden}
+        .crm-toolbar-group:focus-within{background:#fff;border-color:#0f6cbd;box-shadow:0 0 0 3px rgba(15,108,189,.12)}
+        .crm-toolbar-search{flex:1;min-width:140px;display:flex;align-items:center;gap:8px;padding:0 12px;height:100%}
+        .crm-toolbar-search input{flex:1;width:100%;background:transparent;border:0;outline:none;font-size:13px;color:#201f1e}
+        .crm-toolbar-search input::placeholder{color:#a19f9d}
+        .crm-toolbar-split{width:1px;height:18px;background:#e1dfdd;flex-shrink:0}
+        .crm-toolbar-select{border:0;background:transparent url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23605e5c' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") no-repeat right 10px center;font-size:12.5px;font-weight:600;color:#201f1e;padding:0 28px 0 12px;height:100%;outline:none;appearance:none;-webkit-appearance:none;cursor:pointer;max-width:150px}
     </style>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
@@ -69,16 +80,18 @@
                 $links = [
                     ['dashboard', 'Dashboard'],
                     ['customers.index', 'CRM'],
-                    ['upload.index', 'Excel Upload'],
-                    ['fields.index', 'Fields'],
-                    ['note-templates.index', 'Note Templates'],
-                    ['users.index', 'Users'],
                 ];
+                if (auth()->user()->isAdmin()) {
+                    $links = array_merge($links, [
+                        ['settings.index', 'CRM Setting'],
+                        ['users.index', 'Users'],
+                    ]);
+                }
             @endphp
             <div class="px-2 pt-1 pb-2 text-[11px] font-semibold text-slate-500">Favorites</div>
             @foreach($links as [$route, $label])
                 <a href="{{ route($route) }}"
-                   class="nav-item flex items-center gap-2 px-3 py-1.5 mb-0.5 {{ request()->routeIs($route) || request()->routeIs(str_replace('.index','.*',$route)) ? 'active' : 'text-ink hover:bg-mist' }}">
+                   class="nav-item flex items-center gap-2 px-3 py-1.5 mb-0.5 {{ request()->routeIs($route) || request()->routeIs(str_replace('.index','.*',$route)) || ($route === 'settings.index' && request()->routeIs('fields.*', 'note-templates.*')) ? 'active' : 'text-ink hover:bg-mist' }}">
                     <span>{{ $label }}</span>
                 </a>
             @endforeach
@@ -92,7 +105,7 @@
         <div class="p-3 border-t border-line text-[12px]">
             <div class="font-semibold truncate">{{ auth()->user()->name }}</div>
             <div class="flex items-center justify-between gap-2 mt-0.5">
-                <span class="text-slate-500 truncate">{{ auth()->user()->username }}</span>
+                <span class="text-slate-500 truncate">{{ auth()->user()->username }} · {{ auth()->user()->role }}</span>
                 <form method="POST" action="{{ route('logout') }}">@csrf
                     <button class="text-brand font-semibold hover:underline">Logout</button>
                 </form>
@@ -201,6 +214,66 @@ function crmShell() {
         composeOpen: false,
         composeSending: false,
         compose: { channel: 'whatsapp', customerId: null, name: '', phone: '', email: '', message: '', subject: '', link: '' },
+        selectedIds: [],
+        lastSelectId: null,
+        isSelected(id) {
+            return this.selectedIds.map(Number).includes(Number(id));
+        },
+        pageSelected(ids) {
+            const list = (ids || []).map(Number);
+            const current = this.selectedIds.map(Number);
+            return list.length > 0 && list.every(id => current.includes(id));
+        },
+        toggleSelect(id, event) {
+            id = Number(id);
+            const pageIds = (window.CRM_PAGE_IDS || []).map(Number);
+            const current = this.selectedIds.map(Number);
+
+            if (event?.shiftKey && this.lastSelectId != null) {
+                event.preventDefault();
+                const from = pageIds.indexOf(Number(this.lastSelectId));
+                const to = pageIds.indexOf(id);
+                if (from !== -1 && to !== -1) {
+                    const range = pageIds.slice(Math.min(from, to), Math.max(from, to) + 1);
+                    this.selectedIds = [...new Set([...current, ...range])];
+                    return;
+                }
+            }
+
+            this.selectedIds = current.includes(id)
+                ? current.filter(x => x !== id)
+                : [...current, id];
+            this.lastSelectId = id;
+        },
+        togglePage(ids) {
+            const list = (ids || []).map(Number);
+            const current = this.selectedIds.map(Number);
+            this.selectedIds = this.pageSelected(list)
+                ? current.filter(id => !list.includes(id))
+                : [...new Set([...current, ...list])];
+            this.lastSelectId = list[0] ?? null;
+        },
+        clearSelection() {
+            this.selectedIds = [];
+            this.lastSelectId = null;
+        },
+        prepareBulkMap(event) {
+            if (!this.selectedIds.length) {
+                event.preventDefault();
+                alert('Select customers to map.');
+                return;
+            }
+            const form = event.target;
+            form.querySelectorAll('input[data-bulk-id]').forEach(el => el.remove());
+            this.selectedIds.map(Number).forEach(id => {
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = 'ids[]';
+                input.value = String(id);
+                input.setAttribute('data-bulk-id', '1');
+                form.appendChild(input);
+            });
+        },
         async selectCustomer(id) {
             if (!id) return;
             const switching = this.selectedId && this.selectedId !== id;
@@ -212,6 +285,10 @@ function crmShell() {
                 const res = await fetch(`{{ url('/customers') }}/${id}`, {
                     headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
                 });
+                if (!res.ok) {
+                    this.html = '<div class="p-8 text-center text-rose-600 text-sm">This customer is not mapped to you.</div>';
+                    return;
+                }
                 const data = await res.json();
                 this.title = data.customer.name;
                 this.html = data.html;

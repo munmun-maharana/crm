@@ -19,7 +19,7 @@
                 <h3 class="text-sm font-semibold">Excel columns (from Fields)</h3>
                 <p class="text-[12px] text-slate-500 mt-1">Demo file headers match these active Excel fields.</p>
             </div>
-            <a href="{{ route('fields.index') }}" class="text-[12px] font-semibold text-brand hover:underline">Manage fields</a>
+            <a href="{{ route('settings.index', ['tab' => 'fields']) }}" class="text-[12px] font-semibold text-brand hover:underline">Manage fields</a>
         </div>
         <div class="flex flex-wrap gap-1.5 mb-5">
             @forelse($excelFields as $f)
