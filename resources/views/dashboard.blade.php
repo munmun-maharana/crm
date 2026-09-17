@@ -57,7 +57,7 @@
 <div class="rounded-2xl border border-line bg-white overflow-hidden">
     <div class="px-4 py-3 border-b border-line flex items-center justify-between">
         <h2 class="text-sm font-extrabold">Recent customers</h2>
-        <a href="{{ route($listRoute) }}" class="text-[12px] font-bold text-brand hover:underline">{{ ($listRoute ?? 'customers.index') === 'operations.index' ? 'Open Operations' : 'Open CRM' }}</a>
+        <a href="{{ route($listRoute) }}" class="text-[12px] font-bold text-brand hover:underline">{{ ($listRoute ?? 'customers.index') === 'operations.index' ? 'Open TEAM OPS' : 'Open CRM' }}</a>
     </div>
     <div class="overflow-x-auto">
         <table class="w-full text-[13px]">

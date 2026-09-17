@@ -66,7 +66,7 @@ class FieldController extends Controller
         ]);
 
         if ($pipeline === 'operations') {
-            return redirect()->route('operation-settings.index', ['tab' => 'fields'])->with('success', 'Operation field added. Map it to a CRM field to copy data on Assign.');
+            return redirect()->route('settings.index', ['tab' => 'op-fields'])->with('success', 'Operation field added. Map it to a CRM field to copy data on Assign.');
         }
 
         return back()->with('success', 'Field added.');
@@ -133,7 +133,7 @@ class FieldController extends Controller
         ]);
 
         if ($field->pipeline === 'operations') {
-            return redirect()->route('operation-settings.index', ['tab' => 'fields'])->with('success', 'Operation field updated.');
+            return redirect()->route('settings.index', ['tab' => 'op-fields'])->with('success', 'Operation field updated.');
         }
 
         return back()->with('success', 'Field updated.');
@@ -166,7 +166,7 @@ class FieldController extends Controller
         }
 
         if ($pipeline === 'operations') {
-            return redirect()->route('operation-settings.index', ['tab' => 'fields'])->with('success', 'Operation field deleted.');
+            return redirect()->route('settings.index', ['tab' => 'op-fields'])->with('success', 'Operation field deleted.');
         }
 
         return back()->with('success', 'Field deleted. Existing values cleared.');

@@ -85,12 +85,10 @@
                     $links[] = ['customers.index', 'CRM'];
                 }
                 if ($navUser->canAccessOperations()) {
-                    $links[] = ['operations.index', 'Operations'];
+                    $links[] = ['operations.index', 'TEAM OPS'];
                 }
                 if ($navUser->isAdmin()) {
                     $links = array_merge($links, [
-                        ['settings.index', 'CRM Setting'],
-                        ['operation-settings.index', 'Operation Setting'],
                         ['users.index', 'Users'],
                     ]);
                 }
@@ -98,7 +96,7 @@
             <div class="px-2 pt-1 pb-2 text-[11px] font-semibold text-slate-500">Favorites</div>
             @foreach($links as [$route, $label])
                 <a href="{{ route($route) }}"
-                   class="nav-item flex items-center gap-2 px-3 py-1.5 mb-0.5 {{ request()->routeIs($route) || request()->routeIs(str_replace('.index','.*',$route)) || ($route === 'settings.index' && request()->routeIs('fields.*', 'note-templates.*')) ? 'active' : 'text-ink hover:bg-mist' }}">
+                   class="nav-item flex items-center gap-2 px-3 py-1.5 mb-0.5 {{ request()->routeIs($route) || request()->routeIs(str_replace('.index','.*',$route)) || ($route === 'settings.index' && request()->routeIs('fields.*', 'note-templates.*', 'operation-settings.*')) ? 'active' : 'text-ink hover:bg-mist' }}">
                     <span>{{ $label }}</span>
                 </a>
             @endforeach
@@ -110,10 +108,21 @@
             <div class="px-3 py-1.5 text-[12px] text-ink">Auto SMS</div>
         </nav>
         <div class="p-3 border-t border-line text-[12px]">
-            <div class="font-semibold truncate">{{ auth()->user()->name }}</div>
+            <div class="flex items-center justify-between gap-2">
+                <div class="font-semibold truncate min-w-0">{{ auth()->user()->name }}</div>
+                @if(auth()->user()->isAdmin())
+                    <a href="{{ route('settings.index') }}" title="Setting"
+                       class="w-7 h-7 shrink-0 inline-flex items-center justify-center rounded-lg border border-line text-slate-500 hover:bg-brand-soft hover:text-brand hover:border-brand/30 transition {{ request()->routeIs('settings.*', 'fields.*', 'note-templates.*', 'operation-settings.*') ? 'bg-brand-soft text-brand border-brand/30' : '' }}">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                        </svg>
+                    </a>
+                @endif
+            </div>
             <div class="flex items-center justify-between gap-2 mt-0.5">
                 <span class="text-slate-500 truncate">{{ auth()->user()->username }} · {{ auth()->user()->roleLabel() }}</span>
-                <form method="POST" action="{{ route('logout') }}">@csrf
+                <form method="POST" action="{{ route('logout') }}" onsubmit="return confirm('Logout karna hai?')">@csrf
                     <button class="text-brand font-semibold hover:underline">Logout</button>
                 </form>
             </div>
@@ -522,6 +531,15 @@ async function assignToOperations(customerId) {
         }
         const root = Alpine.$data(document.body);
         if (root && data.html) root.html = data.html;
+        if (data.customer_id != null) {
+            const cell = document.querySelector(`[data-fu-cell="${data.customer_id}"]`);
+            if (cell && data.follow_up_html != null) cell.innerHTML = data.follow_up_html;
+            const listBadge = document.querySelector(`[data-fu-list="${data.customer_id}"]`);
+            if (listBadge) {
+                listBadge.textContent = '';
+                listBadge.classList.add('hidden');
+            }
+        }
     } catch (e) {
         alert('Could not assign to Operation Team');
     }

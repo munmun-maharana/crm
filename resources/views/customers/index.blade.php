@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', ($pipeline ?? 'crm') === 'operations' ? 'Operations' : 'CRM')
+@section('title', ($pipeline ?? 'crm') === 'operations' ? 'TEAM OPS' : 'CRM')
 
 @section('split')
 @php

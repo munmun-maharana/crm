@@ -426,9 +426,12 @@ class CustomerController extends Controller
         $newStatus = $setting->status ?: $customer->status;
         $statusChanged = $newStatus !== $oldStatus;
 
-        if ($statusChanged) {
-            $customer->update(['status' => $newStatus]);
-        }
+        $customer->update([
+            'status' => $newStatus,
+            'follow_up' => false,
+            'follow_up_at' => null,
+            'follow_up_has_time' => false,
+        ]);
 
         $title = trim((string) $setting->title) ?: 'Assigned to Operation Team';
         $body = trim((string) $setting->body) ?: 'Lead handed over to Operation Team.';
@@ -437,6 +440,7 @@ class CustomerController extends Controller
             $meta['status_from'] = $oldStatus;
             $meta['status_to'] = $newStatus;
         }
+        $meta['follow_up_cleared'] = true;
 
         CustomerActivity::create([
             'customer_id' => $customer->id,
@@ -464,6 +468,10 @@ class CustomerController extends Controller
             return response()->json([
                 'ok' => true,
                 'message' => 'Assigned to Operation Team.',
+                'customer_id' => $customer->id,
+                'follow_up' => false,
+                'follow_up_label' => null,
+                'follow_up_html' => '<span class="text-slate-400">—</span>',
                 'html' => view('customers.partials.panel', [
                     'customer' => $customer,
                     'formFields' => $formFields,

@@ -42,6 +42,7 @@ Route::middleware('auth')->group(function () {
 
     Route::middleware('admin')->group(function () {
         Route::get('/crm-setting', [SettingsController::class, 'index'])->name('settings.index');
+        Route::get('/setting', fn () => redirect()->route('settings.index'))->name('setting');
 
         Route::get('/fields', fn () => redirect()->route('settings.index', ['tab' => 'fields']))->name('fields.index');
         Route::post('/fields', [FieldController::class, 'store'])->name('fields.store');
@@ -54,7 +55,11 @@ Route::middleware('auth')->group(function () {
         Route::put('/note-templates/{noteTemplate}', [NoteTemplateController::class, 'update'])->name('note-templates.update');
         Route::delete('/note-templates/{noteTemplate}', [NoteTemplateController::class, 'destroy'])->name('note-templates.destroy');
 
-        Route::get('/operation-setting', [OperationSettingController::class, 'index'])->name('operation-settings.index');
+        Route::get('/operation-setting', function () {
+            $tab = request('tab') === 'fields' ? 'op-fields' : 'op-assign';
+
+            return redirect()->route('settings.index', ['tab' => $tab]);
+        })->name('operation-settings.index');
         Route::put('/operation-setting', [OperationSettingController::class, 'update'])->name('operation-settings.update');
 
         Route::get('/users', [UserController::class, 'index'])->name('users.index');

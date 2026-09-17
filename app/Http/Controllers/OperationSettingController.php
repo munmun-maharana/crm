@@ -33,7 +33,8 @@ class OperationSettingController extends Controller
         $setting = OperationSetting::current();
         $setting->update($data);
 
-        return back()->with('success', 'Operation Team setting saved. Assign button will use this status, title and note.');
+        return redirect()->route('settings.index', ['tab' => 'op-assign'])
+            ->with('success', 'Operation Team setting saved. Assign button will use this status, title and note.');
     }
 
     private function statusOptions(): array
