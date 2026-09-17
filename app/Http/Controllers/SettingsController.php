@@ -12,7 +12,7 @@ class SettingsController extends Controller
 {
     public function index(Request $request): View
     {
-        $allowed = ['fields', 'notes', 'op-assign', 'op-fields'];
+        $allowed = ['fields', 'notes', 'op-assign', 'op-fields', 'user-fields'];
         $tab = $request->string('tab')->toString();
         if (! in_array($tab, $allowed, true)) {
             $tab = 'fields';
@@ -23,6 +23,7 @@ class SettingsController extends Controller
         $setting = OperationSetting::current();
         $statuses = $this->statusOptions();
         $opFields = CrmField::inPipeline('operations')->ordered()->get();
+        $userFields = CrmField::inPipeline('users')->ordered()->get();
         $crmFields = $fields->map(fn ($f) => (object) ['id' => $f->id, 'key' => $f->key, 'label' => $f->label]);
 
         return view('settings.index', compact(
@@ -32,6 +33,7 @@ class SettingsController extends Controller
             'setting',
             'statuses',
             'opFields',
+            'userFields',
             'crmFields'
         ));
     }

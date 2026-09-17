@@ -97,7 +97,7 @@
             @foreach($links as [$route, $label])
                 <a href="{{ route($route) }}"
                    class="nav-item flex items-center gap-2 px-3 py-1.5 mb-0.5 {{ request()->routeIs($route) || request()->routeIs(str_replace('.index','.*',$route)) || ($route === 'settings.index' && request()->routeIs('fields.*', 'note-templates.*', 'operation-settings.*')) ? 'active' : 'text-ink hover:bg-mist' }}">
-                    <span>{{ $label }}</span>
+                    <span class="uppercase tracking-wide">{{ $label }}</span>
                 </a>
             @endforeach
 

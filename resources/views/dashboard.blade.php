@@ -7,50 +7,51 @@
     : (auth()->user()->isOperation() ? 'Operations queue' : 'Only leads mapped to you'))
 
 @section('content')
-<div class="grid grid-cols-2 xl:grid-cols-6 gap-3 mb-5">
-    @foreach([
-        ['Total', $stats['total'], 'slate'],
-        ['Today', $stats['today'], 'sky'],
-        ['Interested', $stats['interested'], 'teal'],
-        ['Requests', $stats['requests'], 'amber'],
-        ['Converted', $stats['converted'], 'emerald'],
-        ['Falloff', $stats['lost'], 'rose'],
-    ] as [$label, $value, $tone])
+<div class="grid gap-3 mb-5" style="grid-template-columns: repeat({{ min(10, max(2, count($statusCards))) }}, minmax(0, 1fr));">
+    @foreach($statusCards as $card)
         <div class="stat-card rounded-2xl border border-line bg-white px-4 py-3.5">
-            <div class="text-[11px] uppercase tracking-[0.14em] text-slate-400 font-bold">{{ $label }}</div>
-            <div class="mt-1 text-2xl font-extrabold text-{{ $tone }}-700">{{ $value }}</div>
+            <div class="text-[11px] uppercase tracking-[0.14em] text-slate-400 font-bold">{{ $card['label'] }}</div>
+            <div class="mt-1 text-2xl font-extrabold text-{{ $card['tone'] }}-700">{{ $card['value'] }}</div>
         </div>
     @endforeach
 </div>
 
-<div class="grid grid-cols-1 xl:grid-cols-2 gap-4 mb-4">
-    <div class="rounded-2xl border border-line bg-white p-4">
+<div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-4">
+    <div class="rounded-2xl border border-line bg-white p-4 min-w-0">
         <div class="flex items-center justify-between mb-3">
-            <h2 class="text-sm font-extrabold">Daily leads</h2>
+            <h2 class="text-sm font-extrabold uppercase tracking-wide">Daily leads</h2>
             <span class="text-[11px] text-slate-400">Last 7 days</span>
         </div>
-        <canvas id="dayChart" height="120"></canvas>
+        <div class="h-[260px] relative">
+            <canvas id="dayChart"></canvas>
+        </div>
     </div>
-    <div class="rounded-2xl border border-line bg-white p-4">
+    <div class="rounded-2xl border border-line bg-white p-4 min-w-0">
         <div class="flex items-center justify-between mb-3">
-            <h2 class="text-sm font-extrabold">Monthly leads</h2>
+            <h2 class="text-sm font-extrabold uppercase tracking-wide">Monthly leads</h2>
             <span class="text-[11px] text-slate-400">Last 12 months</span>
         </div>
-        <canvas id="monthChart" height="120"></canvas>
+        <div class="h-[260px] relative">
+            <canvas id="monthChart"></canvas>
+        </div>
     </div>
-    <div class="rounded-2xl border border-line bg-white p-4">
+    <div class="rounded-2xl border border-line bg-white p-4 min-w-0">
         <div class="flex items-center justify-between mb-3">
-            <h2 class="text-sm font-extrabold">Yearly leads</h2>
+            <h2 class="text-sm font-extrabold uppercase tracking-wide">Yearly leads</h2>
             <span class="text-[11px] text-slate-400">5 year trend</span>
         </div>
-        <canvas id="yearChart" height="120"></canvas>
+        <div class="h-[260px] relative">
+            <canvas id="yearChart"></canvas>
+        </div>
     </div>
-    <div class="rounded-2xl border border-line bg-white p-4">
+    <div class="rounded-2xl border border-line bg-white p-4 min-w-0">
         <div class="flex items-center justify-between mb-3">
-            <h2 class="text-sm font-extrabold">Falloff funnel</h2>
+            <h2 class="text-sm font-extrabold uppercase tracking-wide">Falloff funnel</h2>
             <span class="text-[11px] text-slate-400">Pipeline drop</span>
         </div>
-        <canvas id="falloffChart" height="120"></canvas>
+        <div class="h-[260px] relative">
+            <canvas id="falloffChart"></canvas>
+        </div>
     </div>
 </div>
 
@@ -92,7 +93,7 @@
 <script>
 const common = {
     responsive: true,
-    maintainAspectRatio: true,
+    maintainAspectRatio: false,
     plugins: { legend: { display: false } },
     scales: {
         x: { grid: { display: false }, ticks: { font: { size: 11 } } },
@@ -118,9 +119,13 @@ new Chart(document.getElementById('falloffChart'), {
     type: 'doughnut',
     data: {
         labels: @json($falloffLabels),
-        datasets: [{ data: @json($falloffData), backgroundColor: ['#0f766e','#0284c7','#059669','#e11d48'], borderWidth: 0 }]
+        datasets: [{ data: @json($falloffData), backgroundColor: @json($falloffChartColors), borderWidth: 0 }]
     },
-    options: { plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } } } }
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } } }
+    }
 });
 </script>
 @endpush

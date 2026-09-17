@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\CrmField;
 use App\Models\Customer;
+use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -19,7 +20,7 @@ class FieldController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
-        $pipeline = $request->input('pipeline') === 'operations' ? 'operations' : 'crm';
+        $pipeline = CrmField::normalizePipeline((string) $request->input('pipeline', 'crm'));
         $crmKeys = CrmField::inPipeline('crm')->pluck('key')->all();
 
         $data = $request->validate([
@@ -68,8 +69,11 @@ class FieldController extends Controller
         if ($pipeline === 'operations') {
             return redirect()->route('settings.index', ['tab' => 'op-fields'])->with('success', 'Operation field added. Map it to a CRM field to copy data on Assign.');
         }
+        if ($pipeline === 'users') {
+            return redirect()->route('settings.index', ['tab' => 'user-fields'])->with('success', 'User field added.');
+        }
 
-        return back()->with('success', 'Field added.');
+        return redirect()->route('settings.index', ['tab' => 'fields'])->with('success', 'Field added.');
     }
 
     public function update(Request $request, CrmField $field): RedirectResponse
@@ -135,8 +139,11 @@ class FieldController extends Controller
         if ($field->pipeline === 'operations') {
             return redirect()->route('settings.index', ['tab' => 'op-fields'])->with('success', 'Operation field updated.');
         }
+        if ($field->pipeline === 'users') {
+            return redirect()->route('settings.index', ['tab' => 'user-fields'])->with('success', 'User field updated.');
+        }
 
-        return back()->with('success', 'Field updated.');
+        return redirect()->route('settings.index', ['tab' => 'fields'])->with('success', 'Field updated.');
     }
 
     public function destroy(Request $request, CrmField $field): RedirectResponse
@@ -146,30 +153,57 @@ class FieldController extends Controller
         }
 
         $key = $field->key;
-        $pipeline = $field->pipeline === 'operations' ? 'operations' : 'crm';
+        $pipeline = CrmField::normalizePipeline((string) $field->pipeline);
         $field->delete();
 
-        Customer::query()->inPipeline($pipeline)->orderBy('id')->chunkById(100, function ($rows) use ($key) {
-            foreach ($rows as $customer) {
-                $meta = $customer->meta ?? [];
-                if (! is_array($meta) || ! array_key_exists($key, $meta)) {
-                    continue;
-                }
-                unset($meta[$key]);
-                $customer->meta = $meta ?: null;
-                $customer->save();
-            }
-        });
-
         if ($pipeline === 'crm') {
+            Customer::query()->inPipeline('crm')->orderBy('id')->chunkById(100, function ($rows) use ($key) {
+                foreach ($rows as $customer) {
+                    $meta = $customer->meta ?? [];
+                    if (! is_array($meta) || ! array_key_exists($key, $meta)) {
+                        continue;
+                    }
+                    unset($meta[$key]);
+                    $customer->meta = $meta ?: null;
+                    $customer->save();
+                }
+            });
             CrmField::inPipeline('operations')->where('maps_from', $key)->update(['maps_from' => null]);
         }
 
         if ($pipeline === 'operations') {
+            Customer::query()->inPipeline('operations')->orderBy('id')->chunkById(100, function ($rows) use ($key) {
+                foreach ($rows as $customer) {
+                    $meta = $customer->meta ?? [];
+                    if (! is_array($meta) || ! array_key_exists($key, $meta)) {
+                        continue;
+                    }
+                    unset($meta[$key]);
+                    $customer->meta = $meta ?: null;
+                    $customer->save();
+                }
+            });
+
             return redirect()->route('settings.index', ['tab' => 'op-fields'])->with('success', 'Operation field deleted.');
         }
 
-        return back()->with('success', 'Field deleted. Existing values cleared.');
+        if ($pipeline === 'users') {
+            User::query()->orderBy('id')->chunkById(100, function ($rows) use ($key) {
+                foreach ($rows as $user) {
+                    $meta = $user->meta ?? [];
+                    if (! is_array($meta) || ! array_key_exists($key, $meta)) {
+                        continue;
+                    }
+                    unset($meta[$key]);
+                    $user->meta = $meta ?: null;
+                    $user->save();
+                }
+            });
+
+            return redirect()->route('settings.index', ['tab' => 'user-fields'])->with('success', 'User field deleted.');
+        }
+
+        return redirect()->route('settings.index', ['tab' => 'fields'])->with('success', 'Field deleted. Existing values cleared.');
     }
 
     public function reorder(Request $request)

@@ -31,6 +31,7 @@ class User extends Authenticatable
         'email',
         'password',
         'role',
+        'meta',
     ];
 
     protected $hidden = [
@@ -43,7 +44,39 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'meta' => 'array',
         ];
+    }
+
+    public static function roleOptions(): array
+    {
+        $field = CrmField::inPipeline('users')->where('key', 'role')->first();
+        $fromField = collect($field?->options ?? [])
+            ->map(fn ($o) => trim((string) $o))
+            ->filter()
+            ->values()
+            ->all();
+
+        $keys = $fromField !== []
+            ? $fromField
+            : array_keys(self::ROLES);
+
+        $options = [];
+        foreach ($keys as $key) {
+            $options[$key] = self::ROLES[$key]
+                ?? ucwords(str_replace('_', ' ', $key));
+        }
+
+        return $options;
+    }
+
+    public function fieldValue(string $key): mixed
+    {
+        if (in_array($key, CrmField::USER_CORE_KEYS, true)) {
+            return $this->{$key};
+        }
+
+        return data_get($this->meta, $key);
     }
 
     public function customers(): HasMany
@@ -53,7 +86,10 @@ class User extends Authenticatable
 
     public function roleLabel(): string
     {
-        return self::ROLES[$this->role] ?? ucfirst(str_replace('_', ' ', (string) $this->role));
+        $options = self::roleOptions();
+
+        return $options[$this->role]
+            ?? (self::ROLES[$this->role] ?? ucfirst(str_replace('_', ' ', (string) $this->role)));
     }
 
     public function isAdmin(): bool
@@ -103,6 +139,11 @@ class User extends Authenticatable
 
     public static function roleRule(): string
     {
-        return 'in:'.implode(',', array_keys(self::ROLES));
+        $keys = array_keys(self::roleOptions());
+        if ($keys === []) {
+            $keys = array_keys(self::ROLES);
+        }
+
+        return 'in:'.implode(',', $keys);
     }
 }

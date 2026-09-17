@@ -2,80 +2,220 @@
 
 @section('title', 'Users')
 @section('heading', 'Users')
-@section('subheading', 'Create Front Office, Coordinator, Operation and Admin users')
+@section('subheading', 'Fields from Setting · User Fields tab')
 
 @section('content')
-<div class="grid grid-cols-1 xl:grid-cols-3 gap-4">
-    <div class="rounded-2xl border border-line bg-white p-4 h-fit">
-        <h3 class="text-sm font-extrabold mb-3">Create user</h3>
-        <form method="POST" action="{{ route('users.store') }}" class="space-y-2.5">
-            @csrf
-            <input name="name" required placeholder="Full name" class="w-full rounded-xl border border-line px-3 py-2 text-[13px]">
-            <input name="username" required placeholder="Username" class="w-full rounded-xl border border-line px-3 py-2 text-[13px]">
-            <input name="email" type="email" required placeholder="Email" class="w-full rounded-xl border border-line px-3 py-2 text-[13px]">
-            <input name="password" type="password" required placeholder="Password" class="w-full rounded-xl border border-line px-3 py-2 text-[13px]">
-            <select name="role" required class="w-full rounded-xl border border-line px-3 py-2 text-[13px]">
-                @foreach(\App\Models\User::ROLES as $value => $label)
-                    <option value="{{ $value }}" @selected(old('role', 'front_office') === $value)>{{ $label }}</option>
-                @endforeach
-            </select>
-            <button class="w-full rounded-xl bg-brand text-white font-bold py-2.5 text-[13px]">Create</button>
-        </form>
+@php
+    $roleTone = [
+        'admin' => 'bg-brand-soft text-brand',
+        'coordinator' => 'bg-teal-50 text-teal-800',
+        'front_office' => 'bg-sky-50 text-sky-800',
+        'operation' => 'bg-amber-50 text-amber-800',
+    ];
+    $roleLabels = \App\Models\User::roleOptions();
+    $usersJson = $users->getCollection()->map(function ($u) use ($formFields) {
+        $row = ['id' => $u->id, 'name' => $u->name];
+        foreach ($formFields as $field) {
+            if ($field->key === 'password') {
+                $row['password'] = '';
+                continue;
+            }
+            $row[$field->key] = $u->fieldValue($field->key) ?? '';
+        }
+
+        return $row;
+    })->values();
+@endphp
+
+<div x-data="{
+        editOpen: false,
+        form: {},
+        openEdit(user) {
+            this.form = { ...user, password: '' };
+            this.editOpen = true;
+        },
+        closeEdit() {
+            this.editOpen = false;
+            this.form = {};
+        }
+     }">
+
+    <div class="grid grid-cols-1 xl:grid-cols-3 gap-4">
+        <div class="rounded-2xl border border-line bg-white p-4 h-fit">
+            <div class="flex items-center justify-between gap-2 mb-3">
+                <h3 class="text-sm font-extrabold">Create user</h3>
+                <a href="{{ route('settings.index', ['tab' => 'user-fields']) }}" class="text-[11px] font-semibold text-brand hover:underline">Manage fields</a>
+            </div>
+            <form method="POST" action="{{ route('users.store') }}" class="space-y-2.5">
+                @csrf
+                @forelse($formFields as $field)
+                    @if($field->key === 'password')
+                        <input name="password" type="password" @required($field->required)
+                               placeholder="{{ $field->label }}{{ $field->required ? ' *' : '' }}"
+                               class="w-full rounded-xl border border-line px-3 py-2 text-[13px]">
+                    @elseif($field->key === 'role' || $field->type === 'select')
+                        <select name="{{ $field->key }}" @required($field->required) class="w-full rounded-xl border border-line px-3 py-2 text-[13px]">
+                            <option value="">{{ $field->label }}{{ $field->required ? ' *' : '' }}</option>
+                            @if($field->key === 'role')
+                                @foreach($roleLabels as $value => $label)
+                                    <option value="{{ $value }}" @selected(old('role', 'front_office') === $value)>{{ $label }}</option>
+                                @endforeach
+                            @else
+                                @foreach($field->options ?? [] as $opt)
+                                    <option value="{{ $opt }}">{{ $opt }}</option>
+                                @endforeach
+                            @endif
+                        </select>
+                    @elseif($field->type === 'textarea')
+                        <textarea name="{{ $field->key }}" rows="2" @required($field->required)
+                                  placeholder="{{ $field->label }}{{ $field->required ? ' *' : '' }}"
+                                  class="w-full rounded-xl border border-line px-3 py-2 text-[13px]"></textarea>
+                    @else
+                        <input name="{{ $field->key }}"
+                               type="{{ $field->type === 'email' ? 'email' : ($field->type === 'phone' ? 'tel' : 'text') }}"
+                               @required($field->required)
+                               placeholder="{{ $field->label }}{{ $field->required ? ' *' : '' }}"
+                               class="w-full rounded-xl border border-line px-3 py-2 text-[13px]">
+                    @endif
+                @empty
+                    <p class="text-[12px] text-slate-400">No form fields. Add them in Setting → User Fields.</p>
+                @endforelse
+                @if($formFields->isNotEmpty())
+                    <button type="submit" class="w-full rounded-xl bg-brand text-white font-bold py-2.5 text-[13px]">Create</button>
+                @endif
+            </form>
+        </div>
+
+        <div class="xl:col-span-2 rounded-2xl border border-line bg-white overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="w-full text-[13px]">
+                    <thead class="bg-mist/80 text-slate-500 text-[11px] uppercase tracking-wide">
+                        <tr>
+                            @foreach($tableFields as $field)
+                                <th class="text-left font-bold px-4 py-2.5">{{ $field->label }}</th>
+                            @endforeach
+                            <th class="text-right font-bold px-4 py-2.5">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach($users as $u)
+                            <tr class="border-t border-line hover:bg-mist/30">
+                                @foreach($tableFields as $field)
+                                    <td class="px-4 py-2.5 {{ $loop->first ? '' : 'text-slate-500' }}">
+                                        @if($field->key === 'name')
+                                            <div class="font-semibold text-ink">{{ $u->name }}</div>
+                                            @if($tableFields->where('key', 'email')->isEmpty() && $u->email)
+                                                <div class="text-[11px] text-slate-400">{{ $u->email }}</div>
+                                            @endif
+                                        @elseif($field->key === 'role')
+                                            <span class="inline-flex text-[11px] font-bold px-2 py-1 rounded-md {{ $roleTone[$u->role] ?? 'bg-mist text-slate-600' }}">
+                                                {{ $roleLabels[$u->role] ?? $u->roleLabel() }}
+                                            </span>
+                                        @elseif($field->key === 'password')
+                                            <span class="text-slate-400">••••</span>
+                                        @else
+                                            @php $val = $u->fieldValue($field->key); @endphp
+                                            {{ $val !== null && $val !== '' ? $val : '—' }}
+                                        @endif
+                                    </td>
+                                @endforeach
+                                <td class="px-4 py-2.5 text-right">
+                                    <div class="inline-flex items-center gap-1.5 justify-end">
+                                        <button type="button" title="Edit"
+                                                @click="openEdit(@js($usersJson[$loop->index]))"
+                                                class="w-8 h-8 inline-flex items-center justify-center rounded-lg border border-line text-brand hover:bg-brand-soft transition">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                                        </button>
+                                        @if($u->id !== auth()->id())
+                                            <form method="POST" action="{{ route('users.destroy', $u) }}"
+                                                  onsubmit="return confirm('Delete user?')">
+                                                @csrf @method('DELETE')
+                                                <button type="submit" title="Delete"
+                                                        class="w-8 h-8 inline-flex items-center justify-center rounded-lg border border-line text-rose-600 hover:bg-rose-50 transition">
+                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                                                </button>
+                                            </form>
+                                        @endif
+                                    </div>
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+            <div class="p-3">{{ $users->links() }}</div>
+        </div>
     </div>
 
-    <div class="xl:col-span-2 rounded-2xl border border-line bg-white overflow-hidden">
-        <table class="w-full text-[13px]">
-            <thead class="bg-mist/80 text-slate-500 text-[11px] uppercase tracking-wide">
-                <tr>
-                    <th class="text-left font-bold px-4 py-2.5">Name</th>
-                    <th class="text-left font-bold px-4 py-2.5">Username</th>
-                    <th class="text-left font-bold px-4 py-2.5">Role</th>
-                    <th class="text-right font-bold px-4 py-2.5"></th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach($users as $u)
-                    @php
-                        $roleTone = [
-                            'admin' => 'bg-brand-soft text-brand',
-                            'coordinator' => 'bg-teal-50 text-teal-800',
-                            'front_office' => 'bg-sky-50 text-sky-800',
-                            'operation' => 'bg-amber-50 text-amber-800',
-                        ];
-                    @endphp
-                    <tr class="border-t border-line">
-                        <td class="px-4 py-2.5">
-                            <div class="font-semibold">{{ $u->name }}</div>
-                            <div class="text-[11px] text-slate-400">{{ $u->email }}</div>
-                        </td>
-                        <td class="px-4 py-2.5 text-slate-500">{{ $u->username }}</td>
-                        <td class="px-4 py-2.5">
-                            <form method="POST" action="{{ route('users.update', $u) }}" class="inline-flex items-center gap-1.5">
-                                @csrf @method('PUT')
-                                <input type="hidden" name="name" value="{{ $u->name }}">
-                                <input type="hidden" name="username" value="{{ $u->username }}">
-                                <input type="hidden" name="email" value="{{ $u->email }}">
-                                <select name="role" onchange="this.form.submit()"
-                                        class="text-[11px] font-bold px-2 py-1 rounded-md border border-line {{ $roleTone[$u->role] ?? 'bg-mist' }}">
-                                    @foreach(\App\Models\User::ROLES as $value => $label)
-                                        <option value="{{ $value }}" @selected($u->role === $value)>{{ $label }}</option>
-                                    @endforeach
+    {{-- Right edit slider --}}
+    <div class="fixed inset-0 z-[60]" x-show="editOpen" x-cloak>
+        <div class="absolute inset-0 bg-ink/25" x-show="editOpen" x-transition.opacity.duration.200ms @click="closeEdit()"></div>
+        <aside class="absolute right-0 top-0 h-full w-full max-w-[420px] bg-white border-l border-line shadow-xl flex flex-col"
+               x-show="editOpen"
+               x-transition:enter="transition ease-out duration-300"
+               x-transition:enter-start="translate-x-full"
+               x-transition:enter-end="translate-x-0"
+               x-transition:leave="transition ease-in duration-200"
+               x-transition:leave-start="translate-x-0"
+               x-transition:leave-end="translate-x-full"
+               @click.stop>
+            <div class="px-5 py-4 border-b border-line flex items-center justify-between shrink-0">
+                <div class="min-w-0">
+                    <div class="text-[11px] uppercase tracking-[0.14em] text-slate-400 font-bold">Edit user</div>
+                    <div class="text-[17px] font-semibold truncate" x-text="form.name || 'User'"></div>
+                </div>
+                <button type="button" @click="closeEdit()" class="w-8 h-8 rounded hover:bg-mist text-slate-500">✕</button>
+            </div>
+
+            <form method="POST" class="flex-1 flex flex-col min-h-0"
+                  :action="`{{ url('/users') }}/${form.id}`">
+                @csrf
+                <input type="hidden" name="_method" value="PUT">
+                <div class="flex-1 overflow-y-auto crm-scroll p-5 space-y-3">
+                    @foreach($formFields as $field)
+                        <div>
+                            <label class="block text-[11px] font-bold text-slate-500 mb-1">
+                                {{ $field->label }}@if($field->key !== 'password' && $field->required) * @endif
+                                @if($field->key === 'password') <span class="font-normal text-slate-400">(optional)</span> @endif
+                            </label>
+                            @if($field->key === 'password')
+                                <input name="password" type="password" x-model="form.password"
+                                       placeholder="Leave blank to keep current"
+                                       class="w-full rounded-lg border border-line px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-brand/20">
+                            @elseif($field->key === 'role' || $field->type === 'select')
+                                <select name="{{ $field->key }}" x-model="form['{{ $field->key }}']" @required($field->required)
+                                        class="w-full rounded-lg border border-line px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-brand/20">
+                                    <option value="">Select</option>
+                                    @if($field->key === 'role')
+                                        @foreach($roleLabels as $value => $label)
+                                            <option value="{{ $value }}">{{ $label }}</option>
+                                        @endforeach
+                                    @else
+                                        @foreach($field->options ?? [] as $opt)
+                                            <option value="{{ $opt }}">{{ $opt }}</option>
+                                        @endforeach
+                                    @endif
                                 </select>
-                            </form>
-                        </td>
-                        <td class="px-4 py-2.5 text-right">
-                            @if($u->id !== auth()->id())
-                                <form method="POST" action="{{ route('users.destroy', $u) }}" onsubmit="return confirm('Delete user?')">
-                                    @csrf @method('DELETE')
-                                    <button class="text-[12px] font-bold text-rose-600">Delete</button>
-                                </form>
+                            @elseif($field->type === 'textarea')
+                                <textarea name="{{ $field->key }}" x-model="form['{{ $field->key }}']" rows="3" @required($field->required)
+                                          class="w-full rounded-lg border border-line px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-brand/20"></textarea>
+                            @else
+                                <input name="{{ $field->key }}"
+                                       x-model="form['{{ $field->key }}']"
+                                       type="{{ $field->type === 'email' ? 'email' : ($field->type === 'phone' ? 'tel' : 'text') }}"
+                                       @required($field->required)
+                                       class="w-full rounded-lg border border-line px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-brand/20">
                             @endif
-                        </td>
-                    </tr>
-                @endforeach
-            </tbody>
-        </table>
-        <div class="p-3">{{ $users->links() }}</div>
+                        </div>
+                    @endforeach
+                </div>
+                <div class="shrink-0 border-t border-line px-5 py-3 bg-white">
+                    <button type="submit" class="w-full rounded-lg bg-brand hover:bg-brand-dark text-white font-semibold py-2.5 text-[13px]">
+                        Update user
+                    </button>
+                </div>
+            </form>
+        </aside>
     </div>
 </div>
 @endsection

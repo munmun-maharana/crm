@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\CrmField;
 use App\Models\Customer;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -16,14 +17,27 @@ class DashboardController extends Controller
         $pipeline = $request->user()->isOperation() ? 'operations' : 'crm';
         $leads = fn () => Customer::query()->visibleTo($request->user())->inPipeline($pipeline);
 
-        $stats = [
-            'total' => $leads()->count(),
-            'interested' => $leads()->where('status', 'interested')->count(),
-            'requests' => $leads()->where('status', 'request')->count(),
-            'converted' => $leads()->where('status', 'converted')->count(),
-            'lost' => $leads()->where('status', 'lost')->count(),
-            'today' => $leads()->whereDate('created_at', $today)->count(),
+        $statuses = $this->statusOptions($pipeline);
+        $statusCounts = $leads()->select('status', DB::raw('count(*) as total'))
+            ->groupBy('status')
+            ->pluck('total', 'status');
+
+        $tones = ['sky', 'teal', 'amber', 'emerald', 'rose', 'indigo', 'violet', 'orange', 'cyan', 'slate'];
+        $statusCards = [
+            [
+                'label' => 'Today Follow up',
+                'value' => $leads()->where('follow_up', true)->whereDate('follow_up_at', $today)->count(),
+                'tone' => 'orange',
+            ],
         ];
+
+        foreach (array_values($statuses) as $i => $status) {
+            $statusCards[] = [
+                'label' => ucwords(str_replace('_', ' ', $status)),
+                'value' => (int) ($statusCounts[$status] ?? 0),
+                'tone' => $tones[$i % count($tones)],
+            ];
+        }
 
         $dayLabels = [];
         $dayData = [];
@@ -51,23 +65,22 @@ class DashboardController extends Controller
             $yearData[] = $leads()->whereYear('created_at', $year)->count();
         }
 
-        $statusCounts = $leads()->select('status', DB::raw('count(*) as total'))
-            ->groupBy('status')
-            ->pluck('total', 'status');
-
-        $falloffLabels = ['Interested', 'Contacted', 'Converted', 'Lost'];
-        $falloffData = [
-            (int) ($statusCounts['interested'] ?? 0),
-            (int) ($statusCounts['contacted'] ?? 0),
-            (int) ($statusCounts['converted'] ?? 0),
-            (int) ($statusCounts['lost'] ?? 0),
-        ];
+        $falloffLabels = array_map(
+            fn ($s) => ucwords(str_replace('_', ' ', $s)),
+            $statuses
+        );
+        $falloffData = array_map(
+            fn ($s) => (int) ($statusCounts[$s] ?? 0),
+            $statuses
+        );
+        $falloffColors = ['#0f766e', '#0284c7', '#059669', '#e11d48', '#7c3aed', '#ea580c', '#0891b2', '#334155', '#db2777', '#ca8a04'];
+        $falloffChartColors = array_values(array_slice($falloffColors, 0, max(1, count($falloffLabels))));
 
         $recent = $leads()->with('assignee')->latest()->take(8)->get();
         $listRoute = $pipeline === 'operations' ? 'operations.index' : 'customers.index';
 
         return view('dashboard', compact(
-            'stats',
+            'statusCards',
             'dayLabels',
             'dayData',
             'monthLabels',
@@ -76,8 +89,28 @@ class DashboardController extends Controller
             'yearData',
             'falloffLabels',
             'falloffData',
+            'falloffChartColors',
             'recent',
             'listRoute'
         ));
+    }
+
+    private function statusOptions(string $pipeline): array
+    {
+        $field = CrmField::inPipeline($pipeline === 'operations' ? 'operations' : 'crm')
+            ->where('key', 'status')
+            ->first();
+
+        $fromField = collect($field?->options ?? [])
+            ->map(fn ($o) => strtolower(trim((string) $o)))
+            ->filter()
+            ->values()
+            ->all();
+
+        if ($fromField !== []) {
+            return $fromField;
+        }
+
+        return ['new', 'interested', 'contacted', 'converted', 'lost', 'request'];
     }
 }

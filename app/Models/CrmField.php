@@ -41,6 +41,10 @@ class CrmField extends Model
         'name', 'email', 'phone', 'company', 'city', 'source', 'status', 'notes', 'assigned_to',
     ];
 
+    public const USER_CORE_KEYS = [
+        'name', 'username', 'email', 'password', 'role',
+    ];
+
     public function scopeActive(Builder $q): Builder
     {
         return $q->where('active', true);
@@ -51,19 +55,32 @@ class CrmField extends Model
         return $q->orderBy('sort_order')->orderBy('id');
     }
 
+    public static function normalizePipeline(string $pipeline): string
+    {
+        return match ($pipeline) {
+            'operations' => 'operations',
+            'users' => 'users',
+            default => 'crm',
+        };
+    }
+
     public function scopeInPipeline(Builder $q, string $pipeline): Builder
     {
-        return $q->where('pipeline', $pipeline === 'operations' ? 'operations' : 'crm');
+        return $q->where('pipeline', self::normalizePipeline($pipeline));
     }
 
     public function isCore(): bool
     {
+        if ($this->pipeline === 'users') {
+            return in_array($this->key, self::USER_CORE_KEYS, true);
+        }
+
         return in_array($this->key, self::CORE_KEYS, true);
     }
 
     public static function makeKey(string $label, string $pipeline = 'crm'): string
     {
-        $pipeline = $pipeline === 'operations' ? 'operations' : 'crm';
+        $pipeline = self::normalizePipeline($pipeline);
         $base = Str::snake(Str::slug($label, '_'));
         $base = preg_replace('/[^a-z0-9_]/', '', $base) ?: 'field';
         $key = $base;
