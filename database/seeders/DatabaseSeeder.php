@@ -27,6 +27,7 @@ class DatabaseSeeder extends Seeder
 
         foreach ($defaults as $field) {
             CrmField::create([
+                'pipeline' => 'crm',
                 'key' => $field['key'],
                 'label' => $field['label'],
                 'type' => $field['type'],
@@ -36,6 +37,35 @@ class DatabaseSeeder extends Seeder
                 'in_form' => true,
                 'in_table' => $field['in_table'] ?? false,
                 'in_excel' => $field['in_excel'] ?? true,
+                'is_system' => $field['is_system'] ?? false,
+                'sort_order' => $field['sort_order'],
+            ]);
+        }
+
+        $opDefaults = [
+            ['key' => 'name', 'label' => 'Name', 'type' => 'text', 'required' => true, 'in_table' => true, 'is_system' => true, 'sort_order' => 1, 'maps_from' => 'name'],
+            ['key' => 'phone', 'label' => 'Phone', 'type' => 'phone', 'required' => false, 'in_table' => true, 'is_system' => false, 'sort_order' => 2, 'maps_from' => 'phone'],
+            ['key' => 'email', 'label' => 'Email', 'type' => 'email', 'required' => false, 'in_table' => true, 'is_system' => false, 'sort_order' => 3, 'maps_from' => 'email'],
+            ['key' => 'company', 'label' => 'Company', 'type' => 'text', 'required' => false, 'in_table' => false, 'is_system' => false, 'sort_order' => 4, 'maps_from' => 'company'],
+            ['key' => 'city', 'label' => 'City', 'type' => 'text', 'required' => false, 'in_table' => true, 'is_system' => false, 'sort_order' => 5, 'maps_from' => 'city'],
+            ['key' => 'status', 'label' => 'Status', 'type' => 'select', 'required' => true, 'in_table' => true, 'is_system' => true, 'sort_order' => 6, 'maps_from' => 'status', 'options' => ['new', 'interested', 'contacted', 'converted', 'lost', 'request']],
+            ['key' => 'assigned_to', 'label' => 'Assign agent', 'type' => 'select', 'required' => false, 'in_table' => false, 'is_system' => true, 'sort_order' => 7, 'maps_from' => 'assigned_to'],
+            ['key' => 'notes', 'label' => 'Notes', 'type' => 'textarea', 'required' => false, 'in_table' => false, 'is_system' => false, 'sort_order' => 8, 'maps_from' => 'notes'],
+        ];
+
+        foreach ($opDefaults as $field) {
+            CrmField::create([
+                'pipeline' => 'operations',
+                'key' => $field['key'],
+                'maps_from' => $field['maps_from'],
+                'label' => $field['label'],
+                'type' => $field['type'],
+                'options' => $field['options'] ?? null,
+                'required' => $field['required'],
+                'active' => true,
+                'in_form' => true,
+                'in_table' => $field['in_table'] ?? false,
+                'in_excel' => false,
                 'is_system' => $field['is_system'] ?? false,
                 'sort_order' => $field['sort_order'],
             ]);
@@ -54,7 +84,7 @@ class DatabaseSeeder extends Seeder
             'username' => 'agent',
             'email' => 'agent@crm.local',
             'password' => Hash::make('agent123'),
-            'role' => 'agent',
+            'role' => 'front_office',
         ]);
 
         $samples = [

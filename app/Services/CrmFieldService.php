@@ -9,24 +9,24 @@ use Illuminate\Validation\Rule;
 
 class CrmFieldService
 {
-    public function formFields(): Collection
+    public function formFields(string $pipeline = 'crm'): Collection
     {
-        return CrmField::active()->ordered()->where('in_form', true)->get();
+        return CrmField::inPipeline($pipeline)->active()->ordered()->where('in_form', true)->get();
     }
 
-    public function excelFields(): Collection
+    public function excelFields(string $pipeline = 'crm'): Collection
     {
-        return CrmField::active()->ordered()->where('in_excel', true)->get();
+        return CrmField::inPipeline($pipeline)->active()->ordered()->where('in_excel', true)->get();
     }
 
-    public function tableFields(): Collection
+    public function tableFields(string $pipeline = 'crm'): Collection
     {
-        return CrmField::active()->ordered()->where('in_table', true)->get();
+        return CrmField::inPipeline($pipeline)->active()->ordered()->where('in_table', true)->get();
     }
 
-    public function allOrdered(): Collection
+    public function allOrdered(string $pipeline = 'crm'): Collection
     {
-        return CrmField::ordered()->get();
+        return CrmField::inPipeline($pipeline)->ordered()->get();
     }
 
     public function validationRules(Collection $fields): array
@@ -77,7 +77,7 @@ class CrmFieldService
             }
         }
 
-        if (! isset($core['status']) || ! $core['status']) {
+        if (array_key_exists('status', $core) && ! $core['status']) {
             $core['status'] = 'new';
         }
 

@@ -25,7 +25,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/customers', [CustomerController::class, 'index'])->name('customers.index');
     Route::get('/operations', [CustomerController::class, 'operations'])->name('operations.index');
     Route::post('/customers', [CustomerController::class, 'store'])->name('customers.store');
-    Route::post('/customers/bulk-map', [CustomerController::class, 'bulkMap'])->name('customers.bulk-map')->middleware('admin');
+    Route::post('/customers/bulk-map', [CustomerController::class, 'bulkMap'])->name('customers.bulk-map');
     Route::get('/customers/{customer}', [CustomerController::class, 'show'])->name('customers.show');
     Route::put('/customers/{customer}', [CustomerController::class, 'update'])->name('customers.update');
     Route::delete('/customers/{customer}', [CustomerController::class, 'destroy'])->name('customers.destroy');

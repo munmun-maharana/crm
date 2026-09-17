@@ -29,6 +29,9 @@
             </div>
             <div class="text-[13px] text-slate-500 truncate">{{ $customer->email ?: 'No email' }} · {{ $customer->phone ?: 'No phone' }}</div>
             <div class="text-[12px] text-slate-400 mt-0.5 truncate">{{ $customer->company ?: '—' }} · {{ $customer->city ?: '—' }} · Agent: {{ $customer->assignee?->name ?: 'Unassigned' }}</div>
+            @if($customer->isOperations() && $customer->source_customer_id)
+                <div class="text-[12px] text-brand font-semibold mt-0.5">CRM ID #{{ $customer->source_customer_id }}</div>
+            @endif
             @if($customer->follow_up && $customer->follow_up_at)
                 <div class="text-[12px] text-amber-700 font-semibold mt-0.5">
                     Call schedule: {{ $customer->followUpScheduleLabel() }}
@@ -69,12 +72,17 @@
         </div>
     </div>
 
-    @if(!empty($customer->meta))
+    @php
+        $headerKeys = ['name', 'email', 'phone', 'company', 'city', 'status', 'assigned_to', 'notes'];
+        $extraFields = collect($formFields ?? [])->reject(fn ($f) => in_array($f->key, $headerKeys, true));
+    @endphp
+    @if($extraFields->isNotEmpty())
         <div class="rounded border border-line p-3 grid grid-cols-2 gap-2 text-[12px]">
-            @foreach($customer->meta as $k => $v)
+            @foreach($extraFields as $field)
+                @php $v = $customer->fieldValue($field->key); @endphp
                 @if($v !== null && $v !== '')
                     <div>
-                        <div class="text-slate-400 capitalize">{{ str_replace('_', ' ', $k) }}</div>
+                        <div class="text-slate-400">{{ $field->label }}</div>
                         <div class="font-semibold">{{ $v }}</div>
                     </div>
                 @endif

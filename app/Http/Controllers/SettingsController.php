@@ -12,7 +12,7 @@ class SettingsController extends Controller
     public function index(Request $request): View
     {
         $tab = $request->string('tab')->toString() === 'notes' ? 'notes' : 'fields';
-        $fields = CrmField::ordered()->get();
+        $fields = CrmField::inPipeline('crm')->ordered()->get();
         $templates = NoteTemplate::ordered()->get();
 
         return view('settings.index', compact('tab', 'fields', 'templates'));

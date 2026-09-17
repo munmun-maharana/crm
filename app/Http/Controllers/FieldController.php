@@ -12,13 +12,16 @@ class FieldController extends Controller
 {
     public function index(): View
     {
-        $fields = CrmField::ordered()->get();
+        $fields = CrmField::inPipeline('crm')->ordered()->get();
 
         return view('fields.index', compact('fields'));
     }
 
     public function store(Request $request): RedirectResponse
     {
+        $pipeline = $request->input('pipeline') === 'operations' ? 'operations' : 'crm';
+        $crmKeys = CrmField::inPipeline('crm')->pluck('key')->all();
+
         $data = $request->validate([
             'label' => ['required', 'string', 'max:80'],
             'type' => ['required', 'in:text,email,phone,textarea,select'],
@@ -27,6 +30,7 @@ class FieldController extends Controller
             'in_form' => ['nullable', 'boolean'],
             'in_table' => ['nullable', 'boolean'],
             'in_excel' => ['nullable', 'boolean'],
+            'maps_from' => ['nullable', 'string', 'max:80'],
         ]);
 
         $options = null;
@@ -38,10 +42,17 @@ class FieldController extends Controller
                 ->all();
         }
 
-        $maxSort = (int) CrmField::max('sort_order');
+        $mapsFrom = $pipeline === 'operations' ? trim((string) ($data['maps_from'] ?? '')) : '';
+        if ($mapsFrom !== '' && ! in_array($mapsFrom, $crmKeys, true)) {
+            $mapsFrom = '';
+        }
+
+        $maxSort = (int) CrmField::inPipeline($pipeline)->max('sort_order');
 
         CrmField::create([
-            'key' => CrmField::makeKey($data['label']),
+            'pipeline' => $pipeline,
+            'key' => CrmField::makeKey($data['label'], $pipeline),
+            'maps_from' => $mapsFrom !== '' ? $mapsFrom : null,
             'label' => $data['label'],
             'type' => $data['type'],
             'options' => $options,
@@ -49,17 +60,22 @@ class FieldController extends Controller
             'active' => true,
             'in_form' => $request->boolean('in_form', true),
             'in_table' => $request->boolean('in_table'),
-            'in_excel' => $request->boolean('in_excel', true),
+            'in_excel' => $pipeline === 'crm' ? $request->boolean('in_excel', true) : false,
             'is_system' => false,
             'sort_order' => $maxSort + 1,
         ]);
 
-        // Naya field: purane customers me value empty hi rahegi (meta me key nahi)
-        return back()->with('success', 'Field added. Old customer data for this field is empty.');
+        if ($pipeline === 'operations') {
+            return redirect()->route('operation-settings.index', ['tab' => 'fields'])->with('success', 'Operation field added. Map it to a CRM field to copy data on Assign.');
+        }
+
+        return back()->with('success', 'Field added.');
     }
 
     public function update(Request $request, CrmField $field): RedirectResponse
     {
+        $crmKeys = CrmField::inPipeline('crm')->pluck('key')->all();
+
         $data = $request->validate([
             'label' => ['required', 'string', 'max:80'],
             'type' => ['required', 'in:text,email,phone,textarea,select'],
@@ -70,6 +86,7 @@ class FieldController extends Controller
             'in_table' => ['nullable', 'boolean'],
             'in_excel' => ['nullable', 'boolean'],
             'sort_order' => ['nullable', 'integer', 'min:0'],
+            'maps_from' => ['nullable', 'string', 'max:80'],
         ]);
 
         $required = $request->boolean('required');
@@ -78,7 +95,6 @@ class FieldController extends Controller
         $inTable = $request->boolean('in_table');
         $inExcel = $request->boolean('in_excel');
 
-        // Name is always required + active + in form (disabled checkboxes don't POST)
         if ($field->key === 'name') {
             $required = true;
             $active = true;
@@ -94,6 +110,15 @@ class FieldController extends Controller
                 ->all();
         }
 
+        $mapsFrom = $field->maps_from;
+        if ($field->pipeline === 'operations') {
+            $mapsFrom = trim((string) ($data['maps_from'] ?? ''));
+            if ($mapsFrom !== '' && ! in_array($mapsFrom, $crmKeys, true)) {
+                $mapsFrom = '';
+            }
+            $mapsFrom = $mapsFrom !== '' ? $mapsFrom : null;
+        }
+
         $field->update([
             'label' => $data['label'],
             'type' => $field->is_system ? $field->type : $data['type'],
@@ -101,25 +126,30 @@ class FieldController extends Controller
             'required' => $required,
             'active' => $active,
             'in_form' => $inForm,
-            'in_table' => $inTable,
-            'in_excel' => $inExcel,
+            'in_table' => $field->pipeline === 'operations' ? $field->in_table : $inTable,
+            'in_excel' => $field->pipeline === 'operations' ? false : $inExcel,
             'sort_order' => $data['sort_order'] ?? $field->sort_order,
+            'maps_from' => $mapsFrom,
         ]);
+
+        if ($field->pipeline === 'operations') {
+            return redirect()->route('operation-settings.index', ['tab' => 'fields'])->with('success', 'Operation field updated.');
+        }
 
         return back()->with('success', 'Field updated.');
     }
 
-    public function destroy(CrmField $field): RedirectResponse
+    public function destroy(Request $request, CrmField $field): RedirectResponse
     {
         if ($field->is_system) {
             return back()->withErrors(['field' => 'System fields cannot be deleted.']);
         }
 
         $key = $field->key;
+        $pipeline = $field->pipeline === 'operations' ? 'operations' : 'crm';
         $field->delete();
 
-        // Data ho ya na ho — field delete; customer meta se key hata do
-        Customer::query()->orderBy('id')->chunkById(100, function ($rows) use ($key) {
+        Customer::query()->inPipeline($pipeline)->orderBy('id')->chunkById(100, function ($rows) use ($key) {
             foreach ($rows as $customer) {
                 $meta = $customer->meta ?? [];
                 if (! is_array($meta) || ! array_key_exists($key, $meta)) {
@@ -130,6 +160,14 @@ class FieldController extends Controller
                 $customer->save();
             }
         });
+
+        if ($pipeline === 'crm') {
+            CrmField::inPipeline('operations')->where('maps_from', $key)->update(['maps_from' => null]);
+        }
+
+        if ($pipeline === 'operations') {
+            return redirect()->route('operation-settings.index', ['tab' => 'fields'])->with('success', 'Operation field deleted.');
+        }
 
         return back()->with('success', 'Field deleted. Existing values cleared.');
     }

@@ -34,7 +34,7 @@
                         <option value="{{ $s }}" @selected($status===$s)>{{ ucfirst($s) }}</option>
                     @endforeach
                 </select>
-                @if(auth()->user()->isAdmin())
+                @if(auth()->user()->canSeeAllRecords())
                     <span class="crm-toolbar-split"></span>
                     <select name="assigned_to" id="crmAssigned" class="crm-toolbar-select" title="Mapped user">
                         <option value="">All users</option>
@@ -93,7 +93,7 @@
                 <table class="w-full text-[13px]">
                     <thead class="bg-mist text-slate-500 text-[11px] uppercase tracking-wide">
                         <tr>
-                            @if(auth()->user()->isAdmin())
+                            @if(auth()->user()->canSeeAllRecords())
                                 <th class="text-left font-bold px-3 py-2.5 w-10">
                                     <button type="button" class="crm-check"
                                             :class="pageSelected(@js($pageIds)) ? 'on' : ''"
@@ -104,12 +104,15 @@
                                 </th>
                             @endif
                             <th class="text-left font-bold px-4 py-2.5">Customer</th>
+                            @if(($pipeline ?? 'crm') === 'operations')
+                                <th class="text-left font-bold px-4 py-2.5">CRM ID</th>
+                            @endif
                             <th class="text-left font-bold px-4 py-2.5">Contact</th>
                             <th class="text-left font-bold px-4 py-2.5">City</th>
                             <th class="text-left font-bold px-4 py-2.5">Status</th>
                             <th class="text-left font-bold px-4 py-2.5">Follow-up</th>
                             <th class="text-left font-bold px-4 py-2.5">Source</th>
-                            @if(auth()->user()->isAdmin())
+                            @if(auth()->user()->canSeeAllRecords())
                                 <th class="text-left font-bold px-4 py-2.5">Mapped user</th>
                             @endif
                             <th class="text-right font-bold px-4 py-2.5">Action</th>
@@ -119,7 +122,7 @@
                         @forelse($customers as $c)
                             <tr class="border-t border-line hover:bg-mist/70 table-row-press" @click="selectCustomer({{ $c->id }})"
                                 :class="isSelected({{ (int) $c->id }}) ? 'bg-brand-soft/40' : ''">
-                                @if(auth()->user()->isAdmin())
+                                @if(auth()->user()->canSeeAllRecords())
                                     <td class="px-3 py-2.5" @click.stop>
                                         <button type="button" class="crm-check"
                                                 :class="isSelected({{ (int) $c->id }}) ? 'on' : ''"
@@ -133,6 +136,9 @@
                                     <div class="font-semibold">{{ $c->name }}</div>
                                     <div class="text-[11px] text-slate-400">{{ $c->company ?: '—' }}</div>
                                 </td>
+                                @if(($pipeline ?? 'crm') === 'operations')
+                                    <td class="px-4 py-2.5 text-slate-500 font-semibold">{{ $c->source_customer_id ? '#'.$c->source_customer_id : '—' }}</td>
+                                @endif
                                 <td class="px-4 py-2.5 text-slate-500">
                                     <div>{{ $c->phone ?: '—' }}</div>
                                     <div class="text-[11px]">{{ $c->email ?: '' }}</div>
@@ -154,7 +160,7 @@
                                     @endif
                                 </td>
                                 <td class="px-4 py-2.5 text-slate-500">{{ $c->source ?: '—' }}</td>
-                                @if(auth()->user()->isAdmin())
+                                @if(auth()->user()->canSeeAllRecords())
                                     <td class="px-4 py-2.5 text-slate-500">{{ $c->assignee?->name ?: 'Unassigned' }}</td>
                                 @endif
                                 <td class="px-4 py-2.5 text-right" @click.stop>
@@ -189,7 +195,7 @@
                                 </td>
                             </tr>
                         @empty
-                            <tr><td colspan="{{ auth()->user()->isAdmin() ? 9 : 7 }}" class="px-4 py-10 text-center text-slate-400">{{ auth()->user()->isAdmin() ? 'No customers found' : 'No customers mapped to you' }}</td></tr>
+                            <tr><td colspan="{{ auth()->user()->canSeeAllRecords() ? ((($pipeline ?? 'crm') === 'operations') ? 10 : 9) : ((($pipeline ?? 'crm') === 'operations') ? 8 : 7) }}" class="px-4 py-10 text-center text-slate-400">{{ auth()->user()->canSeeAllRecords() ? 'No customers found' : 'No customers mapped to you' }}</td></tr>
                         @endforelse
                     </tbody>
                 </table>
@@ -231,6 +237,9 @@
                                         <div class="font-semibold text-[14px] text-ink truncate">{{ $c->name }}</div>
                                         <div class="text-[11px] text-slate-500 shrink-0 truncate max-w-[110px]" title="{{ $c->assignee?->name ?: 'Unassigned' }}">{{ $c->assignee?->name ?: 'Unassigned' }}</div>
                                     </div>
+                                    @if(($pipeline ?? 'crm') === 'operations' && $c->source_customer_id)
+                                        <div class="text-[11px] text-brand font-semibold mt-0.5">CRM #{{ $c->source_customer_id }}</div>
+                                    @endif
                                     <div class="text-[12px] text-slate-500 truncate mt-0.5">{{ $c->company ?: '—' }}</div>
                                     <div class="mt-1.5 flex items-center gap-2 min-w-0">
                                         <span class="text-[10px] font-semibold px-1.5 py-0.5 rounded capitalize shrink-0 {{ $statusTone[$c->status] ?? 'bg-mist text-slate-600' }}">{{ $c->status }}</span>
@@ -267,7 +276,7 @@
             </template>
         </div>
 
-        @if(auth()->user()->isAdmin() && $customers->isNotEmpty())
+        @if(auth()->user()->canSeeAllRecords() && $customers->isNotEmpty())
             <form method="POST" action="{{ route('customers.bulk-map') }}"
                   x-show="selectedIds.length > 0 && !selectedId"
                   x-cloak

@@ -13,7 +13,8 @@ class DashboardController extends Controller
     public function index(Request $request): View
     {
         $today = Carbon::today();
-        $leads = fn () => Customer::query()->visibleTo($request->user())->inPipeline('crm');
+        $pipeline = $request->user()->isOperation() ? 'operations' : 'crm';
+        $leads = fn () => Customer::query()->visibleTo($request->user())->inPipeline($pipeline);
 
         $stats = [
             'total' => $leads()->count(),
@@ -63,6 +64,7 @@ class DashboardController extends Controller
         ];
 
         $recent = $leads()->with('assignee')->latest()->take(8)->get();
+        $listRoute = $pipeline === 'operations' ? 'operations.index' : 'customers.index';
 
         return view('dashboard', compact(
             'stats',
@@ -74,7 +76,8 @@ class DashboardController extends Controller
             'yearData',
             'falloffLabels',
             'falloffData',
-            'recent'
+            'recent',
+            'listRoute'
         ));
     }
 }

@@ -25,7 +25,7 @@ class UserController extends Controller
             'username' => ['required', 'string', 'max:60', 'alpha_dash', 'unique:users,username'],
             'email' => ['required', 'email', 'max:120', 'unique:users,email'],
             'password' => ['required', 'string', 'min:6'],
-            'role' => ['required', 'in:admin,agent'],
+            'role' => ['required', User::roleRule()],
         ]);
 
         User::create([
@@ -43,7 +43,7 @@ class UserController extends Controller
             'username' => ['required', 'string', 'max:60', 'alpha_dash', Rule::unique('users', 'username')->ignore($user->id)],
             'email' => ['required', 'email', 'max:120', Rule::unique('users', 'email')->ignore($user->id)],
             'password' => ['nullable', 'string', 'min:6'],
-            'role' => ['required', 'in:admin,agent'],
+            'role' => ['required', User::roleRule()],
         ]);
 
         $user->name = $data['name'];

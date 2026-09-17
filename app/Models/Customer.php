@@ -78,8 +78,12 @@ class Customer extends Model
 
     public function scopeVisibleTo($query, User $user)
     {
-        if ($user->isAdmin()) {
+        if ($user->canSeeAllRecords()) {
             return $query;
+        }
+
+        if ($user->isOperation()) {
+            return $query->where('pipeline', 'operations');
         }
 
         return $query->where('assigned_to', $user->id);
@@ -87,7 +91,15 @@ class Customer extends Model
 
     public function accessibleBy(User $user): bool
     {
-        return $user->isAdmin() || (int) $this->assigned_to === (int) $user->id;
+        if ($user->canSeeAllRecords()) {
+            return true;
+        }
+
+        if ($user->isOperation()) {
+            return $this->isOperations();
+        }
+
+        return ! $this->isOperations() && (int) $this->assigned_to === (int) $user->id;
     }
 
     public function activities(): HasMany
@@ -102,5 +114,46 @@ class Customer extends Model
         }
 
         return data_get($this->meta, $key);
+    }
+
+    public function mappedOperationAttributes(): array
+    {
+        $core = [
+            'pipeline' => 'operations',
+            'source_customer_id' => $this->id,
+        ];
+        $meta = [];
+
+        $opFields = CrmField::inPipeline('operations')->active()->ordered()->get();
+        foreach ($opFields as $field) {
+            $from = trim((string) $field->maps_from);
+            if ($from === '') {
+                continue;
+            }
+
+            $value = $this->fieldValue($from);
+            if ($field->isCore()) {
+                $core[$field->key] = $value;
+            } else {
+                $meta[$field->key] = $value;
+            }
+        }
+
+        if (empty($core['name'])) {
+            $core['name'] = $this->name ?: 'Untitled';
+        }
+        $core['status'] = 'new';
+        if (array_key_exists('assigned_to', $core)) {
+            $core['assigned_to'] = $core['assigned_to'] ?: null;
+        }
+        foreach (['email', 'phone', 'company', 'city', 'source', 'notes'] as $key) {
+            if (array_key_exists($key, $core) && $core[$key] === '') {
+                $core[$key] = null;
+            }
+        }
+
+        $core['meta'] = $meta ?: null;
+
+        return $core;
     }
 }

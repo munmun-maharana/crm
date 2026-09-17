@@ -9,7 +9,9 @@ use Illuminate\Support\Str;
 class CrmField extends Model
 {
     protected $fillable = [
+        'pipeline',
         'key',
+        'maps_from',
         'label',
         'type',
         'options',
@@ -49,18 +51,24 @@ class CrmField extends Model
         return $q->orderBy('sort_order')->orderBy('id');
     }
 
+    public function scopeInPipeline(Builder $q, string $pipeline): Builder
+    {
+        return $q->where('pipeline', $pipeline === 'operations' ? 'operations' : 'crm');
+    }
+
     public function isCore(): bool
     {
         return in_array($this->key, self::CORE_KEYS, true);
     }
 
-    public static function makeKey(string $label): string
+    public static function makeKey(string $label, string $pipeline = 'crm'): string
     {
+        $pipeline = $pipeline === 'operations' ? 'operations' : 'crm';
         $base = Str::snake(Str::slug($label, '_'));
         $base = preg_replace('/[^a-z0-9_]/', '', $base) ?: 'field';
         $key = $base;
         $i = 2;
-        while (static::where('key', $key)->exists()) {
+        while (static::where('pipeline', $pipeline)->where('key', $key)->exists()) {
             $key = $base.'_'.$i;
             $i++;
         }

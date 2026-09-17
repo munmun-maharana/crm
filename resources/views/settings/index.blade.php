@@ -25,6 +25,7 @@
                 <h3 class="text-sm font-semibold mb-3">Add new field</h3>
                 <form method="POST" action="{{ route('fields.store') }}" class="space-y-2.5">
                     @csrf
+                    <input type="hidden" name="pipeline" value="crm">
                     <input name="label" required placeholder="Field title *" class="w-full rounded-lg border border-line px-3 py-2 text-[13px]">
                     <select name="type" class="w-full rounded-lg border border-line px-3 py-2 text-[13px]">
                         <option value="text">Text</option>

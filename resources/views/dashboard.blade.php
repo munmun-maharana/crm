@@ -2,7 +2,9 @@
 
 @section('title', 'Dashboard')
 @section('heading', 'Dashboard')
-@section('subheading', auth()->user()->isAdmin() ? 'All mapped CRM data' : 'Only leads mapped to you')
+@section('subheading', auth()->user()->canSeeAllRecords()
+    ? (auth()->user()->isOperation() ? 'All Operations data' : 'All mapped CRM data')
+    : (auth()->user()->isOperation() ? 'Operations queue' : 'Only leads mapped to you'))
 
 @section('content')
 <div class="grid grid-cols-2 xl:grid-cols-6 gap-3 mb-5">
@@ -55,7 +57,7 @@
 <div class="rounded-2xl border border-line bg-white overflow-hidden">
     <div class="px-4 py-3 border-b border-line flex items-center justify-between">
         <h2 class="text-sm font-extrabold">Recent customers</h2>
-        <a href="{{ route('customers.index') }}" class="text-[12px] font-bold text-brand hover:underline">Open CRM</a>
+        <a href="{{ route($listRoute) }}" class="text-[12px] font-bold text-brand hover:underline">{{ ($listRoute ?? 'customers.index') === 'operations.index' ? 'Open Operations' : 'Open CRM' }}</a>
     </div>
     <div class="overflow-x-auto">
         <table class="w-full text-[13px]">
@@ -70,7 +72,7 @@
             </thead>
             <tbody>
                 @forelse($recent as $c)
-                    <tr class="border-t border-line hover:bg-mist/50 cursor-pointer" onclick="window.location='{{ route('customers.index', ['open' => $c->id]) }}'">
+                    <tr class="border-t border-line hover:bg-mist/50 cursor-pointer" onclick="window.location='{{ route($listRoute, ['open' => $c->id]) }}'">
                         <td class="px-4 py-2.5 font-semibold">{{ $c->name }}</td>
                         <td class="px-4 py-2.5 text-slate-500">{{ $c->phone ?: '—' }}</td>
                         <td class="px-4 py-2.5"><span class="inline-flex px-2 py-0.5 rounded-md bg-brand-soft text-brand text-[11px] font-bold capitalize">{{ $c->status }}</span></td>

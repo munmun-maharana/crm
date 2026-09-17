@@ -77,12 +77,17 @@
         </div>
         <nav class="p-2 flex-1 overflow-y-auto crm-scroll text-[13px]">
             @php
+                $navUser = auth()->user();
                 $links = [
                     ['dashboard', 'Dashboard'],
-                    ['customers.index', 'CRM'],
-                    ['operations.index', 'Operations'],
                 ];
-                if (auth()->user()->isAdmin()) {
+                if ($navUser->canAccessCrm()) {
+                    $links[] = ['customers.index', 'CRM'];
+                }
+                if ($navUser->canAccessOperations()) {
+                    $links[] = ['operations.index', 'Operations'];
+                }
+                if ($navUser->isAdmin()) {
                     $links = array_merge($links, [
                         ['settings.index', 'CRM Setting'],
                         ['operation-settings.index', 'Operation Setting'],
@@ -107,7 +112,7 @@
         <div class="p-3 border-t border-line text-[12px]">
             <div class="font-semibold truncate">{{ auth()->user()->name }}</div>
             <div class="flex items-center justify-between gap-2 mt-0.5">
-                <span class="text-slate-500 truncate">{{ auth()->user()->username }} · {{ auth()->user()->role }}</span>
+                <span class="text-slate-500 truncate">{{ auth()->user()->username }} · {{ auth()->user()->roleLabel() }}</span>
                 <form method="POST" action="{{ route('logout') }}">@csrf
                     <button class="text-brand font-semibold hover:underline">Logout</button>
                 </form>

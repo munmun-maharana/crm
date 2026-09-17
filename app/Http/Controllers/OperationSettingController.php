@@ -10,12 +10,15 @@ use Illuminate\View\View;
 
 class OperationSettingController extends Controller
 {
-    public function index(): View
+    public function index(Request $request): View
     {
+        $tab = $request->string('tab')->toString() === 'fields' ? 'fields' : 'assign';
         $setting = OperationSetting::current();
         $statuses = $this->statusOptions();
+        $fields = CrmField::inPipeline('operations')->ordered()->get();
+        $crmFields = CrmField::inPipeline('crm')->ordered()->get(['id', 'key', 'label']);
 
-        return view('operation-settings.index', compact('setting', 'statuses'));
+        return view('operation-settings.index', compact('tab', 'setting', 'statuses', 'fields', 'crmFields'));
     }
 
     public function update(Request $request): RedirectResponse
@@ -35,7 +38,7 @@ class OperationSettingController extends Controller
 
     private function statusOptions(): array
     {
-        $field = CrmField::query()->where('key', 'status')->first();
+        $field = CrmField::inPipeline('crm')->where('key', 'status')->first();
         $fromField = collect($field?->options ?? [])
             ->map(fn ($o) => strtolower(trim((string) $o)))
             ->filter()

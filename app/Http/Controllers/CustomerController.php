@@ -19,11 +19,15 @@ class CustomerController extends Controller
 
     public function index(Request $request): View
     {
+        abort_unless($request->user()->canAccessCrm(), 403);
+
         return $this->listing($request, 'crm');
     }
 
     public function operations(Request $request): View
     {
+        abort_unless($request->user()->canAccessOperations(), 403);
+
         return $this->listing($request, 'operations');
     }
 
@@ -48,7 +52,7 @@ class CustomerController extends Controller
                     ->orWhere('phone', 'like', "%{$q}%")
                     ->orWhere('company', 'like', "%{$q}%");
             }))
-            ->when($request->user()->isAdmin() && $assignedTo, fn ($query) => $query->where('assigned_to', $assignedTo))
+            ->when($request->user()->canSeeAllRecords() && $assignedTo, fn ($query) => $query->where('assigned_to', $assignedTo))
             ->when($filter === 'follow_up_today', function ($query) {
                 $query->where('follow_up', true)
                     ->whereDate('follow_up_at', today())
@@ -61,11 +65,8 @@ class CustomerController extends Controller
             ->withQueryString();
 
         $agents = User::orderBy('name')->get(['id', 'name']);
-        $formFields = $this->fields->formFields();
-        if (! $request->user()->isAdmin()) {
-            $formFields = $formFields->reject(fn ($field) => $field->key === 'assigned_to')->values();
-        }
-        $tableFields = $this->fields->tableFields();
+        $formFields = $this->formFieldsFor($request, $pipeline);
+        $tableFields = $this->fields->tableFields($pipeline);
 
         return view('customers.index', compact(
             'customers', 'agents', 'q', 'status', 'filter', 'assignedTo', 'formFields', 'tableFields', 'pipeline', 'listRoute'
@@ -74,6 +75,7 @@ class CustomerController extends Controller
 
     public function requests(Request $request): View
     {
+        abort_unless($request->user()->canAccessCrm(), 403);
         $customers = $this->mappedCustomers($request)
             ->inPipeline('crm')
             ->with('assignee')
@@ -86,11 +88,17 @@ class CustomerController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
-        $fields = $this->fields->formFields();
+        $pipeline = $request->input('pipeline') === 'operations' ? 'operations' : 'crm';
+        abort_unless(
+            $pipeline === 'operations' ? $request->user()->canAccessOperations() : $request->user()->canAccessCrm(),
+            403
+        );
+        $fields = $this->formFieldsFor($request, $pipeline);
         $request->validate($this->fields->validationRules($fields));
         [$core, $meta] = $this->fields->splitPayload($request, $fields);
         $core = $this->applyAssignment($request, $core);
-        $core['pipeline'] = $request->input('pipeline') === 'operations' ? 'operations' : 'crm';
+        $core['pipeline'] = $pipeline;
+        $core['status'] = $core['status'] ?? 'new';
 
         $customer = Customer::create([...$core, 'meta' => $meta ?: null]);
 
@@ -108,8 +116,8 @@ class CustomerController extends Controller
     public function show(Request $request, Customer $customer): JsonResponse
     {
         $this->authorizeMapped($request, $customer);
-        $customer->load(['assignee', 'activities.user', 'operationCopy']);
-        $formFields = $this->fields->formFields();
+        $customer->load(['assignee', 'activities.user', 'operationCopy', 'sourceCustomer']);
+        $formFields = $this->formFieldsFor($request, $customer->pipeline ?? 'crm');
         $noteTemplates = NoteTemplate::active()->ordered()->get(['id', 'title', 'body']);
 
         return response()->json([
@@ -121,7 +129,7 @@ class CustomerController extends Controller
     public function update(Request $request, Customer $customer): RedirectResponse
     {
         $this->authorizeMapped($request, $customer);
-        $fields = $this->fields->formFields();
+        $fields = $this->formFieldsFor($request, $customer->pipeline ?? 'crm');
         $request->validate($this->fields->validationRules($fields));
         [$core, $meta] = $this->fields->splitPayload($request, $fields);
         $core = $this->applyAssignment($request, $core, $customer);
@@ -225,7 +233,7 @@ class CustomerController extends Controller
         ]);
         if ($request->wantsJson()) {
             $customer->load(['assignee', 'activities.user']);
-            $formFields = $this->fields->formFields();
+            $formFields = $this->formFieldsFor($request, $customer->pipeline ?? 'crm');
             $customer->refresh();
 
             if ($customer->follow_up && $customer->follow_up_at) {
@@ -280,7 +288,7 @@ class CustomerController extends Controller
 
         $customer->update(['last_contact_at' => now()]);
         $customer->load(['assignee', 'activities.user']);
-        $formFields = $this->fields->formFields();
+        $formFields = $this->formFieldsFor($request, $customer->pipeline ?? 'crm');
 
         return response()->json([
             'ok' => true,
@@ -363,7 +371,7 @@ class CustomerController extends Controller
 
         $customer->update(['last_contact_at' => now()]);
         $customer->load(['assignee', 'activities.user']);
-        $formFields = $this->fields->formFields();
+        $formFields = $this->formFieldsFor($request, $customer->pipeline ?? 'crm');
 
         $openUrl = match ($channel) {
             'whatsapp' => 'https://wa.me/'.$phone.'?text='.rawurlencode($fullText),
@@ -396,6 +404,8 @@ class CustomerController extends Controller
     {
         $this->authorizeMapped($request, $customer);
 
+        abort_unless($request->user()->canAccessCrm(), 403);
+
         if ($customer->isOperations()) {
             return $request->wantsJson()
                 ? response()->json(['ok' => false, 'message' => 'This record is already in Operations.'], 422)
@@ -408,10 +418,8 @@ class CustomerController extends Controller
                 : back()->withErrors(['customer' => 'Already assigned to Operation Team.']);
         }
 
-        $copy = $customer->replicate();
-        $copy->pipeline = 'operations';
-        $copy->source_customer_id = $customer->id;
-        $copy->save();
+        $copy = Customer::create($customer->mappedOperationAttributes());
+        $copy->update(['status' => 'new']);
 
         $setting = OperationSetting::current();
         $oldStatus = $customer->status;
@@ -444,14 +452,14 @@ class CustomerController extends Controller
             'user_id' => $request->user()->id,
             'type' => 'system',
             'title' => 'Received from CRM',
-            'body' => 'Copied from CRM customer #'.$customer->id.'.',
+            'body' => 'Copied from CRM #'.$customer->id.' using mapped Operation fields.',
         ]);
 
         $customer->refresh();
 
         if ($request->wantsJson()) {
             $customer->load(['assignee', 'activities.user', 'operationCopy']);
-            $formFields = $this->fields->formFields();
+            $formFields = $this->formFieldsFor($request, $customer->pipeline ?? 'crm');
 
             return response()->json([
                 'ok' => true,
@@ -469,7 +477,7 @@ class CustomerController extends Controller
 
     public function bulkMap(Request $request): RedirectResponse
     {
-        abort_unless($request->user()->isAdmin(), 403);
+        abort_unless($request->user()->canBulkMap(), 403);
 
         $data = $request->validate([
             'ids' => ['required', 'array', 'min:1'],
@@ -495,6 +503,16 @@ class CustomerController extends Controller
         return back()->with('success', "Mapped {$ids->count()} customers to {$agent->name}.");
     }
 
+    private function formFieldsFor(Request $request, string $pipeline = 'crm')
+    {
+        $formFields = $this->fields->formFields($pipeline);
+        if (! $request->user()->canAssignUsers()) {
+            $formFields = $formFields->reject(fn ($field) => $field->key === 'assigned_to')->values();
+        }
+
+        return $formFields;
+    }
+
     private function mappedCustomers(Request $request)
     {
         return Customer::query()->visibleTo($request->user());
@@ -507,7 +525,7 @@ class CustomerController extends Controller
 
     private function applyAssignment(Request $request, array $core, ?Customer $customer = null): array
     {
-        if ($request->user()->isAdmin()) {
+        if ($request->user()->canAssignUsers()) {
             return $core;
         }
 

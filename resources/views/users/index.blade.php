@@ -2,7 +2,7 @@
 
 @section('title', 'Users')
 @section('heading', 'Users')
-@section('subheading', 'Create agents & admins')
+@section('subheading', 'Create Front Office, Coordinator, Operation and Admin users')
 
 @section('content')
 <div class="grid grid-cols-1 xl:grid-cols-3 gap-4">
@@ -14,9 +14,10 @@
             <input name="username" required placeholder="Username" class="w-full rounded-xl border border-line px-3 py-2 text-[13px]">
             <input name="email" type="email" required placeholder="Email" class="w-full rounded-xl border border-line px-3 py-2 text-[13px]">
             <input name="password" type="password" required placeholder="Password" class="w-full rounded-xl border border-line px-3 py-2 text-[13px]">
-            <select name="role" class="w-full rounded-xl border border-line px-3 py-2 text-[13px]">
-                <option value="agent">Agent</option>
-                <option value="admin">Admin</option>
+            <select name="role" required class="w-full rounded-xl border border-line px-3 py-2 text-[13px]">
+                @foreach(\App\Models\User::ROLES as $value => $label)
+                    <option value="{{ $value }}" @selected(old('role', 'front_office') === $value)>{{ $label }}</option>
+                @endforeach
             </select>
             <button class="w-full rounded-xl bg-brand text-white font-bold py-2.5 text-[13px]">Create</button>
         </form>
@@ -34,13 +35,34 @@
             </thead>
             <tbody>
                 @foreach($users as $u)
+                    @php
+                        $roleTone = [
+                            'admin' => 'bg-brand-soft text-brand',
+                            'coordinator' => 'bg-teal-50 text-teal-800',
+                            'front_office' => 'bg-sky-50 text-sky-800',
+                            'operation' => 'bg-amber-50 text-amber-800',
+                        ];
+                    @endphp
                     <tr class="border-t border-line">
                         <td class="px-4 py-2.5">
                             <div class="font-semibold">{{ $u->name }}</div>
                             <div class="text-[11px] text-slate-400">{{ $u->email }}</div>
                         </td>
                         <td class="px-4 py-2.5 text-slate-500">{{ $u->username }}</td>
-                        <td class="px-4 py-2.5"><span class="capitalize text-[11px] font-bold px-2 py-0.5 rounded-md bg-mist">{{ $u->role }}</span></td>
+                        <td class="px-4 py-2.5">
+                            <form method="POST" action="{{ route('users.update', $u) }}" class="inline-flex items-center gap-1.5">
+                                @csrf @method('PUT')
+                                <input type="hidden" name="name" value="{{ $u->name }}">
+                                <input type="hidden" name="username" value="{{ $u->username }}">
+                                <input type="hidden" name="email" value="{{ $u->email }}">
+                                <select name="role" onchange="this.form.submit()"
+                                        class="text-[11px] font-bold px-2 py-1 rounded-md border border-line {{ $roleTone[$u->role] ?? 'bg-mist' }}">
+                                    @foreach(\App\Models\User::ROLES as $value => $label)
+                                        <option value="{{ $value }}" @selected($u->role === $value)>{{ $label }}</option>
+                                    @endforeach
+                                </select>
+                            </form>
+                        </td>
                         <td class="px-4 py-2.5 text-right">
                             @if($u->id !== auth()->id())
                                 <form method="POST" action="{{ route('users.destroy', $u) }}" onsubmit="return confirm('Delete user?')">

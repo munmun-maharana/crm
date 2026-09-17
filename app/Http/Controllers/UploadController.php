@@ -17,15 +17,19 @@ class UploadController extends Controller
 {
     public function __construct(private CrmFieldService $fields) {}
 
-    public function index(): View
+    public function index(Request $request): View
     {
+        abort_unless($request->user()->canAccessCrm(), 403);
+
         $excelFields = $this->fields->excelFields();
 
         return view('upload.index', compact('excelFields'));
     }
 
-    public function demo(): StreamedResponse
+    public function demo(Request $request): StreamedResponse
     {
+        abort_unless($request->user()->canAccessCrm(), 403);
+
         $excelFields = $this->fields->excelFields();
         $spreadsheet = new Spreadsheet;
         $sheet = $spreadsheet->getActiveSheet();
@@ -69,6 +73,8 @@ class UploadController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
+        abort_unless($request->user()->canAccessCrm(), 403);
+
         $request->validate([
             'file' => ['required', 'file', 'mimes:xlsx,xls,csv', 'max:10240'],
         ]);
