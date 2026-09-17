@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Customer;
 use App\Models\CustomerActivity;
 use App\Models\NoteTemplate;
+use App\Models\OperationSetting;
 use App\Models\User;
 use App\Services\CrmFieldService;
 use Illuminate\Http\JsonResponse;
@@ -18,16 +19,28 @@ class CustomerController extends Controller
 
     public function index(Request $request): View
     {
+        return $this->listing($request, 'crm');
+    }
+
+    public function operations(Request $request): View
+    {
+        return $this->listing($request, 'operations');
+    }
+
+    private function listing(Request $request, string $pipeline): View
+    {
         $q = $request->string('q')->toString();
         $status = $request->string('status')->toString();
         $filter = $request->string('filter')->toString();
         $assignedTo = $request->integer('assigned_to') ?: null;
+        $listRoute = $pipeline === 'operations' ? 'operations.index' : 'customers.index';
 
         if ($filter === 'interested' && $status === '') {
             $status = 'interested';
         }
 
         $customers = $this->mappedCustomers($request)
+            ->inPipeline($pipeline)
             ->with('assignee')
             ->when($q, fn ($query) => $query->where(function ($inner) use ($q) {
                 $inner->where('name', 'like', "%{$q}%")
@@ -54,12 +67,15 @@ class CustomerController extends Controller
         }
         $tableFields = $this->fields->tableFields();
 
-        return view('customers.index', compact('customers', 'agents', 'q', 'status', 'filter', 'assignedTo', 'formFields', 'tableFields'));
+        return view('customers.index', compact(
+            'customers', 'agents', 'q', 'status', 'filter', 'assignedTo', 'formFields', 'tableFields', 'pipeline', 'listRoute'
+        ));
     }
 
     public function requests(Request $request): View
     {
         $customers = $this->mappedCustomers($request)
+            ->inPipeline('crm')
             ->with('assignee')
             ->whereIn('status', ['interested', 'request'])
             ->latest()
@@ -74,6 +90,7 @@ class CustomerController extends Controller
         $request->validate($this->fields->validationRules($fields));
         [$core, $meta] = $this->fields->splitPayload($request, $fields);
         $core = $this->applyAssignment($request, $core);
+        $core['pipeline'] = $request->input('pipeline') === 'operations' ? 'operations' : 'crm';
 
         $customer = Customer::create([...$core, 'meta' => $meta ?: null]);
 
@@ -82,7 +99,7 @@ class CustomerController extends Controller
             'user_id' => $request->user()->id,
             'type' => 'system',
             'title' => 'Customer created',
-            'body' => 'Record added to CRM.',
+            'body' => $core['pipeline'] === 'operations' ? 'Record added to Operations.' : 'Record added to CRM.',
         ]);
 
         return back()->with('success', 'Customer created.');
@@ -91,7 +108,7 @@ class CustomerController extends Controller
     public function show(Request $request, Customer $customer): JsonResponse
     {
         $this->authorizeMapped($request, $customer);
-        $customer->load(['assignee', 'activities.user']);
+        $customer->load(['assignee', 'activities.user', 'operationCopy']);
         $formFields = $this->fields->formFields();
         $noteTemplates = NoteTemplate::active()->ordered()->get(['id', 'title', 'body']);
 
@@ -373,6 +390,81 @@ class CustomerController extends Controller
         $customer->delete();
 
         return back()->with('success', 'Customer deleted.');
+    }
+
+    public function assignToOperations(Request $request, Customer $customer): JsonResponse|RedirectResponse
+    {
+        $this->authorizeMapped($request, $customer);
+
+        if ($customer->isOperations()) {
+            return $request->wantsJson()
+                ? response()->json(['ok' => false, 'message' => 'This record is already in Operations.'], 422)
+                : back()->withErrors(['customer' => 'This record is already in Operations.']);
+        }
+
+        if (Customer::where('source_customer_id', $customer->id)->exists()) {
+            return $request->wantsJson()
+                ? response()->json(['ok' => false, 'message' => 'Already assigned to Operation Team.'], 422)
+                : back()->withErrors(['customer' => 'Already assigned to Operation Team.']);
+        }
+
+        $copy = $customer->replicate();
+        $copy->pipeline = 'operations';
+        $copy->source_customer_id = $customer->id;
+        $copy->save();
+
+        $setting = OperationSetting::current();
+        $oldStatus = $customer->status;
+        $newStatus = $setting->status ?: $customer->status;
+        $statusChanged = $newStatus !== $oldStatus;
+
+        if ($statusChanged) {
+            $customer->update(['status' => $newStatus]);
+        }
+
+        $title = trim((string) $setting->title) ?: 'Assigned to Operation Team';
+        $body = trim((string) $setting->body) ?: 'Lead handed over to Operation Team.';
+        $meta = [];
+        if ($statusChanged) {
+            $meta['status_from'] = $oldStatus;
+            $meta['status_to'] = $newStatus;
+        }
+
+        CustomerActivity::create([
+            'customer_id' => $customer->id,
+            'user_id' => $request->user()->id,
+            'type' => $statusChanged ? 'status' : 'note',
+            'title' => $title,
+            'body' => $body,
+            'meta' => $meta ?: null,
+        ]);
+
+        CustomerActivity::create([
+            'customer_id' => $copy->id,
+            'user_id' => $request->user()->id,
+            'type' => 'system',
+            'title' => 'Received from CRM',
+            'body' => 'Copied from CRM customer #'.$customer->id.'.',
+        ]);
+
+        $customer->refresh();
+
+        if ($request->wantsJson()) {
+            $customer->load(['assignee', 'activities.user', 'operationCopy']);
+            $formFields = $this->fields->formFields();
+
+            return response()->json([
+                'ok' => true,
+                'message' => 'Assigned to Operation Team.',
+                'html' => view('customers.partials.panel', [
+                    'customer' => $customer,
+                    'formFields' => $formFields,
+                    'noteTemplates' => NoteTemplate::active()->ordered()->get(['id', 'title', 'body']),
+                ])->render(),
+            ]);
+        }
+
+        return back()->with('success', 'Assigned to Operation Team.');
     }
 
     public function bulkMap(Request $request): RedirectResponse

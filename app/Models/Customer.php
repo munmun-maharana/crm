@@ -19,6 +19,8 @@ class Customer extends Model
         'notes',
         'meta',
         'assigned_to',
+        'pipeline',
+        'source_customer_id',
         'last_contact_at',
         'follow_up',
         'follow_up_at',
@@ -52,6 +54,26 @@ class Customer extends Model
     public function assignee(): BelongsTo
     {
         return $this->belongsTo(User::class, 'assigned_to');
+    }
+
+    public function operationCopy(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(self::class, 'source_customer_id');
+    }
+
+    public function sourceCustomer(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'source_customer_id');
+    }
+
+    public function isOperations(): bool
+    {
+        return $this->pipeline === 'operations';
+    }
+
+    public function scopeInPipeline($query, string $pipeline)
+    {
+        return $query->where('pipeline', $pipeline);
     }
 
     public function scopeVisibleTo($query, User $user)

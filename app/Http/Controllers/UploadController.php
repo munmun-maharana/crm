@@ -120,6 +120,7 @@ class UploadController extends Controller
                 $core['source'] = 'excel';
             }
             $core['assigned_to'] = $request->user()->id;
+            $core['pipeline'] = 'crm';
             $core['meta'] = $meta ?: null;
 
             $customer = Customer::create($core);

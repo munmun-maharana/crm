@@ -13,7 +13,7 @@ class DashboardController extends Controller
     public function index(Request $request): View
     {
         $today = Carbon::today();
-        $leads = fn () => Customer::query()->visibleTo($request->user());
+        $leads = fn () => Customer::query()->visibleTo($request->user())->inPipeline('crm');
 
         $stats = [
             'total' => $leads()->count(),

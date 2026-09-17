@@ -80,10 +80,12 @@
                 $links = [
                     ['dashboard', 'Dashboard'],
                     ['customers.index', 'CRM'],
+                    ['operations.index', 'Operations'],
                 ];
                 if (auth()->user()->isAdmin()) {
                     $links = array_merge($links, [
                         ['settings.index', 'CRM Setting'],
+                        ['operation-settings.index', 'Operation Setting'],
                         ['users.index', 'Users'],
                     ]);
                 }
@@ -494,6 +496,29 @@ function openCrmChannel(url, channel) {
     const win = window.open(url, names[channel] || 'crmCompose');
     if (win) {
         try { win.focus(); } catch (e) {}
+    }
+}
+
+async function assignToOperations(customerId) {
+    if (!confirm('Assign this customer to Operation Team?')) return;
+    try {
+        const res = await fetch(`{{ url('/customers') }}/${customerId}/assign-operations`, {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content
+            }
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+            alert(data.message || 'Could not assign to Operation Team');
+            return;
+        }
+        const root = Alpine.$data(document.body);
+        if (root && data.html) root.html = data.html;
+    } catch (e) {
+        alert('Could not assign to Operation Team');
     }
 }
 

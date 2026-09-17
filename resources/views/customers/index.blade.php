@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'CRM')
+@section('title', ($pipeline ?? 'crm') === 'operations' ? 'Operations' : 'CRM')
 
 @section('split')
 @php
@@ -60,11 +60,13 @@
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
                 Add
             </button>
-            <a href="{{ route('upload.index') }}" title="Excel upload"
-               class="h-9 inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 px-3 text-[12px] font-semibold">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v14a1 1 0 01-1 1H5a1 1 0 01-1-1V5zm0 4h16M4 13h16M4 17h16M9 8v12M15 8v12"/></svg>
-                Excel
-            </a>
+            @if(($pipeline ?? 'crm') !== 'operations')
+                <a href="{{ route('upload.index') }}" title="Excel upload"
+                   class="h-9 inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 px-3 text-[12px] font-semibold">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v14a1 1 0 01-1 1H5a1 1 0 01-1-1V5zm0 4h16M4 13h16M4 17h16M9 8v12M15 8v12"/></svg>
+                    Excel
+                </a>
+            @endif
         </div>
     </div>
 
@@ -210,10 +212,13 @@
                 <div class="flex h-full min-h-0 rounded-xl border border-line bg-white overflow-hidden shadow-sm" :key="deskKey">
                     <section class="w-[340px] shrink-0 border-r border-line flex flex-col bg-white slide-list">
                         <div class="shrink-0 px-3 py-2.5 border-b border-line flex items-center gap-1 text-[12px]">
-                            @php $deskFilter = $filter === 'follow_up_today' ? 'follow_up_today' : 'all'; @endphp
-                            <a href="{{ route('customers.index', array_filter(['q' => $q ?: null, 'assigned_to' => $assignedTo ?: null])) }}"
+                            @php
+                                $listRoute = $listRoute ?? 'customers.index';
+                                $deskFilter = $filter === 'follow_up_today' ? 'follow_up_today' : 'all';
+                            @endphp
+                            <a href="{{ route($listRoute, array_filter(['q' => $q ?: null, 'assigned_to' => $assignedTo ?: null])) }}"
                                class="px-2.5 py-1 rounded-md font-semibold transition {{ $deskFilter === 'all' ? 'bg-brand-soft text-brand' : 'text-slate-500 hover:bg-mist hover:text-ink' }}">All</a>
-                            <a href="{{ route('customers.index', array_filter(['q' => $q ?: null, 'assigned_to' => $assignedTo ?: null, 'filter' => 'follow_up_today'])) }}"
+                            <a href="{{ route($listRoute, array_filter(['q' => $q ?: null, 'assigned_to' => $assignedTo ?: null, 'filter' => 'follow_up_today'])) }}"
                                class="px-2.5 py-1 rounded-md font-semibold transition {{ $deskFilter === 'follow_up_today' ? 'bg-amber-100 text-amber-900' : 'text-slate-500 hover:bg-mist hover:text-ink' }}">Follow-up Today</a>
                         </div>
                         <div class="flex-1 overflow-y-auto crm-scroll">
@@ -333,6 +338,7 @@
                   class="flex-1 overflow-y-auto crm-scroll p-5 space-y-3"
                   :action="formMode === 'edit' ? `{{ url('/customers') }}/${form.id}` : `{{ route('customers.store') }}`">
                 @csrf
+                <input type="hidden" name="pipeline" value="{{ $pipeline ?? 'crm' }}">
                 <template x-if="formMode === 'edit'">
                     <input type="hidden" name="_method" value="PUT">
                 </template>

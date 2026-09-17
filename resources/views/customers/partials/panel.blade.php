@@ -53,6 +53,19 @@
                     class="w-9 h-9 inline-flex items-center justify-center rounded-lg border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M21 12c0 4.418-4.03 8-9 8a9.86 9.86 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
             </button>
+            @unless($customer->isOperations())
+                @if($customer->operationCopy)
+                    <span title="Assigned to Operation Team"
+                          class="h-9 inline-flex items-center px-2.5 rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-800 text-[11px] font-semibold">
+                        Ops
+                    </span>
+                @else
+                    <button type="button" title="Assign to Operation Team" onclick="assignToOperations({{ $customer->id }})"
+                            class="h-9 inline-flex items-center px-2.5 rounded-lg bg-ink text-white text-[11px] font-semibold hover:bg-slate-800">
+                        Operation
+                    </button>
+                @endif
+            @endunless
         </div>
     </div>
 
