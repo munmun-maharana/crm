@@ -4,6 +4,8 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\FieldController;
+use App\Http\Controllers\InventoryController;
+use App\Http\Controllers\InventoryTypeController;
 use App\Http\Controllers\NoteTemplateController;
 use App\Http\Controllers\UploadController;
 use App\Http\Controllers\SettingsController;
@@ -36,6 +38,14 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/requests', [CustomerController::class, 'requests'])->name('requests.index');
 
+    Route::get('/inventory', [InventoryController::class, 'index'])->name('inventory.index');
+    Route::get('/inventory/user-stock', [InventoryController::class, 'userStock'])->name('inventory.user-stock');
+    Route::post('/inventory/shift-stock', [InventoryController::class, 'shiftStock'])->name('inventory.shift-stock');
+    Route::post('/inventory', [InventoryController::class, 'store'])->name('inventory.store');
+    Route::get('/inventory/{inventory}/history', [InventoryController::class, 'history'])->name('inventory.history');
+    Route::put('/inventory/{inventory}', [InventoryController::class, 'update'])->name('inventory.update');
+    Route::delete('/inventory/{inventory}', [InventoryController::class, 'destroy'])->name('inventory.destroy');
+
     Route::get('/upload', [UploadController::class, 'index'])->name('upload.index');
     Route::get('/upload/demo', [UploadController::class, 'demo'])->name('upload.demo');
     Route::post('/upload', [UploadController::class, 'store'])->name('upload.store');
@@ -61,6 +71,10 @@ Route::middleware('auth')->group(function () {
             return redirect()->route('settings.index', ['tab' => $tab]);
         })->name('operation-settings.index');
         Route::put('/operation-setting', [OperationSettingController::class, 'update'])->name('operation-settings.update');
+
+        Route::post('/inventory-types', [InventoryTypeController::class, 'store'])->name('inventory-types.store');
+        Route::put('/inventory-types/{inventoryType}', [InventoryTypeController::class, 'update'])->name('inventory-types.update');
+        Route::delete('/inventory-types/{inventoryType}', [InventoryTypeController::class, 'destroy'])->name('inventory-types.destroy');
 
         Route::get('/users', [UserController::class, 'index'])->name('users.index');
         Route::post('/users', [UserController::class, 'store'])->name('users.store');

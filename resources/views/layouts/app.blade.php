@@ -87,6 +87,9 @@
                 if ($navUser->canAccessOperations()) {
                     $links[] = ['operations.index', 'TEAM OPS'];
                 }
+                if ($navUser->canAccessInventory()) {
+                    $links[] = ['inventory.index', 'Inventory'];
+                }
                 if ($navUser->isAdmin()) {
                     $links = array_merge($links, [
                         ['users.index', 'Users'],
@@ -96,7 +99,7 @@
             <div class="px-2 pt-1 pb-2 text-[11px] font-semibold text-slate-500">Favorites</div>
             @foreach($links as [$route, $label])
                 <a href="{{ route($route) }}"
-                   class="nav-item flex items-center gap-2 px-3 py-1.5 mb-0.5 {{ request()->routeIs($route) || request()->routeIs(str_replace('.index','.*',$route)) || ($route === 'settings.index' && request()->routeIs('fields.*', 'note-templates.*', 'operation-settings.*')) ? 'active' : 'text-ink hover:bg-mist' }}">
+                   class="nav-item flex items-center gap-2 px-3 py-1.5 mb-0.5 {{ request()->routeIs($route) || request()->routeIs(str_replace('.index','.*',$route)) || ($route === 'settings.index' && request()->routeIs('fields.*', 'note-templates.*', 'operation-settings.*', 'inventory-types.*')) ? 'active' : 'text-ink hover:bg-mist' }}">
                     <span class="uppercase tracking-wide">{{ $label }}</span>
                 </a>
             @endforeach

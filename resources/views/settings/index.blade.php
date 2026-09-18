@@ -2,7 +2,7 @@
 
 @section('title', 'Setting')
 @section('heading', 'Setting')
-@section('subheading', 'CRM fields, note templates, and Operation Team settings')
+@section('subheading', 'CRM fields, note templates, inventory types, and Operation Team settings')
 
 @section('content')
 <div x-data="{ tab: '{{ $tab }}' }">
@@ -31,6 +31,11 @@
                 class="px-3.5 py-1.5 rounded-lg text-[13px] font-semibold"
                 :class="tab === 'user-fields' ? 'bg-brand-soft text-brand' : 'text-slate-500 hover:bg-mist'">
             User Fields
+        </button>
+        <button type="button" @click="tab = 'inventory'"
+                class="px-3.5 py-1.5 rounded-lg text-[13px] font-semibold"
+                :class="tab === 'inventory' ? 'bg-brand-soft text-brand' : 'text-slate-500 hover:bg-mist'">
+            Inventory
         </button>
     </div>
 
@@ -558,6 +563,76 @@
                         </tbody>
                     </table>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <div x-show="tab === 'inventory'" x-cloak>
+        <p class="text-[13px] text-slate-500 mb-4 max-w-3xl">
+            Inventory page tabs inhi types se banenge. Default: GPS device, SIM, License key, Fuel sensor.
+            Naya type add karo — Inventory pe auto show hoga. Limitless.
+        </p>
+        <div class="grid grid-cols-1 xl:grid-cols-3 gap-4">
+            <div class="rounded-xl border border-line bg-white p-4 h-fit shadow-sm">
+                <h3 class="text-sm font-semibold mb-1">Add inventory type</h3>
+                <p class="text-[11px] text-slate-400 mb-3">e.g. Antenna, Cable, Mount kit</p>
+                <form method="POST" action="{{ route('inventory-types.store') }}" class="space-y-2.5">
+                    @csrf
+                    <input name="name" required maxlength="120" placeholder="Type name *"
+                           class="w-full rounded-lg border border-line px-3 py-2 text-[13px]">
+                    <button class="w-full rounded-lg bg-brand hover:bg-brand-dark text-white font-semibold py-2 text-[13px] transition">
+                        Add type
+                    </button>
+                </form>
+            </div>
+
+            <div class="xl:col-span-2 rounded-xl border border-line bg-white overflow-hidden shadow-sm">
+                <div class="px-4 py-3 border-b border-line text-[13px] text-slate-500">
+                    {{ $inventoryTypes->count() }} type{{ $inventoryTypes->count() === 1 ? '' : 's' }} · system types cannot be deleted (deactivate instead)
+                </div>
+                @forelse($inventoryTypes as $type)
+                    <div class="border-b border-line last:border-b-0 px-4 py-3 hover:bg-mist/30">
+                        <form method="POST" action="{{ route('inventory-types.update', $type) }}" class="space-y-2">
+                            @csrf @method('PUT')
+                            <div class="flex items-start gap-2">
+                                <div class="flex-1 min-w-0 space-y-2">
+                                    <input name="name" value="{{ $type->name }}" required
+                                           class="w-full rounded-lg border border-line px-3 py-1.5 text-[13px] font-semibold">
+                                    <div class="flex flex-wrap items-center gap-3">
+                                        <input name="sort_order" type="number" min="0" value="{{ $type->sort_order }}"
+                                               class="w-24 rounded-lg border border-line px-2 py-1 text-[12px]" title="Sort order">
+                                        <label class="inline-flex items-center gap-2 text-[12px] text-slate-600">
+                                            <input type="checkbox" name="is_active" value="1" @checked($type->is_active)
+                                                   class="rounded border-line text-brand">
+                                            Active on Inventory
+                                        </label>
+                                        @if($type->is_system)
+                                            <span class="text-[10px] font-bold uppercase tracking-wide text-slate-400">System</span>
+                                        @endif
+                                        <span class="text-[10px] text-slate-400">key: {{ $type->key }}</span>
+                                    </div>
+                                </div>
+                                <div class="flex items-center gap-1.5 shrink-0 pt-0.5">
+                                    <button type="submit" title="Save"
+                                            class="w-8 h-8 inline-flex items-center justify-center rounded-lg border border-line text-brand hover:bg-brand-soft">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
+                        @unless($type->is_system)
+                            <form method="POST" action="{{ route('inventory-types.destroy', $type) }}" class="mt-2"
+                                  onsubmit="return confirm('Delete this inventory type? Items under it will also be removed.')">
+                                @csrf @method('DELETE')
+                                <button type="submit" class="text-[11px] font-semibold text-rose-600 hover:underline">Delete</button>
+                            </form>
+                        @endunless
+                    </div>
+                @empty
+                    <div class="px-4 py-12 text-center text-slate-400 text-sm">
+                        No inventory types yet. Add one on the left.
+                    </div>
+                @endforelse
             </div>
         </div>
     </div>

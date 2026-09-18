@@ -127,6 +127,11 @@ class User extends Authenticatable
         return $this->isAdmin() || $this->isCoordinator() || $this->isOperation();
     }
 
+    public function canAccessInventory(): bool
+    {
+        return $this->isAdmin() || $this->isCoordinator() || $this->isOperation();
+    }
+
     public function canAssignUsers(): bool
     {
         return $this->isAdmin() || $this->isCoordinator();
