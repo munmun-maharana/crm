@@ -14,7 +14,13 @@
     ];
     $roleLabels = \App\Models\User::roleOptions();
     $usersJson = $users->getCollection()->map(function ($u) use ($formFields) {
-        $row = ['id' => $u->id, 'name' => $u->name];
+        $row = [
+            'id' => $u->id,
+            'name' => $u->name,
+            'access_crm' => $u->appAccessCrm(),
+            'access_operations' => $u->appAccessOperations(),
+            'access_inventory' => $u->appAccessInventory(),
+        ];
         foreach ($formFields as $field) {
             if ($field->key === 'password') {
                 $row['password'] = '';
@@ -31,7 +37,13 @@
         editOpen: false,
         form: {},
         openEdit(user) {
-            this.form = { ...user, password: '' };
+            this.form = {
+                ...user,
+                password: '',
+                access_crm: !!user.access_crm,
+                access_operations: !!user.access_operations,
+                access_inventory: !!user.access_inventory,
+            };
             this.editOpen = true;
         },
         closeEdit() {
@@ -80,6 +92,27 @@
                 @empty
                     <p class="text-[12px] text-slate-400">No form fields. Add them in Setting → User Fields.</p>
                 @endforelse
+
+                <div class="rounded-xl border border-line bg-mist/40 p-3 space-y-2">
+                    <div class="text-[11px] font-bold uppercase tracking-wide text-slate-500">App access level</div>
+                    <p class="text-[11px] text-slate-400">Dashboard always on · tick tabs for mobile app</p>
+                    <label class="flex items-center gap-2 text-[13px] font-semibold text-ink">
+                        <input type="checkbox" name="access_crm" value="1" class="rounded border-line text-brand"
+                               @checked(old('access_crm'))>
+                        CRM
+                    </label>
+                    <label class="flex items-center gap-2 text-[13px] font-semibold text-ink">
+                        <input type="checkbox" name="access_operations" value="1" class="rounded border-line text-brand"
+                               @checked(old('access_operations'))>
+                        Operation
+                    </label>
+                    <label class="flex items-center gap-2 text-[13px] font-semibold text-ink">
+                        <input type="checkbox" name="access_inventory" value="1" class="rounded border-line text-brand"
+                               @checked(old('access_inventory'))>
+                        Inventory
+                    </label>
+                </div>
+
                 @if($formFields->isNotEmpty())
                     <button type="submit" class="w-full rounded-xl bg-brand text-white font-bold py-2.5 text-[13px]">Create</button>
                 @endif
@@ -94,6 +127,7 @@
                             @foreach($tableFields as $field)
                                 <th class="text-left font-bold px-4 py-2.5">{{ $field->label }}</th>
                             @endforeach
+                            <th class="text-left font-bold px-4 py-2.5">App access</th>
                             <th class="text-right font-bold px-4 py-2.5">Action</th>
                         </tr>
                     </thead>
@@ -119,6 +153,20 @@
                                         @endif
                                     </td>
                                 @endforeach
+                                <td class="px-4 py-2.5">
+                                    <div class="flex flex-wrap gap-1">
+                                        <span class="inline-flex text-[10px] font-bold px-1.5 py-0.5 rounded bg-mist text-slate-600">Dashboard</span>
+                                        @if($u->appAccessCrm())
+                                            <span class="inline-flex text-[10px] font-bold px-1.5 py-0.5 rounded bg-sky-50 text-sky-800">CRM</span>
+                                        @endif
+                                        @if($u->appAccessOperations())
+                                            <span class="inline-flex text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-50 text-amber-800">Operation</span>
+                                        @endif
+                                        @if($u->appAccessInventory())
+                                            <span class="inline-flex text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-800">Inventory</span>
+                                        @endif
+                                    </div>
+                                </td>
                                 <td class="px-4 py-2.5 text-right">
                                     <div class="inline-flex items-center gap-1.5 justify-end">
                                         <button type="button" title="Edit"
@@ -208,6 +256,26 @@
                             @endif
                         </div>
                     @endforeach
+
+                    <div class="rounded-xl border border-line bg-mist/40 p-3 space-y-2">
+                        <div class="text-[11px] font-bold uppercase tracking-wide text-slate-500">App access level</div>
+                        <p class="text-[11px] text-slate-400">Dashboard always on</p>
+                        <label class="flex items-center gap-2 text-[13px] font-semibold text-ink">
+                            <input type="checkbox" name="access_crm" value="1" class="rounded border-line text-brand"
+                                   x-model="form.access_crm">
+                            CRM
+                        </label>
+                        <label class="flex items-center gap-2 text-[13px] font-semibold text-ink">
+                            <input type="checkbox" name="access_operations" value="1" class="rounded border-line text-brand"
+                                   x-model="form.access_operations">
+                            Operation
+                        </label>
+                        <label class="flex items-center gap-2 text-[13px] font-semibold text-ink">
+                            <input type="checkbox" name="access_inventory" value="1" class="rounded border-line text-brand"
+                                   x-model="form.access_inventory">
+                            Inventory
+                        </label>
+                    </div>
                 </div>
                 <div class="shrink-0 border-t border-line px-5 py-3 bg-white">
                     <button type="submit" class="w-full rounded-lg bg-brand hover:bg-brand-dark text-white font-semibold py-2.5 text-[13px]">

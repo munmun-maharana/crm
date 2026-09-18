@@ -11,10 +11,19 @@
     ];
     $initials = collect(explode(' ', $customer->name))->map(fn ($w) => mb_substr($w, 0, 1))->take(2)->implode('');
     $statusOptions = ['new', 'interested', 'contacted', 'converted', 'lost', 'request'];
+    $myStock = $myStock ?? [];
+    $activationRequests = $activationRequests ?? collect();
+    $actTone = [
+        'draft' => 'bg-slate-100 text-slate-600',
+        'pending' => 'bg-amber-50 text-amber-800',
+        'approved' => 'bg-emerald-50 text-emerald-800',
+        'rejected' => 'bg-rose-50 text-rose-700',
+        'fulfilled' => 'bg-sky-50 text-sky-800',
+    ];
 @endphp
 
 <div class="px-5 py-4 space-y-5 w-full">
-    {{-- One row: profile + action icons (where status used to sit) --}}
+    {{-- One row: profile + action icons --}}
     <div class="flex items-center gap-3">
         <div class="w-11 h-11 rounded-full bg-brand text-white flex items-center justify-center font-semibold text-sm shrink-0">{{ strtoupper($initials) }}</div>
         <div class="min-w-0 flex-1">
@@ -90,6 +99,7 @@
         </div>
     @endif
 
+    @unless($customer->isOperations())
     <form action="{{ route('customers.activities', $customer) }}"
           class="rounded-xl border border-line bg-white shadow-sm overflow-hidden"
           onsubmit="event.preventDefault(); Alpine.$data(document.body).postActivity(this)">
@@ -225,4 +235,96 @@
             @endforelse
         </div>
     </div>
+    @endunless
+
+    @if($customer->isOperations())
+        <div>
+            <div class="flex items-center justify-between gap-2 mb-2">
+                <div class="text-[12px] font-semibold text-slate-500">Activation requests</div>
+                <button type="button"
+                        onclick="startActivationRequest({{ $customer->id }})"
+                        class="rounded-lg bg-brand text-white px-3 py-1.5 text-[12px] font-semibold hover:bg-brand/90">
+                    + Activation request
+                </button>
+            </div>
+
+            <div class="space-y-2">
+                @forelse($activationRequests as $req)
+                    @php
+                        $lines = $req->itemLines();
+                        $isDraft = $req->status === 'draft';
+                    @endphp
+                    <div class="rounded-xl border border-line bg-white shadow-sm overflow-hidden" data-act-card="{{ $req->id }}">
+                        <div class="px-3.5 py-2.5 border-b border-line flex items-center gap-2 flex-wrap bg-mist/40">
+                            <div class="text-[13px] font-semibold text-ink">{{ $customer->name }}</div>
+                            <span class="inline-flex px-1.5 py-0.5 rounded text-[10px] font-bold uppercase {{ $actTone[$req->status] ?? 'bg-mist text-slate-600' }}">
+                                {{ $req->statusLabel() }}
+                            </span>
+                            <span class="ml-auto text-[11px] text-slate-400">{{ $req->created_at?->format('d M Y · h:i A') }}</span>
+                        </div>
+
+                        <div class="px-3.5 py-3 space-y-3">
+                            @if($isDraft)
+                                <button type="button"
+                                        onclick="toggleActivationForm({{ $req->id }})"
+                                        class="rounded-lg border border-line px-3 py-1.5 text-[12px] font-semibold hover:bg-mist">
+                                    Activation request — select devices
+                                </button>
+
+                                <form id="act-form-{{ $req->id }}" class="hidden space-y-3"
+                                      onsubmit="event.preventDefault(); submitActivationItemRequest(this, {{ $customer->id }})">
+                                    <input type="hidden" name="activation_request_id" value="{{ $req->id }}">
+                                    @if(! empty($myStock))
+                                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                            @foreach($myStock as $cat)
+                                                <div>
+                                                    <label class="block text-[11px] font-semibold text-slate-500 mb-1">{{ $cat['name'] }}</label>
+                                                    <select name="inventory_item_ids[]"
+                                                            class="w-full rounded-lg border border-line bg-white px-3 py-2 text-[13px] outline-none focus:border-brand focus:ring-2 focus:ring-brand/20">
+                                                        <option value="">Select {{ $cat['name'] }}…</option>
+                                                        @foreach($cat['items'] as $item)
+                                                            <option value="{{ $item['id'] }}">{{ $item['label'] }}</option>
+                                                        @endforeach
+                                                    </select>
+                                                </div>
+                                            @endforeach
+                                        </div>
+                                    @else
+                                        <div class="text-[12px] text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+                                            No inventory on your ID. Assign stock to yourself in Inventory first.
+                                        </div>
+                                    @endif
+                                    <div>
+                                        <label class="block text-[11px] font-semibold text-slate-500 mb-1">Note</label>
+                                        <textarea name="notes" rows="2" placeholder="Write a note…"
+                                                  class="w-full rounded-lg border border-line bg-mist/20 px-3 py-2 text-[13px] outline-none focus:bg-white focus:border-brand focus:ring-2 focus:ring-brand/20"></textarea>
+                                    </div>
+                                    <button type="submit"
+                                            class="rounded-lg bg-brand text-white px-4 py-2 text-[13px] font-semibold hover:bg-brand/90 disabled:opacity-50"
+                                            @disabled(empty($myStock))>
+                                        Submit activation
+                                    </button>
+                                </form>
+                            @else
+                                @foreach($lines as $line)
+                                    <div class="flex items-start gap-2 text-[13px]">
+                                        <span class="inline-flex px-1.5 py-0.5 rounded text-[10px] font-bold uppercase bg-brand-soft text-brand shrink-0">{{ $line['type'] }}</span>
+                                        <span class="font-semibold text-ink">{{ $line['label'] }}</span>
+                                    </div>
+                                @endforeach
+                                @if($req->notes)
+                                    <div class="text-[12px] text-slate-600 pt-1 border-t border-line">{{ $req->notes }}</div>
+                                @endif
+                                <div class="text-[11px] text-slate-400">Sent by {{ $req->requester?->name ?: 'System' }} · Status: {{ $req->statusLabel() }}</div>
+                            @endif
+                        </div>
+                    </div>
+                @empty
+                    <div class="rounded-xl border border-line bg-white px-3 py-6 text-center text-slate-400 text-sm">
+                        No activation requests yet. Click “+ Activation request” to start one.
+                    </div>
+                @endforelse
+            </div>
+        </div>
+    @endif
 </div>

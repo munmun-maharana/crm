@@ -155,6 +155,11 @@ class UserController extends Controller
             }
         }
 
+        // Mobile app tab access (Dashboard always on)
+        $meta['access_crm'] = $request->boolean('access_crm');
+        $meta['access_operations'] = $request->boolean('access_operations');
+        $meta['access_inventory'] = $request->boolean('access_inventory');
+
         if (empty($core['name']) && $user) {
             $core['name'] = $user->name;
         }

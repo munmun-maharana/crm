@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\ActivationRequestController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DashboardController;
@@ -35,8 +36,13 @@ Route::middleware('auth')->group(function () {
     Route::post('/customers/{customer}/activities', [CustomerController::class, 'addActivity'])->name('customers.activities');
     Route::post('/customers/{customer}/auto/{channel}', [CustomerController::class, 'autoAction'])->name('customers.auto');
     Route::post('/customers/{customer}/compose', [CustomerController::class, 'compose'])->name('customers.compose');
+    Route::post('/customers/{customer}/activation-requests', [ActivationRequestController::class, 'store'])->name('customers.activation-requests');
+    Route::post('/customers/{customer}/activation-requests/start', [ActivationRequestController::class, 'start'])->name('customers.activation-requests.start');
 
     Route::get('/requests', [CustomerController::class, 'requests'])->name('requests.index');
+
+    Route::get('/activation', [ActivationRequestController::class, 'index'])->name('activation.index');
+    Route::put('/activation/{activation}', [ActivationRequestController::class, 'update'])->name('activation.update');
 
     Route::get('/inventory', [InventoryController::class, 'index'])->name('inventory.index');
     Route::get('/inventory/user-stock', [InventoryController::class, 'userStock'])->name('inventory.user-stock');

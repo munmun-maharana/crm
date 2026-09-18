@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\Customer;
 use App\Models\CustomerActivity;
+use App\Models\InventoryItem;
+use App\Models\InventoryType;
 use App\Models\NoteTemplate;
 use App\Models\OperationSetting;
 use App\Models\User;
@@ -116,13 +118,57 @@ class CustomerController extends Controller
     public function show(Request $request, Customer $customer): JsonResponse
     {
         $this->authorizeMapped($request, $customer);
-        $customer->load(['assignee', 'activities.user', 'operationCopy', 'sourceCustomer']);
+        $customer->load([
+            'assignee',
+            'activities.user',
+            'operationCopy',
+            'sourceCustomer',
+            'activationRequests.items.inventoryType:id,name',
+            'activationRequests.items.inventoryItem:id,name,code',
+            'activationRequests.inventoryType:id,name',
+            'activationRequests.inventoryItem:id,name,code',
+            'activationRequests.requester:id,name',
+        ]);
         $formFields = $this->formFieldsFor($request, $customer->pipeline ?? 'crm');
         $noteTemplates = NoteTemplate::active()->ordered()->get(['id', 'title', 'body']);
+        $inventoryTypes = collect();
+        $myStock = [];
+        if ($customer->isOperations()) {
+            $myItems = InventoryItem::query()
+                ->with('type:id,name')
+                ->where('held_by_user_id', $request->user()->id)
+                ->orderBy('name')
+                ->get(['id', 'inventory_type_id', 'name', 'code', 'status', 'quantity']);
+
+            $myStock = $myItems->groupBy('inventory_type_id')->map(function ($items, $typeId) {
+                $type = $items->first()?->type;
+
+                return [
+                    'id' => (int) $typeId,
+                    'name' => $type?->name ?? 'Type #'.$typeId,
+                    'items' => $items->map(fn ($item) => [
+                        'id' => $item->id,
+                        'label' => trim($item->name.($item->code ? ' · '.$item->code : '')),
+                        'name' => $item->name,
+                        'code' => $item->code,
+                        'status' => $item->statusLabel(),
+                        'quantity' => $item->quantity,
+                    ])->values(),
+                ];
+            })->values()->all();
+        }
+        $activationRequests = $customer->activationRequests;
 
         return response()->json([
             'customer' => $customer,
-            'html' => view('customers.partials.panel', compact('customer', 'formFields', 'noteTemplates'))->render(),
+            'html' => view('customers.partials.panel', compact(
+                'customer',
+                'formFields',
+                'noteTemplates',
+                'inventoryTypes',
+                'activationRequests',
+                'myStock'
+            ))->render(),
         ]);
     }
 

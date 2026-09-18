@@ -90,6 +90,9 @@
                 if ($navUser->canAccessInventory()) {
                     $links[] = ['inventory.index', 'Inventory'];
                 }
+                if ($navUser->canSeeAllRecords()) {
+                    $links[] = ['activation.index', 'Activation'];
+                }
                 if ($navUser->isAdmin()) {
                     $links = array_merge($links, [
                         ['users.index', 'Users'],
@@ -547,6 +550,75 @@ async function assignToOperations(customerId) {
         alert('Could not assign to Operation Team');
     }
 }
+
+async function submitActivationItemRequest(form, customerId) {
+    const itemIds = Array.from(form.querySelectorAll('select[name="inventory_item_ids[]"]'))
+        .map(el => el.value)
+        .filter(Boolean)
+        .map(Number);
+    const notes = form.querySelector('[name="notes"]')?.value || '';
+    const activationRequestId = form.querySelector('[name="activation_request_id"]')?.value || null;
+    if (!itemIds.length) {
+        alert('Select at least one device from a category.');
+        return;
+    }
+    try {
+        const payload = { inventory_item_ids: itemIds, notes };
+        if (activationRequestId) payload.activation_request_id = Number(activationRequestId);
+
+        const res = await fetch(`{{ url('/customers') }}/${customerId}/activation-requests`, {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content
+            },
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+            alert(data.message || Object.values(data.errors || {})?.[0]?.[0] || 'Could not submit request');
+            return;
+        }
+        const root = Alpine.$data(document.body);
+        if (root?.selectCustomer) {
+            await root.selectCustomer(customerId);
+        } else {
+            alert(data.message || 'Activation request submitted.');
+        }
+    } catch (e) {
+        alert('Could not submit activation request');
+    }
+}
+
+async function startActivationRequest(customerId) {
+    try {
+        const res = await fetch(`{{ url('/customers') }}/${customerId}/activation-requests/start`, {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content
+            }
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+            alert(data.message || 'Could not start activation request');
+            return;
+        }
+        const root = Alpine.$data(document.body);
+        if (root?.selectCustomer) await root.selectCustomer(customerId);
+    } catch (e) {
+        alert('Could not start activation request');
+    }
+}
+
+function toggleActivationForm(requestId) {
+    const form = document.getElementById('act-form-' + requestId);
+    if (form) form.classList.toggle('hidden');
+}
+
 
 async function runAutoAction(customerId, channel) {
     if (channel !== 'call') {

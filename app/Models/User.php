@@ -32,11 +32,13 @@ class User extends Authenticatable
         'password',
         'role',
         'meta',
+        'api_token',
     ];
 
     protected $hidden = [
         'password',
         'remember_token',
+        'api_token',
     ];
 
     protected function casts(): array
@@ -130,6 +132,41 @@ class User extends Authenticatable
     public function canAccessInventory(): bool
     {
         return $this->isAdmin() || $this->isCoordinator() || $this->isOperation();
+    }
+
+    /** Mobile app tab access — Dashboard is always allowed. */
+    public function appAccessCrm(): bool
+    {
+        return $this->appAccessFlag('access_crm', $this->canAccessCrm());
+    }
+
+    public function appAccessOperations(): bool
+    {
+        return $this->appAccessFlag('access_operations', $this->canAccessOperations());
+    }
+
+    public function appAccessInventory(): bool
+    {
+        return $this->appAccessFlag('access_inventory', $this->canAccessInventory());
+    }
+
+    public function appAccessFlags(): array
+    {
+        return [
+            'crm' => $this->appAccessCrm(),
+            'operations' => $this->appAccessOperations(),
+            'inventory' => $this->appAccessInventory(),
+        ];
+    }
+
+    private function appAccessFlag(string $key, bool $roleDefault): bool
+    {
+        $meta = is_array($this->meta) ? $this->meta : [];
+        if (array_key_exists($key, $meta)) {
+            return filter_var($meta[$key], FILTER_VALIDATE_BOOLEAN);
+        }
+
+        return $roleDefault;
     }
 
     public function canAssignUsers(): bool

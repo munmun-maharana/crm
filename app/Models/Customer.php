@@ -99,12 +99,18 @@ class Customer extends Model
             return $this->isOperations();
         }
 
-        return ! $this->isOperations() && (int) $this->assigned_to === (int) $user->id;
+        // Assigned records in either CRM or Operations (e.g. front office with ops access)
+        return (int) $this->assigned_to === (int) $user->id;
     }
 
     public function activities(): HasMany
     {
         return $this->hasMany(CustomerActivity::class)->latest();
+    }
+
+    public function activationRequests(): HasMany
+    {
+        return $this->hasMany(ActivationRequest::class)->latest();
     }
 
     public function fieldValue(string $key): mixed
