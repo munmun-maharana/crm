@@ -38,9 +38,7 @@ class CrmFieldService
             $rule[] = match ($field->type) {
                 'email' => 'email',
                 'textarea' => 'string',
-                'select' => ! empty($field->options)
-                    ? Rule::in($field->options)
-                    : 'string',
+                'select' => 'string',
                 default => 'string',
             };
 
@@ -49,9 +47,7 @@ class CrmFieldService
                 continue;
             }
 
-            if ($field->type !== 'select') {
-                $rule[] = 'max:2000';
-            }
+            $rule[] = 'max:2000';
 
             $rules[$field->key] = $rule;
         }
@@ -74,6 +70,13 @@ class CrmFieldService
                 $core[$field->key] = $value;
             } else {
                 $meta[$field->key] = $value;
+            }
+
+            if (($field->type === 'phone' || in_array($field->key, ['phone', 'phone_no', 'mobile', 'contact', 'contact_no'], true)) && ! empty($value)) {
+                $core['phone'] = $value;
+            }
+            if (($field->type === 'email' || in_array($field->key, ['email', 'email_address', 'mail'], true)) && ! empty($value)) {
+                $core['email'] = $value;
             }
         }
 

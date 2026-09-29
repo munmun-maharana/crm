@@ -15,14 +15,14 @@ class DatabaseSeeder extends Seeder
     {
         $defaults = [
             ['key' => 'name', 'label' => 'Name', 'type' => 'text', 'required' => true, 'in_table' => true, 'is_system' => true, 'sort_order' => 1],
-            ['key' => 'phone', 'label' => 'Phone', 'type' => 'phone', 'required' => false, 'in_table' => true, 'is_system' => true, 'sort_order' => 2],
-            ['key' => 'email', 'label' => 'Email', 'type' => 'email', 'required' => false, 'in_table' => true, 'is_system' => true, 'sort_order' => 3],
-            ['key' => 'company', 'label' => 'Company', 'type' => 'text', 'required' => false, 'in_table' => false, 'is_system' => true, 'sort_order' => 4],
-            ['key' => 'city', 'label' => 'City', 'type' => 'text', 'required' => false, 'in_table' => true, 'is_system' => true, 'sort_order' => 5],
-            ['key' => 'source', 'label' => 'Source', 'type' => 'text', 'required' => false, 'in_table' => true, 'is_system' => true, 'sort_order' => 6],
-            ['key' => 'status', 'label' => 'Status', 'type' => 'select', 'required' => true, 'in_table' => true, 'is_system' => true, 'sort_order' => 7, 'options' => ['new', 'interested', 'contacted', 'converted', 'lost', 'request']],
-            ['key' => 'assigned_to', 'label' => 'Assign agent', 'type' => 'select', 'required' => false, 'in_table' => false, 'in_excel' => false, 'is_system' => true, 'sort_order' => 8],
-            ['key' => 'notes', 'label' => 'Notes', 'type' => 'textarea', 'required' => false, 'in_table' => false, 'is_system' => true, 'sort_order' => 9],
+            ['key' => 'phone', 'label' => 'Phone', 'type' => 'phone', 'required' => false, 'in_table' => true, 'is_system' => false, 'sort_order' => 2],
+            ['key' => 'email', 'label' => 'Email', 'type' => 'email', 'required' => false, 'in_table' => true, 'is_system' => false, 'sort_order' => 3],
+            ['key' => 'company', 'label' => 'Company', 'type' => 'text', 'required' => false, 'in_table' => false, 'is_system' => false, 'sort_order' => 4],
+            ['key' => 'city', 'label' => 'City', 'type' => 'text', 'required' => false, 'in_table' => true, 'is_system' => false, 'sort_order' => 5],
+            ['key' => 'source', 'label' => 'Source', 'type' => 'text', 'required' => false, 'in_table' => true, 'is_system' => false, 'sort_order' => 6],
+            ['key' => 'status', 'label' => 'Status', 'type' => 'select', 'required' => true, 'in_table' => true, 'is_system' => false, 'sort_order' => 7, 'options' => ['new', 'interested', 'contacted', 'converted', 'lost', 'request']],
+            ['key' => 'assigned_to', 'label' => 'Assign agent', 'type' => 'select', 'required' => false, 'in_table' => false, 'in_excel' => false, 'is_system' => false, 'sort_order' => 8],
+            ['key' => 'notes', 'label' => 'Notes', 'type' => 'textarea', 'required' => false, 'in_table' => false, 'is_system' => false, 'sort_order' => 9],
         ];
 
         foreach ($defaults as $field) {

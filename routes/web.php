@@ -11,6 +11,7 @@ use App\Http\Controllers\NoteTemplateController;
 use App\Http\Controllers\UploadController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\OperationSettingController;
+use App\Http\Controllers\WhatsappSettingController;
 use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
 
@@ -29,6 +30,8 @@ Route::middleware('auth')->group(function () {
     Route::get('/operations', [CustomerController::class, 'operations'])->name('operations.index');
     Route::post('/customers', [CustomerController::class, 'store'])->name('customers.store');
     Route::post('/customers/bulk-map', [CustomerController::class, 'bulkMap'])->name('customers.bulk-map');
+    Route::post('/customers/bulk-whatsapp', [CustomerController::class, 'bulkWhatsapp'])->name('customers.bulk-whatsapp');
+    Route::post('/customers/bulk-email', [CustomerController::class, 'bulkEmail'])->name('customers.bulk-email');
     Route::get('/customers/{customer}', [CustomerController::class, 'show'])->name('customers.show');
     Route::put('/customers/{customer}', [CustomerController::class, 'update'])->name('customers.update');
     Route::delete('/customers/{customer}', [CustomerController::class, 'destroy'])->name('customers.destroy');
@@ -77,6 +80,7 @@ Route::middleware('auth')->group(function () {
             return redirect()->route('settings.index', ['tab' => $tab]);
         })->name('operation-settings.index');
         Route::put('/operation-setting', [OperationSettingController::class, 'update'])->name('operation-settings.update');
+        Route::put('/whatsapp-setting', [WhatsappSettingController::class, 'update'])->name('whatsapp-settings.update');
 
         Route::post('/inventory-types', [InventoryTypeController::class, 'store'])->name('inventory-types.store');
         Route::put('/inventory-types/{inventoryType}', [InventoryTypeController::class, 'update'])->name('inventory-types.update');

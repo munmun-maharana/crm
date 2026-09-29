@@ -7,10 +7,14 @@
     $openId = request('open');
     $statusTone = [
         'new' => 'text-sky-700 bg-sky-50',
+        'no answer' => 'text-slate-700 bg-slate-100',
+        'follow-up' => 'text-amber-800 bg-amber-100',
         'interested' => 'text-teal-700 bg-teal-50',
         'contacted' => 'text-blue-700 bg-blue-50',
         'converted' => 'text-emerald-700 bg-emerald-50',
+        'cancelled' => 'text-rose-700 bg-rose-50',
         'lost' => 'text-rose-700 bg-rose-50',
+        'confirmed' => 'text-emerald-700 bg-emerald-50',
         'request' => 'text-amber-800 bg-amber-50',
     ];
 @endphp
@@ -30,8 +34,8 @@
                 <span class="crm-toolbar-split"></span>
                 <select name="status" id="crmStatus" class="crm-toolbar-select" title="Status">
                     <option value="">All status</option>
-                    @foreach(['new','interested','contacted','converted','lost','request'] as $s)
-                        <option value="{{ $s }}" @selected($status===$s)>{{ ucfirst($s) }}</option>
+                    @foreach($statusOptions ?? ['new','interested','contacted','converted','lost','request'] as $s)
+                        <option value="{{ $s }}" @selected(strtolower((string)$status)===strtolower((string)$s))>{{ ucfirst($s) }}</option>
                     @endforeach
                 </select>
                 @if(auth()->user()->canSeeAllRecords())
@@ -103,19 +107,14 @@
                                     </button>
                                 </th>
                             @endif
-                            <th class="text-left font-bold px-4 py-2.5">Customer</th>
                             @if(($pipeline ?? 'crm') === 'operations')
-                                <th class="text-left font-bold px-4 py-2.5">CRM ID</th>
+                                <th class="text-left font-bold px-4 py-2.5 whitespace-nowrap">CRM ID</th>
                             @endif
-                            <th class="text-left font-bold px-4 py-2.5">Contact</th>
-                            <th class="text-left font-bold px-4 py-2.5">City</th>
-                            <th class="text-left font-bold px-4 py-2.5">Status</th>
-                            <th class="text-left font-bold px-4 py-2.5">Follow-up</th>
-                            <th class="text-left font-bold px-4 py-2.5">Source</th>
-                            @if(auth()->user()->canSeeAllRecords())
-                                <th class="text-left font-bold px-4 py-2.5">Mapped user</th>
-                            @endif
-                            <th class="text-right font-bold px-4 py-2.5">Action</th>
+                            @foreach($tableFields as $field)
+                                <th class="text-left font-bold px-4 py-2.5 whitespace-nowrap">{{ $field->label }}</th>
+                            @endforeach
+                            <th class="text-left font-bold px-4 py-2.5 whitespace-nowrap">Follow-up</th>
+                            <th class="text-right font-bold px-4 py-2.5 whitespace-nowrap">Action</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -132,22 +131,53 @@
                                         </button>
                                     </td>
                                 @endif
-                                <td class="px-4 py-2.5">
-                                    <div class="font-semibold">{{ $c->name }}</div>
-                                    <div class="text-[11px] text-slate-400">{{ $c->company ?: '—' }}</div>
-                                </td>
                                 @if(($pipeline ?? 'crm') === 'operations')
-                                    <td class="px-4 py-2.5 text-slate-500 font-semibold">{{ $c->source_customer_id ? '#'.$c->source_customer_id : '—' }}</td>
+                                    <td class="px-4 py-2.5 text-slate-500 font-semibold whitespace-nowrap">{{ $c->source_customer_id ? '#'.$c->source_customer_id : '—' }}</td>
                                 @endif
-                                <td class="px-4 py-2.5 text-slate-500">
-                                    <div>{{ $c->phone ?: '—' }}</div>
-                                    <div class="text-[11px]">{{ $c->email ?: '' }}</div>
-                                </td>
-                                <td class="px-4 py-2.5 text-slate-500">{{ $c->city ?: '—' }}</td>
-                                <td class="px-4 py-2.5">
-                                    <span class="inline-flex px-2 py-0.5 rounded text-[11px] font-bold capitalize {{ $statusTone[$c->status] ?? 'bg-mist' }}">{{ $c->status }}</span>
-                                </td>
-                                <td class="px-4 py-2.5 text-[12px]" data-fu-cell="{{ $c->id }}">
+                                @foreach($tableFields as $field)
+                                    <td class="px-4 py-2.5 whitespace-nowrap">
+                                        @if($field->key === 'name')
+                                            <div class="font-semibold text-ink">{{ $c->name }}</div>
+                                            @if($tableFields->where('key', 'company')->isEmpty() && $c->company)
+                                                <div class="text-[11px] text-slate-400">{{ $c->company }}</div>
+                                            @endif
+                                        @elseif($field->key === 'status')
+                                            <span class="inline-flex px-2 py-0.5 rounded text-[11px] font-bold capitalize {{ $statusTone[strtolower($c->status)] ?? 'bg-sky-50 text-sky-800' }}" data-status-cell="{{ $c->id }}">{{ $c->status }}</span>
+                                        @elseif($field->key === 'assigned_to')
+                                            <span class="text-slate-600">{{ $c->assignee?->name ?: 'Unassigned' }}</span>
+                                        @elseif($field->key === 'phone')
+                                            <span class="text-slate-600">{{ $c->phone ?: '—' }}</span>
+                                        @elseif($field->key === 'email')
+                                            <span class="text-slate-600">{{ $c->email ?: '—' }}</span>
+                                        @elseif($field->key === 'company')
+                                            <span class="text-slate-600">{{ $c->company ?: '—' }}</span>
+                                        @elseif($field->key === 'city')
+                                            <span class="text-slate-600">{{ $c->city ?: '—' }}</span>
+                                        @elseif($field->key === 'source')
+                                            <span class="text-slate-600">{{ $c->source ?: '—' }}</span>
+                                        @elseif($field->key === 'notes')
+                                            <span class="text-slate-500 line-clamp-1 max-w-[200px]" title="{{ $c->notes }}">{{ $c->notes ?: '—' }}</span>
+                                        @else
+                                            @php
+                                                $val = $c->fieldValue($field->key);
+                                            @endphp
+                                            <span class="text-slate-600">
+                                                @if(is_array($val))
+                                                    {{ implode(', ', $val) }}
+                                                @elseif($val !== null && $val !== '')
+                                                    @if(filter_var($val, FILTER_VALIDATE_URL))
+                                                        <a href="{{ $val }}" target="_blank" rel="noopener noreferrer" class="text-brand hover:underline" @click.stop>Link ↗</a>
+                                                    @else
+                                                        {{ $val }}
+                                                    @endif
+                                                @else
+                                                    —
+                                                @endif
+                                            </span>
+                                        @endif
+                                    </td>
+                                @endforeach
+                                <td class="px-4 py-2.5 text-[12px] whitespace-nowrap" data-fu-cell="{{ $c->id }}">
                                     @if($c->follow_up && $c->follow_up_at)
                                         <span class="inline-flex px-2 py-0.5 rounded bg-amber-50 text-amber-800 font-semibold">
                                             {{ $c->follow_up_at->format('d M Y') }}
@@ -159,16 +189,12 @@
                                         <span class="text-slate-400">—</span>
                                     @endif
                                 </td>
-                                <td class="px-4 py-2.5 text-slate-500">{{ $c->source ?: '—' }}</td>
-                                @if(auth()->user()->canSeeAllRecords())
-                                    <td class="px-4 py-2.5 text-slate-500">{{ $c->assignee?->name ?: 'Unassigned' }}</td>
-                                @endif
-                                <td class="px-4 py-2.5 text-right" @click.stop>
+                                <td class="px-4 py-2.5 text-right whitespace-nowrap" @click.stop>
                                     <div class="inline-flex items-center gap-1.5 justify-end">
                                         <button type="button"
                                                 title="Edit"
                                                 class="w-8 h-8 inline-flex items-center justify-center rounded-lg border border-line text-brand hover:bg-brand-soft transition"
-                                                @click="openEditForm(@js([
+                                                @click="openEditForm(@js(array_merge([
                                                     'id' => $c->id,
                                                     'name' => $c->name,
                                                     'email' => $c->email,
@@ -180,7 +206,7 @@
                                                     'notes' => $c->notes,
                                                     'assigned_to' => $c->assigned_to,
                                                     'meta' => $c->meta ?? (object) [],
-                                                ]))">
+                                                ], $c->meta ?? [])))">
                                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                                         </button>
                                         <form method="POST" action="{{ route('customers.destroy', $c) }}"
@@ -195,7 +221,7 @@
                                 </td>
                             </tr>
                         @empty
-                            <tr><td colspan="{{ auth()->user()->canSeeAllRecords() ? ((($pipeline ?? 'crm') === 'operations') ? 10 : 9) : ((($pipeline ?? 'crm') === 'operations') ? 8 : 7) }}" class="px-4 py-10 text-center text-slate-400">{{ auth()->user()->canSeeAllRecords() ? 'No customers found' : 'No customers mapped to you' }}</td></tr>
+                            <tr><td colspan="{{ $tableFields->count() + (auth()->user()->canSeeAllRecords() ? 1 : 0) + ((($pipeline ?? 'crm') === 'operations') ? 1 : 0) + 2 }}" class="px-4 py-10 text-center text-slate-400">{{ auth()->user()->canSeeAllRecords() ? 'No customers found' : 'No customers mapped to you' }}</td></tr>
                         @endforelse
                     </tbody>
                 </table>
@@ -242,7 +268,7 @@
                                     @endif
                                     <div class="text-[12px] text-slate-500 truncate mt-0.5">{{ $c->company ?: '—' }}</div>
                                     <div class="mt-1.5 flex items-center gap-2 min-w-0">
-                                        <span class="text-[10px] font-semibold px-1.5 py-0.5 rounded capitalize shrink-0 {{ $statusTone[$c->status] ?? 'bg-mist text-slate-600' }}">{{ $c->status }}</span>
+                                        <span class="text-[10px] font-semibold px-1.5 py-0.5 rounded capitalize shrink-0 {{ $statusTone[strtolower($c->status)] ?? ($statusTone[$c->status] ?? 'bg-mist text-slate-600') }}" data-status-list="{{ $c->id }}">{{ $c->status }}</span>
                                         @if($c->follow_up && $c->follow_up_at)
                                             <span class="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 shrink-0" data-fu-list="{{ $c->id }}">
                                                 FU {{ $c->follow_up_at->format('d M') }}
@@ -300,6 +326,23 @@
                 <button type="submit" class="rounded-full bg-brand text-white font-semibold px-3.5 py-1.5 text-[12px] hover:bg-brand-dark">
                     Map selected
                 </button>
+
+                <span class="w-px h-5 bg-line"></span>
+
+                <button type="button" @click="sendBulkWhatsapp()"
+                        class="inline-flex items-center gap-1.5 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-3.5 py-1.5 text-[12px] shadow-sm transition shrink-0"
+                        title="Send selected customer data to WhatsApp">
+                    <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.82 9.82 0 0012.04 2zm0 1.82c4.46 0 8.09 3.63 8.09 8.09s-3.63 8.09-8.09 8.09c-1.42 0-2.8-.37-4.01-1.06l-.29-.17-3.12.82.83-3.04-.19-.31a8.05 8.05 0 01-1.22-4.33c0-4.46 3.63-8.09 8.09-8.09zm4.57 10.38c-.18-.09-1.06-.52-1.22-.58-.16-.06-.28-.09-.4.09-.12.18-.46.58-.56.7-.1.12-.2.13-.38.04-.18-.09-.76-.28-1.45-.89-.54-.48-.9-1.07-1.01-1.25-.1-.18-.01-.28.08-.37.08-.08.18-.2.27-.3.09-.1.12-.18.18-.3.06-.12.03-.22-.02-.31-.04-.09-.4-.96-.55-1.31-.14-.34-.29-.3-.4-.3h-.34c-.12 0-.31.04-.47.22-.16.18-.62.61-.62 1.48s.64 1.72.73 1.84c.09.12 1.25 1.91 3.03 2.68.42.18.75.29 1.01.37.42.13.81.11 1.11.07.34-.05 1.06-.43 1.21-.85.15-.42.15-.78.1-.85-.04-.07-.16-.12-.34-.21z"/></svg>
+                    <span>Send in WP</span>
+                </button>
+
+                <button type="button" @click="sendBulkEmail()"
+                        class="inline-flex items-center gap-1.5 rounded-full bg-slate-800 hover:bg-slate-900 text-white font-semibold px-3.5 py-1.5 text-[12px] shadow-sm transition shrink-0"
+                        title="Open Gmail with selected customers formatted in a table">
+                    <svg class="w-3.5 h-3.5 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                    <span>Send Email</span>
+                </button>
+
                 <button type="button" title="Clear" @click="clearSelection()"
                         class="w-8 h-8 rounded-full text-slate-400 hover:bg-mist hover:text-ink">✕</button>
             </form>
@@ -344,6 +387,7 @@
             </div>
 
             <form method="POST"
+                  id="customerDrawerForm"
                   class="flex-1 overflow-y-auto crm-scroll p-5 space-y-3"
                   :action="formMode === 'edit' ? `{{ url('/customers') }}/${form.id}` : `{{ route('customers.store') }}`">
                 @csrf
@@ -358,25 +402,25 @@
                             {{ $field->label }}@if($field->required) * @endif
                         </label>
                         @if($field->key === 'assigned_to')
-                            <select name="assigned_to" x-model="form.assigned_to" class="w-full rounded-lg border border-line px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-brand/20" @required($field->required)>
+                            <select name="assigned_to" x-model="form['assigned_to']" class="w-full rounded-lg border border-line px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-brand/20" @required($field->required)>
                                 <option value="">Unassigned</option>
                                 @foreach($agents as $a)
                                     <option value="{{ $a->id }}">{{ $a->name }}</option>
                                 @endforeach
                             </select>
                         @elseif($field->type === 'textarea')
-                            <textarea name="{{ $field->key }}" x-model="form.{{ $field->key }}" rows="3" class="w-full rounded-lg border border-line px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-brand/20" @required($field->required)></textarea>
+                            <textarea name="{{ $field->key }}" x-model="form['{{ $field->key }}']" rows="3" class="w-full rounded-lg border border-line px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-brand/20" @required($field->required)></textarea>
                         @elseif($field->type === 'select')
-                            <select name="{{ $field->key }}" x-model="form.{{ $field->key }}" class="w-full rounded-lg border border-line px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-brand/20" @required($field->required)>
+                            <select name="{{ $field->key }}" x-model="form['{{ $field->key }}']" class="w-full rounded-lg border border-line px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-brand/20" @required($field->required)>
                                 <option value="">Select</option>
                                 @foreach($field->options ?? [] as $opt)
-                                    <option value="{{ $opt }}">{{ ucfirst($opt) }}</option>
+                                    <option value="{{ $opt }}" :selected="String(form['{{ $field->key }}'] || '').trim().toLowerCase() === @js(strtolower(trim($opt)))">{{ ucfirst($opt) }}</option>
                                 @endforeach
                             </select>
                         @else
                             <input
                                 name="{{ $field->key }}"
-                                x-model="form.{{ $field->key }}"
+                                x-model="form['{{ $field->key }}']"
                                 type="{{ $field->type === 'email' ? 'email' : ($field->type === 'phone' ? 'tel' : 'text') }}"
                                 class="w-full rounded-lg border border-line px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-brand/20"
                                 @required($field->required)

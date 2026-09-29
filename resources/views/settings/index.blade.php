@@ -17,6 +17,12 @@
                 :class="tab === 'notes' ? 'bg-brand-soft text-brand' : 'text-slate-500 hover:bg-mist'">
             Note Templates
         </button>
+        <button type="button" @click="tab = 'whatsapp'"
+                class="px-3.5 py-1.5 rounded-lg text-[13px] font-semibold inline-flex items-center gap-1.5"
+                :class="tab === 'whatsapp' ? 'bg-emerald-50 text-emerald-700 font-bold' : 'text-slate-500 hover:bg-mist'">
+            <svg class="w-3.5 h-3.5 text-emerald-600" fill="currentColor" viewBox="0 0 24 24"><path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.82 9.82 0 0012.04 2zm0 1.82c4.46 0 8.09 3.63 8.09 8.09s-3.63 8.09-8.09 8.09c-1.42 0-2.8-.37-4.01-1.06l-.29-.17-3.12.82.83-3.04-.19-.31a8.05 8.05 0 01-1.22-4.33c0-4.46 3.63-8.09 8.09-8.09zm4.57 10.38c-.18-.09-1.06-.52-1.22-.58-.16-.06-.28-.09-.4.09-.12.18-.46.58-.56.7-.1.12-.2.13-.38.04-.18-.09-.76-.28-1.45-.89-.54-.48-.9-1.07-1.01-1.25-.1-.18-.01-.28.08-.37.08-.08.18-.2.27-.3.09-.1.12-.18.18-.3.06-.12.03-.22-.02-.31-.04-.09-.4-.96-.55-1.31-.14-.34-.29-.3-.4-.3h-.34c-.12 0-.31.04-.47.22-.16.18-.62.61-.62 1.48s.64 1.72.73 1.84c.09.12 1.25 1.91 3.03 2.68.42.18.75.29 1.01.37.42.13.81.11 1.11.07.34-.05 1.06-.43 1.21-.85.15-.42.15-.78.1-.85-.04-.07-.16-.12-.34-.21z"/></svg>
+            <span>WhatsApp</span>
+        </button>
         <button type="button" @click="tab = 'op-assign'"
                 class="px-3.5 py-1.5 rounded-lg text-[13px] font-semibold"
                 :class="tab === 'op-assign' ? 'bg-brand-soft text-brand' : 'text-slate-500 hover:bg-mist'">
@@ -158,16 +164,21 @@
                                                     class="w-8 h-8 inline-flex items-center justify-center rounded-lg border border-line text-brand hover:bg-brand-soft transition">
                                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
                                             </button>
-                                            @unless($field->is_system)
+                                            @if($field->key === 'name')
+                                                <button type="button" disabled title="The Name field is required by the system and cannot be deleted"
+                                                        class="w-8 h-8 inline-flex items-center justify-center rounded-lg border border-line text-slate-300 cursor-not-allowed">
+                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                                                </button>
+                                            @else
                                                 <form method="POST" action="{{ route('fields.destroy', $field) }}"
-                                                      onsubmit="return confirm('Delete field?')">
+                                                      onsubmit="return confirm('Delete field \'{{ $field->label }}\'?')">
                                                     @csrf @method('DELETE')
                                                     <button type="submit" title="Delete"
                                                             class="w-8 h-8 inline-flex items-center justify-center rounded-lg border border-line text-rose-600 hover:bg-rose-50 transition">
                                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                                                     </button>
                                                 </form>
-                                            @endunless
+                                            @endif
                                         </div>
                                     </td>
                                 </tr>
@@ -236,6 +247,55 @@
                     </div>
                 @endforelse
             </div>
+        </div>
+    </div>
+
+    <div x-show="tab === 'whatsapp'" x-cloak class="max-w-2xl">
+        <div class="rounded-xl border border-line bg-white p-5 shadow-sm space-y-4">
+            <div class="flex items-center gap-3 pb-3 border-b border-line">
+                <span class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 inline-flex items-center justify-center shrink-0">
+                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.82 9.82 0 0012.04 2zm0 1.82c4.46 0 8.09 3.63 8.09 8.09s-3.63 8.09-8.09 8.09c-1.42 0-2.8-.37-4.01-1.06l-.29-.17-3.12.82.83-3.04-.19-.31a8.05 8.05 0 01-1.22-4.33c0-4.46 3.63-8.09 8.09-8.09zm4.57 10.38c-.18-.09-1.06-.52-1.22-.58-.16-.06-.28-.09-.4.09-.12.18-.46.58-.56.7-.1.12-.2.13-.38.04-.18-.09-.76-.28-1.45-.89-.54-.48-.9-1.07-1.01-1.25-.1-.18-.01-.28.08-.37.08-.08.18-.2.27-.3.09-.1.12-.18.18-.3.06-.12.03-.22-.02-.31-.04-.09-.4-.96-.55-1.31-.14-.34-.29-.3-.4-.3h-.34c-.12 0-.31.04-.47.22-.16.18-.62.61-.62 1.48s.64 1.72.73 1.84c.09.12 1.25 1.91 3.03 2.68.42.18.75.29 1.01.37.42.13.81.11 1.11.07.34-.05 1.06-.43 1.21-.85.15-.42.15-.78.1-.85-.04-.07-.16-.12-.34-.21z"/></svg>
+                </span>
+                <div>
+                    <h3 class="text-sm font-bold text-ink">WhatsApp Data Send Settings</h3>
+                    <p class="text-[12px] text-slate-500">Jab table me customers select karke "Send to WhatsApp" click karenge, lead details is number pe send hongi.</p>
+                </div>
+            </div>
+
+            <form method="POST" action="{{ route('whatsapp-settings.update') }}" class="space-y-4">
+                @csrf
+                @method('PUT')
+                <div>
+                    <label class="block text-[11px] font-bold text-slate-600 uppercase tracking-wide mb-1.5">Destination WhatsApp Phone Number *</label>
+                    <div class="relative">
+                        <input type="text" name="phone" required
+                               value="{{ old('phone', $whatsappSetting?->phone) }}"
+                               placeholder="e.g. 919876543210 or 9876543210"
+                               class="w-full rounded-lg border border-line bg-white px-3.5 py-2.5 text-[13px] font-medium outline-none focus:border-brand focus:ring-2 focus:ring-brand/20">
+                    </div>
+                    <p class="text-[11px] text-slate-400 mt-1">Country code ke sath enter karein (e.g. <strong>919876543210</strong>). Agar 10 digit number likhenge to automatic <strong>+91</strong> (India) lag jayega.</p>
+                </div>
+
+                <div class="rounded-lg bg-mist/40 border border-line p-3 space-y-1.5">
+                    <div class="text-[11px] font-bold text-slate-600">Message Preview:</div>
+                    <div class="text-[12px] text-slate-600 font-mono bg-white rounded p-2.5 border border-line whitespace-pre-line leading-relaxed">📋 *CUSTOMER LEAD DATA*
+👤 *CUSTOMER:* *Customer Name*
+• *Phone No:* 9776101485
+• *City:* Cuttuck
+• *Vehicle Type:* Sedan
+• *Model:* Honda Mmaze
+• *Service Details:* Full Car Detailing
+• *Seal Price:* ₹1199
+• *Status:* New</div>
+                    <p class="text-[11px] text-slate-400">Sabhi active CRM fields customer details ke sath automatically is template me format ho kar WhatsApp me pre-fill ho jayengi.</p>
+                </div>
+
+                <div class="pt-2">
+                    <button type="submit" class="rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-5 py-2.5 text-[13px] shadow-sm transition">
+                        Save WhatsApp Settings
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 
@@ -408,16 +468,21 @@
                                                     class="w-8 h-8 inline-flex items-center justify-center rounded-lg border border-line text-brand hover:bg-brand-soft transition">
                                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
                                             </button>
-                                            @unless($field->is_system)
+                                            @if($field->key === 'name')
+                                                <button type="button" disabled title="The Name field is required by the system and cannot be deleted"
+                                                        class="w-8 h-8 inline-flex items-center justify-center rounded-lg border border-line text-slate-300 cursor-not-allowed">
+                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                                                </button>
+                                            @else
                                                 <form method="POST" action="{{ route('fields.destroy', $field) }}"
-                                                      onsubmit="return confirm('Delete field?')">
+                                                      onsubmit="return confirm('Delete field \'{{ $field->label }}\'?')">
                                                     @csrf @method('DELETE')
                                                     <button type="submit" title="Delete"
                                                             class="w-8 h-8 inline-flex items-center justify-center rounded-lg border border-line text-rose-600 hover:bg-rose-50 transition">
                                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                                                     </button>
                                                 </form>
-                                            @endunless
+                                            @endif
                                         </div>
                                     </td>
                                 </tr>
@@ -546,16 +611,21 @@
                                                     class="w-8 h-8 inline-flex items-center justify-center rounded-lg border border-line text-brand hover:bg-brand-soft transition">
                                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
                                             </button>
-                                            @unless($field->is_system)
+                                            @if(in_array($field->key, ['name', 'username', 'email', 'password', 'role'], true))
+                                                <button type="button" disabled title="Core user field cannot be deleted"
+                                                        class="w-8 h-8 inline-flex items-center justify-center rounded-lg border border-line text-slate-300 cursor-not-allowed">
+                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                                                </button>
+                                            @else
                                                 <form method="POST" action="{{ route('fields.destroy', $field) }}"
-                                                      onsubmit="return confirm('Delete field?')">
+                                                      onsubmit="return confirm('Delete field \'{{ $field->label }}\'?')">
                                                     @csrf @method('DELETE')
                                                     <button type="submit" title="Delete"
                                                             class="w-8 h-8 inline-flex items-center justify-center rounded-lg border border-line text-rose-600 hover:bg-rose-50 transition">
                                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                                                     </button>
                                                 </form>
-                                            @endunless
+                                            @endif
                                         </div>
                                     </td>
                                 </tr>

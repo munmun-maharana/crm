@@ -38,6 +38,32 @@ class Customer extends Model
         ];
     }
 
+    public function getPhoneAttribute(?string $value): ?string
+    {
+        if ($value !== null && $value !== '') {
+            return $value;
+        }
+
+        return $this->meta['phone_no']
+            ?? $this->meta['phone']
+            ?? $this->meta['mobile']
+            ?? $this->meta['contact']
+            ?? $this->meta['contact_no']
+            ?? null;
+    }
+
+    public function getEmailAttribute(?string $value): ?string
+    {
+        if ($value !== null && $value !== '') {
+            return $value;
+        }
+
+        return $this->meta['email']
+            ?? $this->meta['email_address']
+            ?? $this->meta['mail']
+            ?? null;
+    }
+
     public function followUpScheduleLabel(string $dateFormat = 'd M Y'): ?string
     {
         if (! $this->follow_up || ! $this->follow_up_at) {
@@ -119,7 +145,17 @@ class Customer extends Model
             return $this->{$key};
         }
 
-        return data_get($this->meta, $key);
+        $val = data_get($this->meta, $key);
+        if ($val === null || $val === '') {
+            if (in_array($key, ['phone_no', 'mobile', 'contact', 'contact_no'], true)) {
+                return $this->phone;
+            }
+            if (in_array($key, ['email_address', 'mail'], true)) {
+                return $this->email;
+            }
+        }
+
+        return $val;
     }
 
     public function mappedOperationAttributes(): array

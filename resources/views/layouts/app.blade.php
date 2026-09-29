@@ -222,6 +222,120 @@
     </aside>
 </div>
 
+{{-- Send Leads to Gmail Modal with Real Cyan Table Preview --}}
+<div class="fixed inset-0 z-[70] flex items-center justify-center p-3 sm:p-5"
+     x-show="emailModalOpen"
+     x-cloak>
+    <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs transition-opacity"
+         x-show="emailModalOpen"
+         x-transition.opacity.duration.200ms
+         @click="emailModalOpen = false"></div>
+
+    <div class="relative w-full max-w-4xl max-h-[92vh] bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-slate-200 z-10"
+         x-show="emailModalOpen"
+         x-transition:enter="transition ease-out duration-250"
+         x-transition:enter-start="opacity-0 scale-95"
+         x-transition:enter-end="opacity-100 scale-100"
+         x-transition:leave="transition ease-in duration-150"
+         x-transition:leave-start="opacity-100 scale-100"
+         x-transition:leave-end="opacity-0 scale-95"
+         @click.stop>
+
+        {{-- Modal Header --}}
+        <div class="px-6 py-4 border-b border-line flex items-center justify-between bg-slate-50 shrink-0">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-rose-50 border border-rose-200 flex items-center justify-center text-rose-600 shadow-xs">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                </div>
+                <div>
+                    <h3 class="text-base font-bold text-slate-800">Send Customer Leads via Gmail</h3>
+                    <p class="text-[12px] text-slate-500" x-text="emailModalCount + ' customers selected • Excel-style cyan header & borders'"></p>
+                </div>
+            </div>
+            <button type="button" @click="emailModalOpen = false"
+                    class="w-8 h-8 rounded-lg hover:bg-slate-200/70 text-slate-400 hover:text-slate-700 flex items-center justify-center transition">✕</button>
+        </div>
+
+        {{-- Recipient Email Input & Quick Copy --}}
+        <div class="px-6 py-3.5 bg-slate-50/70 border-b border-line shrink-0 space-y-2">
+            <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-600">
+                Recipient Email (Enter Manually)
+            </label>
+            <div class="flex items-center gap-2">
+                <div class="relative flex-1">
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.206"/></svg>
+                    </div>
+                    <input type="email" x-model="emailModalRecipient"
+                           placeholder="Type recipient email address (e.g. boss@gmail.com, partner@company.com)..."
+                           class="w-full rounded-xl border border-line pl-9 pr-3.5 py-2 text-[13px] bg-white focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition font-medium">
+                </div>
+                <button type="button" @click="copyEmailTableToClipboard()"
+                        class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-[12px] font-semibold transition shrink-0 shadow-xs"
+                        :class="emailModalCopied ? 'border-emerald-400 text-emerald-700 bg-emerald-50' : ''">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                    <span x-text="emailModalCopied ? 'Copied to Clipboard!' : 'Copy Table'"></span>
+                </button>
+            </div>
+            <p class="text-[11px] text-slate-400">You can enter the email address above, or leave it blank to type it in Gmail.</p>
+        </div>
+
+        {{-- Live Table Preview --}}
+        <div class="flex-1 overflow-y-auto crm-scroll p-6 bg-slate-100/60 min-h-[220px]">
+            <div class="flex items-center justify-between mb-2.5">
+                <div class="flex items-center gap-2">
+                    <span class="text-[11px] font-bold uppercase tracking-wider text-slate-600">Live Table Preview</span>
+                    <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-[#8fe3eb]/40 text-slate-800 border border-[#8fe3eb]">
+                        Cyan Header (#8fe3eb) &amp; Black Borders
+                    </span>
+                </div>
+                <span class="text-[11px] text-slate-400" x-text="'Showing ' + emailModalCount + ' rows'"></span>
+            </div>
+
+            <div x-show="emailModalLoading" class="py-12 text-center text-slate-400 text-sm animate-pulse">
+                Loading table data…
+            </div>
+
+            <div x-show="!emailModalLoading" class="border border-slate-400 rounded-lg overflow-x-auto shadow-sm bg-white p-1">
+                <div x-html="emailModalHtml"></div>
+            </div>
+        </div>
+
+        {{-- Instructions Notice --}}
+        <div class="px-6 py-3 bg-amber-50/90 border-t border-amber-200/80 flex items-center justify-between gap-3 text-[12px] text-amber-900 shrink-0">
+            <div class="flex items-center gap-2.5 min-w-0">
+                <span class="w-6 h-6 rounded-full bg-amber-200/80 text-amber-800 font-bold flex items-center justify-center text-[12px] shrink-0">ℹ</span>
+                <span class="truncate">
+                    In Gmail compose: press <kbd class="px-1.5 py-0.5 rounded bg-white border border-amber-300 font-mono text-[11px] font-bold shadow-xs text-amber-900">Ctrl + V</kbd> to paste this exact colored Excel table!
+                </span>
+            </div>
+            <span x-show="emailModalCopied" class="text-emerald-700 font-bold text-[12px] shrink-0 animate-pulse">
+                ✓ Table copied to clipboard!
+            </span>
+        </div>
+
+        {{-- Footer --}}
+        <div class="px-6 py-4 border-t border-line bg-white flex items-center justify-between gap-3 shrink-0">
+            <button type="button" @click="emailModalOpen = false"
+                    class="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 text-[13px] font-semibold transition">
+                Close
+            </button>
+            <div class="flex items-center gap-2.5">
+                <button type="button" @click="copyEmailTableToClipboard()"
+                        class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-[13px] font-semibold shadow-xs transition">
+                    <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                    <span x-text="emailModalCopied ? 'Table Copied!' : 'Copy Table Only'"></span>
+                </button>
+                <button type="button" @click="openGmailFromModal()"
+                        class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-black text-white text-[13px] font-bold shadow-lg shadow-slate-900/20 hover:scale-[1.01] active:scale-[0.99] transition">
+                    <svg class="w-4 h-4 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                    <span>Open in Gmail Web</span>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
 function crmShell() {
     return {
@@ -236,6 +350,15 @@ function crmShell() {
         composeOpen: false,
         composeSending: false,
         compose: { channel: 'whatsapp', customerId: null, name: '', phone: '', email: '', message: '', subject: '', link: '' },
+        emailModalOpen: false,
+        emailModalLoading: false,
+        emailModalCopied: false,
+        emailModalRecipient: '',
+        emailModalSubject: '',
+        emailModalHtml: '',
+        emailModalCount: 0,
+        emailModalIds: [],
+        emailModalData: null,
         selectedIds: [],
         lastSelectId: null,
         isSelected(id) {
@@ -296,6 +419,111 @@ function crmShell() {
                 form.appendChild(input);
             });
         },
+        async sendBulkWhatsapp() {
+            if (!this.selectedIds.length) {
+                alert('Please select at least one customer.');
+                return;
+            }
+            try {
+                const res = await fetch(`{{ route('customers.bulk-whatsapp') }}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content
+                    },
+                    body: JSON.stringify({ ids: this.selectedIds })
+                });
+                const data = await res.json();
+                if (!res.ok) {
+                    if (data.settings_url && confirm((data.message || 'WhatsApp number not set.') + '\n\nDo you want to open Settings now?')) {
+                        window.location.href = data.settings_url;
+                    } else {
+                        alert(data.message || 'Could not prepare WhatsApp message');
+                    }
+                    return;
+                }
+                if (data.url) {
+                    window.open(data.url, '_blank');
+                }
+            } catch (e) {
+                alert('Failed to send WhatsApp message.');
+            }
+        },
+        async openEmailModal(ids = null) {
+            const targetIds = (ids && ids.length) ? ids : this.selectedIds;
+            if (!targetIds || !targetIds.length) {
+                alert('Please select at least one customer.');
+                return;
+            }
+            this.emailModalIds = targetIds.map(Number);
+            this.emailModalLoading = true;
+            this.emailModalCopied = false;
+            this.emailModalRecipient = '';
+            this.emailModalOpen = true;
+
+            try {
+                const res = await fetch(`{{ route('customers.bulk-email') }}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content
+                    },
+                    body: JSON.stringify({ ids: this.emailModalIds, recipient: '' })
+                });
+                const data = await res.json();
+                if (!res.ok) {
+                    alert(data.message || 'Could not load customer email data.');
+                    this.emailModalOpen = false;
+                    return;
+                }
+                this.emailModalData = data;
+                this.emailModalHtml = data.html_table || '';
+                this.emailModalSubject = data.subject || '';
+                this.emailModalCount = data.count || this.emailModalIds.length;
+            } catch (e) {
+                alert('Failed to load customer email data.');
+                this.emailModalOpen = false;
+            } finally {
+                this.emailModalLoading = false;
+            }
+        },
+        async copyEmailTableToClipboard() {
+            if (!this.emailModalHtml) return;
+            const ok = await copyHtmlTableToClipboard(this.emailModalHtml, this.emailModalData?.subject || '');
+            if (ok) {
+                this.emailModalCopied = true;
+                setTimeout(() => { this.emailModalCopied = false; }, 3000);
+            }
+        },
+        async openGmailFromModal() {
+            if (!this.emailModalHtml) return;
+            // 1. Copy styled table to clipboard right now (during active click gesture)
+            await copyHtmlTableToClipboard(this.emailModalHtml, this.emailModalData?.subject || '');
+            this.emailModalCopied = true;
+
+            // 2. Insert user entered recipient into Gmail URL
+            let recipient = (this.emailModalRecipient || '').trim();
+            let url = this.emailModalData?.gmail_url || '';
+            if (recipient !== '') {
+                url = url.replace(/(&to=)[^&]*/, '$1' + encodeURIComponent(recipient));
+            }
+
+            // 3. Open Gmail
+            if (url) {
+                window.open(url, '_blank');
+            }
+        },
+        async sendBulkEmail() {
+            if (!this.selectedIds.length) {
+                alert('Please select at least one customer.');
+                return;
+            }
+            await this.openEmailModal(this.selectedIds);
+        },
         async selectCustomer(id) {
             if (!id) return;
             const switching = this.selectedId && this.selectedId !== id;
@@ -325,21 +553,78 @@ function crmShell() {
         },
         openCreateForm() {
             this.formMode = 'create';
-            this.form = { id: null };
+            const newForm = { id: null };
             (window.CRM_FORM_FIELDS || []).forEach(f => {
-                this.form[f.key] = f.key === 'status' ? 'new' : '';
+                let defaultVal = '';
+                if (f.key === 'status') {
+                    if (Array.isArray(f.options) && f.options.length > 0) {
+                        const newOpt = f.options.find(o => String(o).trim().toLowerCase() === 'new');
+                        defaultVal = newOpt ?? f.options[0];
+                    } else {
+                        defaultVal = 'New';
+                    }
+                }
+                newForm[f.key] = defaultVal;
             });
+            this.form = newForm;
             this.formOpen = true;
+            this.$nextTick(() => {
+                const drawer = document.getElementById('customerDrawerForm');
+                if (drawer) {
+                    const sel = drawer.querySelector('select[name="status"]');
+                    if (sel && this.form.status) {
+                        const valStr = String(this.form.status).trim().toLowerCase();
+                        const matchedOption = Array.from(sel.options).find(o => 
+                            o.value.trim().toLowerCase() === valStr
+                        );
+                        if (matchedOption) {
+                            sel.value = matchedOption.value;
+                            this.form.status = matchedOption.value;
+                        }
+                    }
+                }
+            });
         },
         openEditForm(c) {
             this.formMode = 'edit';
-            this.form = { id: c.id };
+            const newForm = { id: c.id };
             (window.CRM_FORM_FIELDS || []).forEach(f => {
                 let val = c[f.key];
                 if ((val === undefined || val === null) && c.meta) val = c.meta[f.key];
-                this.form[f.key] = val ?? '';
+                if (val !== undefined && val !== null && (f.type === 'select' || f.key === 'status') && Array.isArray(f.options)) {
+                    const match = f.options.find(opt => String(opt).trim().toLowerCase() === String(val).trim().toLowerCase());
+                    if (match !== undefined) {
+                        val = match;
+                    }
+                }
+                newForm[f.key] = val ?? '';
             });
+            this.form = newForm;
             this.formOpen = true;
+            this.$nextTick(() => {
+                const drawer = document.getElementById('customerDrawerForm');
+                if (drawer) {
+                    (window.CRM_FORM_FIELDS || []).forEach(f => {
+                        if (f.type === 'select' || f.key === 'status') {
+                            const sel = drawer.querySelector(`select[name="${f.key}"]`);
+                            if (sel && this.form[f.key]) {
+                                const valStr = String(this.form[f.key]).trim().toLowerCase();
+                                const matchedOption = Array.from(sel.options).find(o => 
+                                    o.value.trim().toLowerCase() === valStr
+                                );
+                                if (matchedOption) {
+                                    sel.value = matchedOption.value;
+                                    this.form[f.key] = matchedOption.value;
+                                } else {
+                                    const newOpt = new Option(this.form[f.key], this.form[f.key], true, true);
+                                    sel.add(newOpt);
+                                    sel.value = this.form[f.key];
+                                }
+                            }
+                        }
+                    });
+                }
+            });
         },
         closeForm() {
             this.formOpen = false;
@@ -469,6 +754,22 @@ function crmShell() {
                     } else {
                         listBadge.textContent = '';
                         listBadge.classList.add('hidden');
+                    }
+                }
+                if (data.status != null) {
+                    const statusCell = document.querySelector(`[data-status-cell="${data.customer_id}"]`);
+                    if (statusCell) {
+                        statusCell.textContent = data.status;
+                        if (data.status_tone_class) {
+                            statusCell.className = `inline-flex px-2 py-0.5 rounded text-[11px] font-bold capitalize ${data.status_tone_class}`;
+                        }
+                    }
+                    const statusList = document.querySelector(`[data-status-list="${data.customer_id}"]`);
+                    if (statusList) {
+                        statusList.textContent = data.status;
+                        if (data.status_tone_class) {
+                            statusList.className = `text-[10px] font-semibold px-1.5 py-0.5 rounded capitalize shrink-0 ${data.status_tone_class}`;
+                        }
                     }
                 }
             }
@@ -645,6 +946,98 @@ async function runAutoAction(customerId, channel) {
     } catch (e) {
         alert('Could not run automation');
     }
+}
+
+async function sendSingleCustomerWhatsapp(customerId) {
+    if (!customerId) return;
+    try {
+        const res = await fetch(`{{ route('customers.bulk-whatsapp') }}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content
+            },
+            body: JSON.stringify({ ids: [customerId] })
+        });
+        const data = await res.json();
+        if (!res.ok) {
+            if (data.settings_url && confirm((data.message || 'WhatsApp number not set.') + '\n\nDo you want to open Settings now?')) {
+                window.location.href = data.settings_url;
+            } else {
+                alert(data.message || 'Could not prepare WhatsApp message');
+            }
+            return;
+        }
+        if (data.url) {
+            window.open(data.url, '_blank');
+        }
+    } catch (e) {
+        alert('Failed to send WhatsApp message.');
+    }
+}
+
+async function sendSingleCustomerEmail(customerId) {
+    if (!customerId) return;
+    try {
+        const root = Alpine.$data(document.body);
+        if (root && typeof root.openEmailModal === 'function') {
+            await root.openEmailModal([customerId]);
+            return;
+        }
+    } catch (e) {
+        console.warn('Could not open email modal via Alpine:', e);
+    }
+}
+
+async function copyHtmlTableToClipboard(htmlString, plainString) {
+    if (!htmlString) return false;
+    let copied = false;
+
+    // 1. Try modern navigator.clipboard with ClipboardItem
+    if (navigator.clipboard && window.ClipboardItem) {
+        try {
+            const blobHtml = new Blob([htmlString], { type: 'text/html' });
+            const blobText = new Blob([plainString || ''], { type: 'text/plain' });
+            await navigator.clipboard.write([
+                new ClipboardItem({
+                    'text/html': blobHtml,
+                    'text/plain': blobText
+                })
+            ]);
+            copied = true;
+        } catch (e) {
+            console.warn('navigator.clipboard.write failed, trying fallback:', e);
+        }
+    }
+
+    // 2. Fallback using invisible DOM element + execCommand
+    if (!copied) {
+        try {
+            const container = document.createElement('div');
+            container.innerHTML = htmlString;
+            container.style.position = 'fixed';
+            container.style.pointerEvents = 'none';
+            container.style.opacity = '0';
+            container.style.left = '-9999px';
+            document.body.appendChild(container);
+
+            const range = document.createRange();
+            range.selectNode(container);
+            const selection = window.getSelection();
+            selection.removeAllRanges();
+            selection.addRange(range);
+
+            copied = document.execCommand('copy');
+            selection.removeAllRanges();
+            document.body.removeChild(container);
+        } catch (e2) {
+            console.warn('execCommand copy fallback failed:', e2);
+        }
+    }
+
+    return copied;
 }
 </script>
 @stack('scripts')

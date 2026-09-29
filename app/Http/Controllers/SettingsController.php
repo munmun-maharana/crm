@@ -6,6 +6,7 @@ use App\Models\CrmField;
 use App\Models\InventoryType;
 use App\Models\NoteTemplate;
 use App\Models\OperationSetting;
+use App\Models\WhatsappSetting;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
@@ -13,7 +14,7 @@ class SettingsController extends Controller
 {
     public function index(Request $request): View
     {
-        $allowed = ['fields', 'notes', 'op-assign', 'op-fields', 'user-fields', 'inventory'];
+        $allowed = ['fields', 'notes', 'whatsapp', 'op-assign', 'op-fields', 'user-fields', 'inventory'];
         $tab = $request->string('tab')->toString();
         if (! in_array($tab, $allowed, true)) {
             $tab = 'fields';
@@ -22,6 +23,7 @@ class SettingsController extends Controller
         $fields = CrmField::inPipeline('crm')->ordered()->get();
         $templates = NoteTemplate::ordered()->get();
         $setting = OperationSetting::current();
+        $whatsappSetting = WhatsappSetting::current();
         $statuses = $this->statusOptions();
         $opFields = CrmField::inPipeline('operations')->ordered()->get();
         $userFields = CrmField::inPipeline('users')->ordered()->get();
@@ -33,6 +35,7 @@ class SettingsController extends Controller
             'fields',
             'templates',
             'setting',
+            'whatsappSetting',
             'statuses',
             'opFields',
             'userFields',

@@ -148,8 +148,12 @@ class FieldController extends Controller
 
     public function destroy(Request $request, CrmField $field): RedirectResponse
     {
-        if ($field->is_system) {
-            return back()->withErrors(['field' => 'System fields cannot be deleted.']);
+        if ($field->key === 'name') {
+            return back()->withErrors(['field' => 'The Name field is required by the system and cannot be deleted.']);
+        }
+
+        if ($field->pipeline === 'users' && in_array($field->key, CrmField::USER_CORE_KEYS, true)) {
+            return back()->withErrors(['field' => 'Core user fields cannot be deleted.']);
         }
 
         $key = $field->key;
@@ -160,11 +164,17 @@ class FieldController extends Controller
             Customer::query()->inPipeline('crm')->orderBy('id')->chunkById(100, function ($rows) use ($key) {
                 foreach ($rows as $customer) {
                     $meta = $customer->meta ?? [];
-                    if (! is_array($meta) || ! array_key_exists($key, $meta)) {
-                        continue;
+                    if (is_array($meta) && array_key_exists($key, $meta)) {
+                        unset($meta[$key]);
+                        $customer->meta = $meta ?: null;
                     }
-                    unset($meta[$key]);
-                    $customer->meta = $meta ?: null;
+                    if (in_array($key, CrmField::CORE_KEYS, true) && $key !== 'name') {
+                        if ($key === 'status') {
+                            $customer->status = 'new';
+                        } else {
+                            $customer->{$key} = null;
+                        }
+                    }
                     $customer->save();
                 }
             });
@@ -175,11 +185,17 @@ class FieldController extends Controller
             Customer::query()->inPipeline('operations')->orderBy('id')->chunkById(100, function ($rows) use ($key) {
                 foreach ($rows as $customer) {
                     $meta = $customer->meta ?? [];
-                    if (! is_array($meta) || ! array_key_exists($key, $meta)) {
-                        continue;
+                    if (is_array($meta) && array_key_exists($key, $meta)) {
+                        unset($meta[$key]);
+                        $customer->meta = $meta ?: null;
                     }
-                    unset($meta[$key]);
-                    $customer->meta = $meta ?: null;
+                    if (in_array($key, CrmField::CORE_KEYS, true) && $key !== 'name') {
+                        if ($key === 'status') {
+                            $customer->status = 'new';
+                        } else {
+                            $customer->{$key} = null;
+                        }
+                    }
                     $customer->save();
                 }
             });

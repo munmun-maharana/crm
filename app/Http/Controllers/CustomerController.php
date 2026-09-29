@@ -2,12 +2,14 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\CrmField;
 use App\Models\Customer;
 use App\Models\CustomerActivity;
 use App\Models\InventoryItem;
 use App\Models\InventoryType;
 use App\Models\NoteTemplate;
 use App\Models\OperationSetting;
+use App\Models\WhatsappSetting;
 use App\Models\User;
 use App\Services\CrmFieldService;
 use Illuminate\Http\JsonResponse;
@@ -70,8 +72,13 @@ class CustomerController extends Controller
         $formFields = $this->formFieldsFor($request, $pipeline);
         $tableFields = $this->fields->tableFields($pipeline);
 
+        $statusField = CrmField::inPipeline($pipeline)->where('key', 'status')->first();
+        $statusOptions = ! empty($statusField?->options)
+            ? $statusField->options
+            : ['new', 'interested', 'contacted', 'converted', 'lost', 'request'];
+
         return view('customers.index', compact(
-            'customers', 'agents', 'q', 'status', 'filter', 'assignedTo', 'formFields', 'tableFields', 'pipeline', 'listRoute'
+            'customers', 'agents', 'q', 'status', 'filter', 'assignedTo', 'formFields', 'tableFields', 'pipeline', 'listRoute', 'statusOptions'
         ));
     }
 
@@ -157,6 +164,10 @@ class CustomerController extends Controller
                 ];
             })->values()->all();
         }
+        $statusField = CrmField::inPipeline($customer->pipeline ?? 'crm')->where('key', 'status')->first();
+        $statusOptions = ! empty($statusField?->options)
+            ? $statusField->options
+            : ['new', 'interested', 'contacted', 'converted', 'lost', 'request'];
         $activationRequests = $customer->activationRequests;
 
         return response()->json([
@@ -164,6 +175,7 @@ class CustomerController extends Controller
             'html' => view('customers.partials.panel', compact(
                 'customer',
                 'formFields',
+                'statusOptions',
                 'noteTemplates',
                 'inventoryTypes',
                 'activationRequests',
@@ -199,12 +211,16 @@ class CustomerController extends Controller
     public function addActivity(Request $request, Customer $customer): RedirectResponse|JsonResponse
     {
         $this->authorizeMapped($request, $customer);
-        $statuses = ['new', 'interested', 'contacted', 'converted', 'lost', 'request'];
+        $statusField = CrmField::inPipeline($customer->pipeline ?? 'crm')->where('key', 'status')->first();
+        $statusOptions = ! empty($statusField?->options)
+            ? $statusField->options
+            : ['new', 'interested', 'contacted', 'converted', 'lost', 'request'];
+
         $data = $request->validate([
             'type' => ['required', 'in:note,call,whatsapp,email,sms'],
-            'status_change' => ['nullable', 'in:'.implode(',', $statuses)],
+            'status_change' => ['nullable', 'string', 'max:100'],
             'title' => ['nullable', 'string', 'max:120'],
-            'body' => ['required', 'string'],
+            'body' => ['nullable', 'string'],
             'follow_up' => ['nullable', 'boolean'],
             'follow_up_date' => ['nullable', 'date'],
             'follow_up_time_on' => ['nullable', 'boolean'],
@@ -213,10 +229,17 @@ class CustomerController extends Controller
 
         $activityType = $data['type'];
         $title = trim((string) ($data['title'] ?? ''));
-        $body = trim((string) $data['body']);
-        if ($body === '' || strtolower($body) === 'null') {
-            return response()->json(['ok' => false, 'message' => 'Please write a note.'], 422);
+        $body = trim((string) ($data['body'] ?? ''));
+
+        $statusChangeVal = trim((string) ($data['status_change'] ?? ''));
+        $targetStatus = null;
+        if ($statusChangeVal !== '') {
+            $matched = collect($statusOptions)->first(fn ($s) => strtolower(trim((string)$s)) === strtolower($statusChangeVal));
+            $targetStatus = $matched ?: $statusChangeVal;
         }
+
+        $statusChanged = $targetStatus !== null && strtolower((string)$targetStatus) !== strtolower((string)$customer->status);
+        $oldStatus = $customer->status;
 
         $followUp = $request->boolean('follow_up');
         $hasTime = $request->boolean('follow_up_time_on');
@@ -230,15 +253,24 @@ class CustomerController extends Controller
             return response()->json(['ok' => false, 'message' => 'Select a follow-up time, or uncheck Time.'], 422);
         }
 
+        if ($body === '' || strtolower($body) === 'null') {
+            if ($statusChanged && $followUp) {
+                $body = "Status updated to {$targetStatus} and follow-up scheduled.";
+            } elseif ($statusChanged) {
+                $body = "Status updated to {$targetStatus}.";
+            } elseif ($followUp) {
+                $body = "Follow-up scheduled.";
+            } else {
+                return response()->json(['ok' => false, 'message' => 'Please write a note, change status, or set a follow-up.'], 422);
+            }
+        }
+
         $followUpAt = null;
         if ($followUp) {
             $followUpAt = $hasTime
                 ? $followDate.' '.$followTime.':00'
                 : $followDate.' 00:00:00';
         }
-
-        $statusChanged = ! empty($data['status_change']) && $data['status_change'] !== $customer->status;
-        $oldStatus = $customer->status;
 
         $customerData = [
             'last_contact_at' => now(),
@@ -248,9 +280,9 @@ class CustomerController extends Controller
         ];
 
         if ($statusChanged) {
-            $customerData['status'] = $data['status_change'];
+            $customerData['status'] = $targetStatus;
             if ($title === '') {
-                $title = 'Update · '.$oldStatus.' → '.$data['status_change'];
+                $title = 'Update · '.$oldStatus.' → '.$targetStatus;
             }
         } elseif ($title === '') {
             $title = ucfirst($activityType).' update';
@@ -261,7 +293,7 @@ class CustomerController extends Controller
         $meta = [];
         if ($statusChanged) {
             $meta['status_from'] = $oldStatus;
-            $meta['status_to'] = $data['status_change'];
+            $meta['status_to'] = $targetStatus;
         }
         if ($followUp) {
             $meta['follow_up'] = true;
@@ -293,9 +325,25 @@ class CustomerController extends Controller
                 $followUpHtml = '<span class="text-slate-400">—</span>';
             }
 
+            $toneMap = [
+                'new' => 'text-sky-700 bg-sky-50',
+                'no answer' => 'text-slate-700 bg-slate-100',
+                'follow-up' => 'text-amber-800 bg-amber-100',
+                'interested' => 'text-teal-700 bg-teal-50',
+                'contacted' => 'text-blue-700 bg-blue-50',
+                'converted' => 'text-emerald-700 bg-emerald-50',
+                'cancelled' => 'text-rose-700 bg-rose-50',
+                'lost' => 'text-rose-700 bg-rose-50',
+                'confirmed' => 'text-emerald-700 bg-emerald-50',
+                'request' => 'text-amber-800 bg-amber-50',
+            ];
+            $statusToneClass = $toneMap[strtolower((string)$customer->status)] ?? 'bg-sky-50 text-sky-800';
+
             return response()->json([
                 'ok' => true,
                 'customer_id' => $customer->id,
+                'status' => $customer->status,
+                'status_tone_class' => $statusToneClass,
                 'follow_up' => (bool) $customer->follow_up,
                 'follow_up_at' => $customer->follow_up_at?->toIso8601String(),
                 'follow_up_label' => ($customer->follow_up && $customer->follow_up_at)
@@ -305,6 +353,7 @@ class CustomerController extends Controller
                 'html' => view('customers.partials.panel', [
                     'customer' => $customer,
                     'formFields' => $formFields,
+                    'statusOptions' => $statusOptions,
                     'noteTemplates' => NoteTemplate::active()->ordered()->get(['id', 'title', 'body']),
                 ])->render(),
             ]);
@@ -555,6 +604,220 @@ class CustomerController extends Controller
         }
 
         return back()->with('success', "Mapped {$ids->count()} customers to {$agent->name}.");
+    }
+
+    public function bulkWhatsapp(Request $request): JsonResponse
+    {
+        $setting = WhatsappSetting::current();
+        $targetPhone = $setting->normalizedPhone();
+
+        if (empty($targetPhone)) {
+            return response()->json([
+                'ok' => false,
+                'message' => 'Please set the WhatsApp number in Settings first.',
+                'settings_url' => route('settings.index', ['tab' => 'whatsapp']),
+            ], 422);
+        }
+
+        $rawIds = $request->input('ids');
+        if (is_string($rawIds)) {
+            $rawIds = explode(',', $rawIds);
+        }
+        $ids = is_array($rawIds) ? array_filter(array_map('intval', $rawIds)) : [];
+
+        if (empty($ids)) {
+            return response()->json(['ok' => false, 'message' => 'Please select at least one customer.'], 422);
+        }
+
+        $customers = Customer::query()
+            ->whereIn('id', $ids)
+            ->visibleTo($request->user())
+            ->with('assignee')
+            ->orderBy('id', 'desc')
+            ->get();
+
+        if ($customers->isEmpty()) {
+            return response()->json(['ok' => false, 'message' => 'No accessible customers found.'], 404);
+        }
+
+        $pipeline = $customers->first()->pipeline ?? 'crm';
+        $crmFields = CrmField::inPipeline($pipeline)->active()->ordered()->get();
+
+        $lines = [];
+        $count = $customers->count();
+        $lines[] = "📋 *CUSTOMER LEAD DATA* (" . $count . " " . ($count > 1 ? "Records" : "Record") . ")";
+        $lines[] = "📅 *Date:* " . now()->format('d M Y, h:i A');
+        $lines[] = "━━━━━━━━━━━━━━━━━━━━";
+
+        foreach ($customers as $index => $customer) {
+            $num = $count > 1 ? " #" . ($index + 1) : "";
+            $lines[] = "👤 *CUSTOMER{$num}:* *" . trim($customer->name) . "*";
+
+            foreach ($crmFields as $f) {
+                if ($f->key === 'name') {
+                    continue;
+                }
+                $val = $customer->fieldValue($f->key);
+                if ($f->key === 'assigned_to') {
+                    $val = $customer->assignee?->name;
+                }
+                if ($val !== null && $val !== '' && ! (is_array($val) && empty($val))) {
+                    if (is_array($val)) {
+                        $val = implode(', ', $val);
+                    }
+                    $lines[] = "• *{$f->label}:* " . trim((string) $val);
+                }
+            }
+
+            if ($customer->follow_up && $customer->follow_up_at) {
+                $lines[] = "• *Follow-up:* " . $customer->followUpScheduleLabel();
+            }
+
+            if ($index < $count - 1) {
+                $lines[] = "────────────────────";
+            }
+        }
+
+        $messageText = implode("\n", $lines);
+        $encodedText = rawurlencode($messageText);
+        $whatsappUrl = "https://api.whatsapp.com/send?phone={$targetPhone}&text={$encodedText}";
+
+        return response()->json([
+            'ok' => true,
+            'phone' => $targetPhone,
+            'url' => $whatsappUrl,
+            'count' => $count,
+        ]);
+    }
+
+    public function bulkEmail(Request $request): JsonResponse
+    {
+        $rawIds = $request->input('ids');
+        if (is_string($rawIds)) {
+            $rawIds = explode(',', $rawIds);
+        }
+        $ids = is_array($rawIds) ? array_filter(array_map('intval', $rawIds)) : [];
+
+        if (empty($ids)) {
+            return response()->json(['ok' => false, 'message' => 'Please select at least one customer.'], 422);
+        }
+
+        $customers = Customer::query()
+            ->whereIn('id', $ids)
+            ->visibleTo($request->user())
+            ->with(['assignee', 'activities'])
+            ->orderBy('id', 'desc')
+            ->get();
+
+        if ($customers->isEmpty()) {
+            return response()->json(['ok' => false, 'message' => 'No accessible customers found.'], 404);
+        }
+
+        $headers = ['Date', 'Name', 'City', 'Mobile Number', 'Leads Status', 'Feedback', 'Amount Received', 'Payment Mode'];
+        $rows = [];
+
+        foreach ($customers as $c) {
+            $date = $c->fieldValue('date') ?: ($c->created_at ? $c->created_at->format('d-m-Y') : '');
+            $name = trim((string) $c->name);
+            $city = trim((string) ($c->city ?: $c->fieldValue('city')));
+            $phone = trim((string) ($c->phone ?: $c->fieldValue('phone_no')));
+            $status = trim((string) ($c->fieldValue('leads_status') ?: $c->status));
+
+            // Feedback: strictly customer note only (no vehicle or status logs)
+            $feedback = trim((string) $c->notes);
+            if ($feedback === '') {
+                $userNote = $c->activities
+                    ->where('type', 'note')
+                    ->first(function ($act) {
+                        $b = trim((string) $act->body);
+                        return $b !== '' && ! str_starts_with($b, 'Status updated to');
+                    })?->body;
+                $feedback = trim((string) ($userNote ?: ($c->fieldValue('notes') ?: ($c->fieldValue('note') ?: ($c->fieldValue('feedback') ?: '')))));
+            }
+
+            $amountReceived = (string) ($c->fieldValue('amount_received') ?: ($c->fieldValue('seal_price') ?: ($c->fieldValue('mrp') ?: '')));
+            $rawPaymentMode = trim((string) ($c->fieldValue('payment_mode') ?: ($c->fieldValue('payment_type') ?: '')));
+            $paymentMode = $rawPaymentMode !== '' ? $rawPaymentMode : 'Online';
+
+            $rows[] = [
+                'date' => $date,
+                'name' => $name,
+                'city' => $city,
+                'phone' => $phone,
+                'status' => $status,
+                'feedback' => $feedback,
+                'amount_received' => $amountReceived,
+                'payment_mode' => $paymentMode,
+            ];
+        }
+
+        $recipient = trim((string) $request->input('recipient', ''));
+
+        // 1. Build Rich HTML Table matching user's image styling (cyan background header, underlined, black borders)
+        $htmlTable = '<table border="1" cellpadding="6" cellspacing="0" style="border-collapse: collapse; mso-table-lspace: 0pt; mso-table-rspace: 0pt; font-family: Calibri, \'Segoe UI\', Arial, sans-serif; font-size: 13px; border: 1px solid #000000; width: 100%; min-width: 720px; background-color: #ffffff;">' . "\n";
+        $htmlTable .= '  <thead>' . "\n";
+        $htmlTable .= '    <tr style="background-color: #8fe3eb;">' . "\n";
+        foreach ($headers as $h) {
+            $htmlTable .= '      <th style="background-color: #8fe3eb; background: #8fe3eb; border: 1px solid #000000; padding: 7px 10px; text-decoration: underline; font-weight: bold; color: #000000; text-align: left; vertical-align: middle;">' . htmlspecialchars($h) . '</th>' . "\n";
+        }
+        $htmlTable .= '    </tr>' . "\n";
+        $htmlTable .= '  </thead>' . "\n";
+        $htmlTable .= '  <tbody>' . "\n";
+        foreach ($rows as $r) {
+            $htmlTable .= '    <tr style="background-color: #ffffff;">' . "\n";
+            $htmlTable .= '      <td style="border: 1px solid #000000; padding: 6px 10px; color: #000000; white-space: nowrap;">' . htmlspecialchars($r['date']) . '</td>' . "\n";
+            $htmlTable .= '      <td style="border: 1px solid #000000; padding: 6px 10px; font-weight: bold; color: #000000;">' . htmlspecialchars($r['name']) . '</td>' . "\n";
+            $htmlTable .= '      <td style="border: 1px solid #000000; padding: 6px 10px; color: #000000;">' . htmlspecialchars($r['city']) . '</td>' . "\n";
+            $htmlTable .= '      <td style="border: 1px solid #000000; padding: 6px 10px; color: #000000; white-space: nowrap;">' . htmlspecialchars($r['phone']) . '</td>' . "\n";
+            $htmlTable .= '      <td style="border: 1px solid #000000; padding: 6px 10px; color: #000000;">' . htmlspecialchars($r['status']) . '</td>' . "\n";
+            $htmlTable .= '      <td style="border: 1px solid #000000; padding: 6px 10px; color: #000000;">' . htmlspecialchars($r['feedback']) . '</td>' . "\n";
+            $htmlTable .= '      <td style="border: 1px solid #000000; padding: 6px 10px; color: #000000; text-align: right;">' . htmlspecialchars($r['amount_received']) . '</td>' . "\n";
+            $htmlTable .= '      <td style="border: 1px solid #000000; padding: 6px 10px; color: #000000;">' . htmlspecialchars($r['payment_mode']) . '</td>' . "\n";
+            $htmlTable .= '    </tr>' . "\n";
+        }
+        $htmlTable .= '  </tbody>' . "\n";
+        $htmlTable .= '</table>';
+
+        // 2. Clean, beautifully structured lead summary for Gmail body
+        $leadCards = [];
+        $idx = 1;
+        foreach ($rows as $r) {
+            $lines = [];
+            $lines[] = "[Lead {$idx}] " . ($r['name'] ?: 'Customer') . " (" . ($r['phone'] ?: 'No Phone') . ")";
+            $lines[] = "  • Date: " . ($r['date'] ?: '-') . "  |  City: " . ($r['city'] ?: '-') . "  |  Status: " . ($r['status'] ?: '-');
+            if ($r['feedback'] !== '') {
+                $lines[] = "  • Feedback: " . $r['feedback'];
+            }
+            if ($r['amount_received'] !== '' || $r['payment_mode'] !== '') {
+                $lines[] = "  • Amount: " . ($r['amount_received'] ?: '-') . "  |  Mode: " . ($r['payment_mode'] ?: '-');
+            }
+            $leadCards[] = implode("\n", $lines);
+            $idx++;
+        }
+
+        $subject = "Customer Leads Report (" . count($rows) . " Records) - " . now()->format('d M Y');
+
+        $fullBody = "Dear Team,\n\n"
+            . "👉 [PASTE TABLE HERE: Press Ctrl + V to insert the colored Excel table]\n\n"
+            . "--------------------------------------------------\n"
+            . implode("\n--------------------------------------------------\n", $leadCards) . "\n"
+            . "--------------------------------------------------\n\n"
+            . "Regards,\nCRM";
+
+        $gmailUrl = "https://mail.google.com/mail/?view=cm&fs=1"
+            . ($recipient !== '' ? "&to=" . rawurlencode($recipient) : "&to=")
+            . "&su=" . rawurlencode($subject)
+            . "&body=" . rawurlencode($fullBody);
+
+        return response()->json([
+            'ok' => true,
+            'count' => count($rows),
+            'subject' => $subject,
+            'recipient' => $recipient,
+            'gmail_url' => $gmailUrl,
+            'html_table' => $htmlTable,
+            'rows' => $rows,
+        ]);
     }
 
     private function formFieldsFor(Request $request, string $pipeline = 'crm')

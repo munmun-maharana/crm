@@ -10,7 +10,8 @@
         'system' => 'bg-mist text-slate-500',
     ];
     $initials = collect(explode(' ', $customer->name))->map(fn ($w) => mb_substr($w, 0, 1))->take(2)->implode('');
-    $statusOptions = ['new', 'interested', 'contacted', 'converted', 'lost', 'request'];
+    $statusField = \App\Models\CrmField::inPipeline($customer->pipeline ?? 'crm')->where('key', 'status')->first();
+    $statusOptions = $statusOptions ?? (! empty($statusField?->options) ? $statusField->options : ['new', 'interested', 'contacted', 'converted', 'lost', 'request']);
     $myStock = $myStock ?? [];
     $activationRequests = $activationRequests ?? collect();
     $actTone = [
@@ -138,9 +139,17 @@
                     <select name="status_change"
                             class="appearance-none rounded-lg border border-line bg-mist/50 hover:bg-white focus:bg-white focus:border-brand focus:ring-2 focus:ring-brand/20 pl-2.5 pr-7 py-1.5 text-[12px] font-medium text-ink outline-none transition">
                         <option value="">Status</option>
+                        @php $matchedExisting = false; @endphp
                         @foreach($statusOptions as $s)
-                            <option value="{{ $s }}" @selected($customer->status === $s)>{{ ucfirst($s) }}</option>
+                            @php
+                                $isMatch = strtolower(trim((string)$customer->status)) === strtolower(trim((string)$s));
+                                if ($isMatch) $matchedExisting = true;
+                            @endphp
+                            <option value="{{ $s }}" @selected($isMatch)>{{ ucfirst($s) }}</option>
                         @endforeach
+                        @if(!empty($customer->status) && ! $matchedExisting)
+                            <option value="{{ $customer->status }}" selected>{{ ucfirst($customer->status) }}</option>
+                        @endif
                     </select>
                     <svg class="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                 </div>
@@ -179,7 +188,7 @@
                 </div>
             </div>
 
-            <textarea name="body" id="activityBody-{{ $customer->id }}" required rows="3" placeholder="What happened / note…"
+            <textarea name="body" id="activityBody-{{ $customer->id }}" rows="3" placeholder="What happened / note…"
                       class="w-full rounded-lg border border-line bg-mist/20 px-3 py-2.5 text-[13px] leading-relaxed outline-none resize-y min-h-[72px]
                              focus:bg-white focus:border-brand focus:ring-2 focus:ring-brand/20 transition"></textarea>
 
