@@ -63,7 +63,13 @@ class CustomerController extends Controller
                     ->orderByRaw('CASE WHEN follow_up_has_time = 1 THEN 0 ELSE 1 END')
                     ->orderBy('follow_up_at');
             })
-            ->when($filter !== 'follow_up_today' && $status, fn ($query) => $query->where('status', $status))
+            ->when($filter !== 'follow_up_today' && $status, function ($query) use ($status) {
+                $query->where(function ($sub) use ($status) {
+                    $sub->where('status', $status)
+                        ->orWhere('status', str_replace(' ', '-', $status))
+                        ->orWhere('status', str_replace('-', ' ', $status));
+                });
+            })
             ->when($filter !== 'follow_up_today', fn ($query) => $query->latest())
             ->paginate(15)
             ->withQueryString();
