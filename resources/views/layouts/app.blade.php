@@ -116,21 +116,35 @@
         <div class="p-3 border-t border-line text-[12px]">
             <div class="flex items-center justify-between gap-2">
                 <div class="font-semibold truncate min-w-0">{{ auth()->user()->name }}</div>
-                @if(auth()->user()->isAdmin())
-                    <a href="{{ route('settings.index') }}" title="Setting"
-                       class="w-7 h-7 shrink-0 inline-flex items-center justify-center rounded-lg border border-line text-slate-500 hover:bg-brand-soft hover:text-brand hover:border-brand/30 transition {{ request()->routeIs('settings.*', 'fields.*', 'note-templates.*', 'operation-settings.*') ? 'bg-brand-soft text-brand border-brand/30' : '' }}">
+                <div class="flex items-center gap-1 shrink-0">
+                    <button type="button" @click="changePasswordOpen = true" title="Change Password"
+                       class="w-7 h-7 inline-flex items-center justify-center rounded-lg border border-line text-slate-500 hover:bg-brand-soft hover:text-brand hover:border-brand/30 transition">
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/>
                         </svg>
-                    </a>
-                @endif
+                    </button>
+                    @if(auth()->user()->isAdmin())
+                        <a href="{{ route('settings.index') }}" title="Setting"
+                           class="w-7 h-7 shrink-0 inline-flex items-center justify-center rounded-lg border border-line text-slate-500 hover:bg-brand-soft hover:text-brand hover:border-brand/30 transition {{ request()->routeIs('settings.*', 'fields.*', 'note-templates.*', 'operation-settings.*') ? 'bg-brand-soft text-brand border-brand/30' : '' }}">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                            </svg>
+                        </a>
+                    @endif
+                </div>
             </div>
-            <div class="flex items-center justify-between gap-2 mt-0.5">
+            <div class="flex items-center justify-between gap-2 mt-1">
                 <span class="text-slate-500 truncate">{{ auth()->user()->username }} · {{ auth()->user()->roleLabel() }}</span>
-                <form method="POST" action="{{ route('logout') }}" onsubmit="return confirm('Logout karna hai?')">@csrf
-                    <button class="text-brand font-semibold hover:underline">Logout</button>
-                </form>
+                <div class="flex items-center gap-1.5 shrink-0">
+                    <button type="button" @click="changePasswordOpen = true" class="text-slate-500 hover:text-brand font-medium text-[11px] transition">
+                        Password
+                    </button>
+                    <span class="text-slate-300">·</span>
+                    <form method="POST" action="{{ route('logout') }}" onsubmit="return confirm('Logout karna hai?')">@csrf
+                        <button class="text-brand font-semibold hover:underline">Logout</button>
+                    </form>
+                </div>
             </div>
         </div>
     </aside>
@@ -220,6 +234,124 @@
             </div>
         </form>
     </aside>
+</div>
+
+{{-- Change Password Modal --}}
+<div class="fixed inset-0 z-[80] flex items-center justify-center p-4"
+     x-show="changePasswordOpen"
+     x-cloak>
+    <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs transition-opacity"
+         x-show="changePasswordOpen"
+         x-transition.opacity.duration.200ms
+         @click="changePasswordOpen = false"></div>
+
+    <div class="relative w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden border border-line z-10"
+         x-show="changePasswordOpen"
+         x-transition:enter="transition ease-out duration-250"
+         x-transition:enter-start="opacity-0 scale-95"
+         x-transition:enter-end="opacity-100 scale-100"
+         x-transition:leave="transition ease-in duration-150"
+         x-transition:leave-start="opacity-100 scale-100"
+         x-transition:leave-end="opacity-0 scale-95"
+         @click.stop
+         x-data="{ showCurrent: false, showNew: false, showConfirm: false }">
+
+        <div class="px-6 py-4 border-b border-line flex items-center justify-between bg-slate-50">
+            <div class="flex items-center gap-3">
+                <div class="w-9 h-9 rounded-xl bg-brand-soft text-brand flex items-center justify-center">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                    </svg>
+                </div>
+                <div>
+                    <h3 class="text-sm font-bold text-ink">Change Password</h3>
+                    <p class="text-[11px] text-slate-500">Update password for {{ auth()->user()->username }}</p>
+                </div>
+            </div>
+            <button type="button" @click="changePasswordOpen = false" class="w-8 h-8 rounded-lg hover:bg-slate-200/60 text-slate-400 hover:text-slate-600 flex items-center justify-center text-sm font-bold">✕</button>
+        </div>
+
+        <form method="POST" action="{{ route('password.update') }}" class="p-6 space-y-4">
+            @csrf
+            @method('PUT')
+
+            @if($errors->updatePassword->any())
+                <div class="rounded-xl border border-rose-200 bg-rose-50 p-3 text-[12px] text-rose-700 space-y-1">
+                    @foreach($errors->updatePassword->all() as $err)
+                        <div class="flex items-center gap-1.5 font-medium">
+                            <span>⚠</span>
+                            <span>{{ $err }}</span>
+                        </div>
+                    @endforeach
+                </div>
+            @endif
+
+            <div>
+                <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">Current Password</label>
+                <div class="relative">
+                    <input :type="showCurrent ? 'text' : 'password'"
+                           name="current_password"
+                           required
+                           placeholder="Enter your current password"
+                           class="w-full rounded-xl border border-line bg-white px-3.5 py-2.5 text-[13px] text-ink focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand pr-10">
+                    <button type="button"
+                            @click="showCurrent = !showCurrent"
+                            class="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1">
+                        <svg class="w-4 h-4" x-show="!showCurrent" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                        <svg class="w-4 h-4" x-show="showCurrent" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18"/></svg>
+                    </button>
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">New Password</label>
+                <div class="relative">
+                    <input :type="showNew ? 'text' : 'password'"
+                           name="password"
+                           required
+                           minlength="6"
+                           placeholder="At least 6 characters"
+                           class="w-full rounded-xl border border-line bg-white px-3.5 py-2.5 text-[13px] text-ink focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand pr-10">
+                    <button type="button"
+                            @click="showNew = !showNew"
+                            class="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1">
+                        <svg class="w-4 h-4" x-show="!showNew" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                        <svg class="w-4 h-4" x-show="showCurrent" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18"/></svg>
+                    </button>
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">Confirm New Password</label>
+                <div class="relative">
+                    <input :type="showConfirm ? 'text' : 'password'"
+                           name="password_confirmation"
+                           required
+                           minlength="6"
+                           placeholder="Re-enter new password"
+                           class="w-full rounded-xl border border-line bg-white px-3.5 py-2.5 text-[13px] text-ink focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand pr-10">
+                    <button type="button"
+                            @click="showConfirm = !showConfirm"
+                            class="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1">
+                        <svg class="w-4 h-4" x-show="!showConfirm" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                        <svg class="w-4 h-4" x-show="showConfirm" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18"/></svg>
+                    </button>
+                </div>
+            </div>
+
+            <div class="pt-2 flex items-center justify-end gap-2.5 border-t border-line">
+                <button type="button"
+                        @click="changePasswordOpen = false"
+                        class="px-4 py-2 rounded-xl border border-line text-slate-600 hover:bg-slate-100 text-[13px] font-semibold transition">
+                    Cancel
+                </button>
+                <button type="submit"
+                        class="px-5 py-2 rounded-xl bg-brand hover:bg-brand-dark text-white text-[13px] font-semibold transition shadow-sm shadow-brand/20">
+                    Update Password
+                </button>
+            </div>
+        </form>
+    </div>
 </div>
 
 {{-- Send Leads to Gmail Modal with Real Cyan Table Preview --}}
@@ -339,6 +471,7 @@
 <script>
 function crmShell() {
     return {
+        changePasswordOpen: {{ $errors->updatePassword->any() ? 'true' : 'false' }},
         selectedId: null,
         title: '',
         html: '',

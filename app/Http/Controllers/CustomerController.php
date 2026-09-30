@@ -741,9 +741,18 @@ class CustomerController extends Controller
                 $feedback = trim((string) ($userNote ?: ($c->fieldValue('notes') ?: ($c->fieldValue('note') ?: ($c->fieldValue('feedback') ?: '')))));
             }
 
-            $amountReceived = (string) ($c->fieldValue('amount_received') ?: ($c->fieldValue('seal_price') ?: ($c->fieldValue('mrp') ?: '')));
-            $rawPaymentMode = trim((string) ($c->fieldValue('payment_mode') ?: ($c->fieldValue('payment_type') ?: '')));
-            $paymentMode = $rawPaymentMode !== '' ? $rawPaymentMode : 'Online';
+            // Only show Amount Received (sell price) and Payment Mode when status is success / confirmed / converted
+            $statusNorm = strtolower(trim(str_replace(['_', '-'], ' ', (string) $status)));
+            $isSuccess = in_array($statusNorm, ['success', 'successful', 'confirmed', 'converted', 'won', 'completed', 'done', 'paid'], true);
+
+            if ($isSuccess) {
+                $amountReceived = (string) ($c->fieldValue('amount_received') ?: ($c->fieldValue('seal_price') ?: ($c->fieldValue('sell_price') ?: ($c->fieldValue('mrp') ?: ''))));
+                $rawPaymentMode = trim((string) ($c->fieldValue('payment_mode') ?: ($c->fieldValue('payment_type') ?: '')));
+                $paymentMode = $rawPaymentMode !== '' ? $rawPaymentMode : 'Online';
+            } else {
+                $amountReceived = '';
+                $paymentMode = '';
+            }
 
             $rows[] = [
                 'date' => $date,
