@@ -24,6 +24,7 @@ Route::middleware('guest')->group(function () {
 
 Route::middleware('auth')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
+    Route::put('/change-password', [AuthController::class, 'updatePassword'])->name('password.update');
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
     Route::get('/customers', [CustomerController::class, 'index'])->name('customers.index');

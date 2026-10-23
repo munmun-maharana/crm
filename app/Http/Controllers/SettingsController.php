@@ -14,7 +14,7 @@ class SettingsController extends Controller
 {
     public function index(Request $request): View
     {
-        $allowed = ['fields', 'notes', 'whatsapp', 'op-assign', 'op-fields', 'user-fields', 'inventory'];
+        $allowed = ['fields', 'notes', 'whatsapp', 'op-assign', 'op-fields', 'user-fields', 'inventory', 'security'];
         $tab = $request->string('tab')->toString();
         if (! in_array($tab, $allowed, true)) {
             $tab = 'fields';

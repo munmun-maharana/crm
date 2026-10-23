@@ -17,10 +17,36 @@ class DashboardController extends Controller
         $pipeline = $request->user()->isOperation() ? 'operations' : 'crm';
         $leads = fn () => Customer::query()->visibleTo($request->user())->inPipeline($pipeline);
 
-        $statuses = $this->statusOptions($pipeline);
-        $statusCounts = $leads()->select('status', DB::raw('count(*) as total'))
+        $normalize = fn ($s) => strtolower(trim(str_replace(['_', '-'], ' ', (string) $s)));
+
+        $rawStatusCounts = $leads()
+            ->whereNotNull('status')
+            ->select('status', DB::raw('count(*) as total'))
             ->groupBy('status')
-            ->pluck('total', 'status');
+            ->pluck('total', 'status')
+            ->toArray();
+
+        $normalizedCounts = [];
+        foreach ($rawStatusCounts as $st => $count) {
+            $norm = $normalize($st);
+            if ($norm !== '') {
+                $normalizedCounts[$norm] = ($normalizedCounts[$norm] ?? 0) + (int) $count;
+            }
+        }
+
+        $statuses = $this->statusOptions($pipeline);
+
+        // Include any active status in DB that might not be in configured options
+        $configuredNormalized = array_map($normalize, $statuses);
+        foreach ($rawStatusCounts as $dbStatus => $count) {
+            $dbNorm = $normalize($dbStatus);
+            if ($dbNorm !== '' && !in_array($dbNorm, $configuredNormalized, true)) {
+                $statuses[] = ucwords(str_replace(['_', '-'], ' ', (string) $dbStatus));
+                $configuredNormalized[] = $dbNorm;
+            }
+        }
+
+        $listRoute = $pipeline === 'operations' ? 'operations.index' : 'customers.index';
 
         $tones = ['sky', 'teal', 'amber', 'emerald', 'rose', 'indigo', 'violet', 'orange', 'cyan', 'slate'];
         $statusCards = [
@@ -28,14 +54,17 @@ class DashboardController extends Controller
                 'label' => 'Today Follow up',
                 'value' => $leads()->where('follow_up', true)->whereDate('follow_up_at', $today)->count(),
                 'tone' => 'orange',
+                'url' => route($listRoute, ['filter' => 'follow_up_today']),
             ],
         ];
 
         foreach (array_values($statuses) as $i => $status) {
+            $norm = $normalize($status);
             $statusCards[] = [
-                'label' => ucwords(str_replace('_', ' ', $status)),
-                'value' => (int) ($statusCounts[$status] ?? 0),
+                'label' => ucwords(str_replace(['_', '-'], ' ', (string) $status)),
+                'value' => (int) ($normalizedCounts[$norm] ?? 0),
                 'tone' => $tones[$i % count($tones)],
+                'url' => route($listRoute, ['status' => $status]),
             ];
         }
 
@@ -66,18 +95,17 @@ class DashboardController extends Controller
         }
 
         $falloffLabels = array_map(
-            fn ($s) => ucwords(str_replace('_', ' ', $s)),
+            fn ($s) => ucwords(str_replace(['_', '-'], ' ', (string) $s)),
             $statuses
         );
         $falloffData = array_map(
-            fn ($s) => (int) ($statusCounts[$s] ?? 0),
+            fn ($s) => (int) ($normalizedCounts[$normalize($s)] ?? 0),
             $statuses
         );
         $falloffColors = ['#0f766e', '#0284c7', '#059669', '#e11d48', '#7c3aed', '#ea580c', '#0891b2', '#334155', '#db2777', '#ca8a04'];
         $falloffChartColors = array_values(array_slice($falloffColors, 0, max(1, count($falloffLabels))));
 
         $recent = $leads()->with('assignee')->latest()->take(8)->get();
-        $listRoute = $pipeline === 'operations' ? 'operations.index' : 'customers.index';
 
         return view('dashboard', compact(
             'statusCards',
@@ -102,7 +130,7 @@ class DashboardController extends Controller
             ->first();
 
         $fromField = collect($field?->options ?? [])
-            ->map(fn ($o) => strtolower(trim((string) $o)))
+            ->map(fn ($o) => trim((string) $o))
             ->filter()
             ->values()
             ->all();
@@ -111,6 +139,6 @@ class DashboardController extends Controller
             return $fromField;
         }
 
-        return ['new', 'interested', 'contacted', 'converted', 'lost', 'request'];
+        return ['New', 'Interested', 'Contacted', 'Converted', 'Lost', 'Request'];
     }
 }

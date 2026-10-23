@@ -43,6 +43,11 @@
                 :class="tab === 'inventory' ? 'bg-brand-soft text-brand' : 'text-slate-500 hover:bg-mist'">
             Inventory
         </button>
+        <button type="button" @click="tab = 'security'"
+                class="px-3.5 py-1.5 rounded-lg text-[13px] font-semibold"
+                :class="tab === 'security' ? 'bg-brand-soft text-brand' : 'text-slate-500 hover:bg-mist'">
+            Security
+        </button>
     </div>
 
     <div x-show="tab === 'fields'" x-cloak>
@@ -704,6 +709,62 @@
                     </div>
                 @endforelse
             </div>
+        </div>
+    </div>
+
+    <div x-show="tab === 'security'" x-cloak>
+        <div class="max-w-xl rounded-xl border border-line bg-white p-6 shadow-xs">
+            <div class="flex items-center gap-3 mb-5 pb-4 border-b border-line">
+                <div class="w-10 h-10 rounded-xl bg-brand-soft text-brand flex items-center justify-center">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                    </svg>
+                </div>
+                <div>
+                    <h3 class="text-sm font-bold text-ink">Change Account Password</h3>
+                    <p class="text-[12px] text-slate-500">Ensure your account uses a long, random password to stay secure.</p>
+                </div>
+            </div>
+
+            <form method="POST" action="{{ route('password.update') }}" class="space-y-4">
+                @csrf
+                @method('PUT')
+
+                @if($errors->updatePassword->any())
+                    <div class="rounded-xl border border-rose-200 bg-rose-50 p-3.5 text-[12px] text-rose-700 space-y-1">
+                        @foreach($errors->updatePassword->all() as $err)
+                            <div class="flex items-center gap-1.5 font-medium">
+                                <span>⚠</span>
+                                <span>{{ $err }}</span>
+                            </div>
+                        @endforeach
+                    </div>
+                @endif
+
+                <div>
+                    <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">Current Password</label>
+                    <input type="password" name="current_password" required placeholder="Enter current password"
+                           class="w-full rounded-xl border border-line px-3.5 py-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand">
+                </div>
+
+                <div>
+                    <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">New Password</label>
+                    <input type="password" name="password" required minlength="6" placeholder="Enter new password (min. 6 characters)"
+                           class="w-full rounded-xl border border-line px-3.5 py-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand">
+                </div>
+
+                <div>
+                    <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">Confirm New Password</label>
+                    <input type="password" name="password_confirmation" required minlength="6" placeholder="Re-enter new password"
+                           class="w-full rounded-xl border border-line px-3.5 py-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand">
+                </div>
+
+                <div class="pt-2">
+                    <button type="submit" class="px-5 py-2.5 rounded-xl bg-brand hover:bg-brand-dark text-white text-[13px] font-semibold transition shadow-sm">
+                        Update Password
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 </div>

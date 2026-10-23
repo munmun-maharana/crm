@@ -63,7 +63,13 @@ class CustomerController extends Controller
                     ->orderByRaw('CASE WHEN follow_up_has_time = 1 THEN 0 ELSE 1 END')
                     ->orderBy('follow_up_at');
             })
-            ->when($filter !== 'follow_up_today' && $status, fn ($query) => $query->where('status', $status))
+            ->when($filter !== 'follow_up_today' && $status, function ($query) use ($status) {
+                $query->where(function ($sub) use ($status) {
+                    $sub->where('status', $status)
+                        ->orWhere('status', str_replace(' ', '-', $status))
+                        ->orWhere('status', str_replace('-', ' ', $status));
+                });
+            })
             ->when($filter !== 'follow_up_today', fn ($query) => $query->latest())
             ->paginate(15)
             ->withQueryString();
@@ -735,9 +741,18 @@ class CustomerController extends Controller
                 $feedback = trim((string) ($userNote ?: ($c->fieldValue('notes') ?: ($c->fieldValue('note') ?: ($c->fieldValue('feedback') ?: '')))));
             }
 
-            $amountReceived = (string) ($c->fieldValue('amount_received') ?: ($c->fieldValue('seal_price') ?: ($c->fieldValue('mrp') ?: '')));
-            $rawPaymentMode = trim((string) ($c->fieldValue('payment_mode') ?: ($c->fieldValue('payment_type') ?: '')));
-            $paymentMode = $rawPaymentMode !== '' ? $rawPaymentMode : 'Online';
+            // Only show Amount Received (sell price) and Payment Mode when status is success / confirmed / converted
+            $statusNorm = strtolower(trim(str_replace(['_', '-'], ' ', (string) $status)));
+            $isSuccess = in_array($statusNorm, ['success', 'successful', 'confirmed', 'converted', 'won', 'completed', 'done', 'paid'], true);
+
+            if ($isSuccess) {
+                $amountReceived = (string) ($c->fieldValue('amount_received') ?: ($c->fieldValue('seal_price') ?: ($c->fieldValue('sell_price') ?: ($c->fieldValue('mrp') ?: ''))));
+                $rawPaymentMode = trim((string) ($c->fieldValue('payment_mode') ?: ($c->fieldValue('payment_type') ?: '')));
+                $paymentMode = $rawPaymentMode !== '' ? $rawPaymentMode : 'Online';
+            } else {
+                $amountReceived = '';
+                $paymentMode = '';
+            }
 
             $rows[] = [
                 'date' => $date,
