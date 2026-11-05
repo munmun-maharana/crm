@@ -20,6 +20,7 @@ class CrmField extends Model
         'in_form',
         'in_table',
         'in_excel',
+        'in_update',
         'is_system',
         'sort_order',
     ];
@@ -33,6 +34,7 @@ class CrmField extends Model
             'in_form' => 'boolean',
             'in_table' => 'boolean',
             'in_excel' => 'boolean',
+            'in_update' => 'boolean',
             'is_system' => 'boolean',
         ];
     }
@@ -44,6 +46,22 @@ class CrmField extends Model
     public const USER_CORE_KEYS = [
         'name', 'username', 'email', 'password', 'role',
     ];
+
+    public const TYPES = [
+        'text' => 'Text',
+        'email' => 'Email',
+        'phone' => 'Phone',
+        'number' => 'Number',
+        'date' => 'Date',
+        'time' => 'Time',
+        'textarea' => 'Textarea',
+        'select' => 'Select (dropdown)',
+    ];
+
+    public static function typeRule(): string
+    {
+        return 'in:'.implode(',', array_keys(self::TYPES));
+    }
 
     public function scopeActive(Builder $q): Builder
     {

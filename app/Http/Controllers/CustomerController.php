@@ -77,6 +77,7 @@ class CustomerController extends Controller
         $agents = User::orderBy('name')->get(['id', 'name']);
         $formFields = $this->formFieldsFor($request, $pipeline);
         $tableFields = $this->fields->tableFields($pipeline);
+        $excelFields = $this->fields->excelFields($pipeline);
 
         $statusField = CrmField::inPipeline($pipeline)->where('key', 'status')->first();
         $statusOptions = ! empty($statusField?->options)
@@ -84,7 +85,7 @@ class CustomerController extends Controller
             : ['new', 'interested', 'contacted', 'converted', 'lost', 'request'];
 
         return view('customers.index', compact(
-            'customers', 'agents', 'q', 'status', 'filter', 'assignedTo', 'formFields', 'tableFields', 'pipeline', 'listRoute', 'statusOptions'
+            'customers', 'agents', 'q', 'status', 'filter', 'assignedTo', 'formFields', 'tableFields', 'excelFields', 'pipeline', 'listRoute', 'statusOptions'
         ));
     }
 
@@ -136,45 +137,13 @@ class CustomerController extends Controller
             'activities.user',
             'operationCopy',
             'sourceCustomer',
-            'activationRequests.items.inventoryType:id,name',
-            'activationRequests.items.inventoryItem:id,name,code',
-            'activationRequests.inventoryType:id,name',
-            'activationRequests.inventoryItem:id,name,code',
-            'activationRequests.requester:id,name',
         ]);
         $formFields = $this->formFieldsFor($request, $customer->pipeline ?? 'crm');
         $noteTemplates = NoteTemplate::active()->ordered()->get(['id', 'title', 'body']);
-        $inventoryTypes = collect();
-        $myStock = [];
-        if ($customer->isOperations()) {
-            $myItems = InventoryItem::query()
-                ->with('type:id,name')
-                ->where('held_by_user_id', $request->user()->id)
-                ->orderBy('name')
-                ->get(['id', 'inventory_type_id', 'name', 'code', 'status', 'quantity']);
-
-            $myStock = $myItems->groupBy('inventory_type_id')->map(function ($items, $typeId) {
-                $type = $items->first()?->type;
-
-                return [
-                    'id' => (int) $typeId,
-                    'name' => $type?->name ?? 'Type #'.$typeId,
-                    'items' => $items->map(fn ($item) => [
-                        'id' => $item->id,
-                        'label' => trim($item->name.($item->code ? ' · '.$item->code : '')),
-                        'name' => $item->name,
-                        'code' => $item->code,
-                        'status' => $item->statusLabel(),
-                        'quantity' => $item->quantity,
-                    ])->values(),
-                ];
-            })->values()->all();
-        }
         $statusField = CrmField::inPipeline($customer->pipeline ?? 'crm')->where('key', 'status')->first();
         $statusOptions = ! empty($statusField?->options)
             ? $statusField->options
             : ['new', 'interested', 'contacted', 'converted', 'lost', 'request'];
-        $activationRequests = $customer->activationRequests;
 
         return response()->json([
             'customer' => $customer,
@@ -182,10 +151,7 @@ class CustomerController extends Controller
                 'customer',
                 'formFields',
                 'statusOptions',
-                'noteTemplates',
-                'inventoryTypes',
-                'activationRequests',
-                'myStock'
+                'noteTemplates'
             ))->render(),
         ]);
     }
@@ -252,11 +218,65 @@ class CustomerController extends Controller
         $followDate = $data['follow_up_date'] ?? null;
         $followTime = $data['follow_up_time'] ?? null;
 
+        if ($statusChanged && in_array(strtolower((string) $targetStatus), ['confirmed', 'confirm', 'converted'], true)) {
+            $followUp = false;
+            $hasTime = false;
+            $followDate = null;
+            $followTime = null;
+        }
+
         if ($followUp && empty($followDate)) {
             return response()->json(['ok' => false, 'message' => 'Follow-up date required when Follow up is checked.'], 422);
         }
         if ($followUp && $hasTime && empty($followTime)) {
             return response()->json(['ok' => false, 'message' => 'Select a follow-up time, or uncheck Time.'], 422);
+        }
+
+        $updateFields = CrmField::inPipeline($customer->pipeline ?? 'crm')
+            ->active()
+            ->where('in_update', true)
+            ->where('key', '!=', 'status')
+            ->ordered()
+            ->get();
+
+        $fieldChanges = [];
+        $currentMeta = is_array($customer->meta) ? $customer->meta : [];
+        $coreFieldUpdates = [];
+        $inputUpdateFields = $request->input('update_fields', []);
+
+        if (is_array($inputUpdateFields)) {
+            foreach ($updateFields as $uf) {
+                if (! array_key_exists($uf->key, $inputUpdateFields)) {
+                    continue;
+                }
+                $newVal = trim((string) ($inputUpdateFields[$uf->key] ?? ''));
+                $oldVal = trim((string) ($customer->fieldValue($uf->key) ?? ''));
+
+                if ($newVal !== $oldVal) {
+                    $fieldChanges[$uf->label] = [
+                        'key' => $uf->key,
+                        'from' => $oldVal !== '' ? $oldVal : '—',
+                        'to' => $newVal !== '' ? $newVal : '—',
+                    ];
+
+                    if ($uf->isCore()) {
+                        $coreFieldUpdates[$uf->key] = $newVal !== '' ? $newVal : null;
+                    } else {
+                        if ($newVal === '') {
+                            unset($currentMeta[$uf->key]);
+                        } else {
+                            $currentMeta[$uf->key] = $newVal;
+                        }
+                    }
+
+                    if (($uf->type === 'phone' || in_array($uf->key, ['phone', 'phone_no', 'mobile', 'contact', 'contact_no'], true)) && $newVal !== '') {
+                        $coreFieldUpdates['phone'] = $newVal;
+                    }
+                    if (($uf->type === 'email' || in_array($uf->key, ['email', 'email_address', 'mail'], true)) && $newVal !== '') {
+                        $coreFieldUpdates['email'] = $newVal;
+                    }
+                }
+            }
         }
 
         if ($body === '' || strtolower($body) === 'null') {
@@ -266,24 +286,41 @@ class CustomerController extends Controller
                 $body = "Status updated to {$targetStatus}.";
             } elseif ($followUp) {
                 $body = "Follow-up scheduled.";
+            } elseif (! empty($fieldChanges)) {
+                $parts = [];
+                foreach ($fieldChanges as $label => $chg) {
+                    $parts[] = "{$label}: {$chg['from']} → {$chg['to']}";
+                }
+                $body = "Updated " . implode(', ', $parts) . ".";
             } else {
-                return response()->json(['ok' => false, 'message' => 'Please write a note, change status, or set a follow-up.'], 422);
+                return response()->json(['ok' => false, 'message' => 'Please write a note, change status/fields, or set a follow-up.'], 422);
             }
         }
 
         $followUpAt = null;
+        $followUpHasTime = false;
         if ($followUp) {
             $followUpAt = $hasTime
                 ? $followDate.' '.$followTime.':00'
                 : $followDate.' 00:00:00';
+            $followUpHasTime = $hasTime;
+            unset($currentMeta['booking_slot_time']);
+        } elseif ($statusChanged && in_array(strtolower((string) $targetStatus), ['confirmed', 'confirm', 'converted'], true)) {
+            $followUpAt = now();
+            $followUpHasTime = false;
+        } elseif (! $customer->follow_up && $customer->follow_up_at) {
+            // Preserve existing booking confirmation date if user just posts a note without follow-up
+            $followUpAt = $customer->follow_up_at;
+            $followUpHasTime = (bool) $customer->follow_up_has_time;
         }
 
-        $customerData = [
+        $customerData = array_merge($coreFieldUpdates, [
             'last_contact_at' => now(),
             'follow_up' => $followUp,
             'follow_up_at' => $followUpAt,
-            'follow_up_has_time' => $followUp && $hasTime,
-        ];
+            'follow_up_has_time' => $followUpHasTime,
+            'meta' => $currentMeta ?: null,
+        ]);
 
         if ($statusChanged) {
             $customerData['status'] = $targetStatus;
@@ -306,6 +343,9 @@ class CustomerController extends Controller
             $meta['follow_up_at'] = $followUpAt;
             $meta['follow_up_has_time'] = $hasTime;
         }
+        if (! empty($fieldChanges)) {
+            $meta['field_changes'] = $fieldChanges;
+        }
 
         CustomerActivity::create([
             'customer_id' => $customer->id,
@@ -320,16 +360,7 @@ class CustomerController extends Controller
             $formFields = $this->formFieldsFor($request, $customer->pipeline ?? 'crm');
             $customer->refresh();
 
-            if ($customer->follow_up && $customer->follow_up_at) {
-                $timeLine = $customer->follow_up_has_time
-                    ? e($customer->follow_up_at->format('h:i A'))
-                    : 'Anytime';
-                $followUpHtml = '<span class="inline-flex px-2 py-0.5 rounded bg-amber-50 text-amber-800 font-semibold">'
-                    .e($customer->follow_up_at->format('d M Y')).'</span>'
-                    .'<div class="text-[10px] text-slate-400 mt-0.5">'.$timeLine.'</div>';
-            } else {
-                $followUpHtml = '<span class="text-slate-400">—</span>';
-            }
+            $followUpHtml = $customer->actionDateCellHtml();
 
             $toneMap = [
                 'new' => 'text-sky-700 bg-sky-50',
@@ -356,6 +387,7 @@ class CustomerController extends Controller
                     ? 'FU '.$customer->follow_up_at->format('d M')
                     : null,
                 'follow_up_html' => $followUpHtml,
+                'list_date_html' => $customer->listDateSummaryHtml(),
                 'html' => view('customers.partials.panel', [
                     'customer' => $customer,
                     'formFields' => $formFields,

@@ -82,9 +82,33 @@
                         <textarea name="{{ $field->key }}" rows="2" @required($field->required)
                                   placeholder="{{ $field->label }}{{ $field->required ? ' *' : '' }}"
                                   class="w-full rounded-xl border border-line px-3 py-2 text-[13px]"></textarea>
+                    @elseif($field->type === 'phone')
+                        <input name="{{ $field->key }}" type="tel" inputmode="tel" pattern="[0-9+\-\s()]*"
+                               oninput="this.value = this.value.replace(/[^0-9+\-\s()]/g, '')"
+                               @required($field->required)
+                               placeholder="{{ $field->label }}{{ $field->required ? ' *' : '' }}"
+                               class="w-full rounded-xl border border-line px-3 py-2 text-[13px]">
+                    @elseif($field->type === 'number')
+                        <input name="{{ $field->key }}" type="number" step="any" inputmode="decimal"
+                               oninput="this.value = this.value.replace(/[^0-9.\-]/g, '')"
+                               @required($field->required)
+                               placeholder="{{ $field->label }}{{ $field->required ? ' *' : '' }}"
+                               class="w-full rounded-xl border border-line px-3 py-2 text-[13px]">
+                    @elseif($field->type === 'date')
+                        <div>
+                            <label class="block text-[11px] font-bold text-slate-500 mb-0.5">{{ $field->label }}{{ $field->required ? ' *' : '' }}</label>
+                            <input name="{{ $field->key }}" type="date" @required($field->required)
+                                   class="w-full rounded-xl border border-line px-3 py-2 text-[13px]">
+                        </div>
+                    @elseif($field->type === 'time')
+                        <div>
+                            <label class="block text-[11px] font-bold text-slate-500 mb-0.5">{{ $field->label }}{{ $field->required ? ' *' : '' }}</label>
+                            <input name="{{ $field->key }}" type="time" @required($field->required)
+                                   class="w-full rounded-xl border border-line px-3 py-2 text-[13px]">
+                        </div>
                     @else
                         <input name="{{ $field->key }}"
-                               type="{{ $field->type === 'email' ? 'email' : ($field->type === 'phone' ? 'tel' : 'text') }}"
+                               type="{{ $field->type === 'email' ? 'email' : 'text' }}"
                                @required($field->required)
                                placeholder="{{ $field->label }}{{ $field->required ? ' *' : '' }}"
                                class="w-full rounded-xl border border-line px-3 py-2 text-[13px]">
@@ -105,11 +129,6 @@
                         <input type="checkbox" name="access_operations" value="1" class="rounded border-line text-brand"
                                @checked(old('access_operations'))>
                         Operation
-                    </label>
-                    <label class="flex items-center gap-2 text-[13px] font-semibold text-ink">
-                        <input type="checkbox" name="access_inventory" value="1" class="rounded border-line text-brand"
-                               @checked(old('access_inventory'))>
-                        Inventory
                     </label>
                 </div>
 
@@ -161,9 +180,6 @@
                                         @endif
                                         @if($u->appAccessOperations())
                                             <span class="inline-flex text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-50 text-amber-800">Operation</span>
-                                        @endif
-                                        @if($u->appAccessInventory())
-                                            <span class="inline-flex text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-800">Inventory</span>
                                         @endif
                                     </div>
                                 </td>
@@ -247,10 +263,30 @@
                             @elseif($field->type === 'textarea')
                                 <textarea name="{{ $field->key }}" x-model="form['{{ $field->key }}']" rows="3" @required($field->required)
                                           class="w-full rounded-lg border border-line px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-brand/20"></textarea>
+                            @elseif($field->type === 'phone')
+                                <input name="{{ $field->key }}" x-model="form['{{ $field->key }}']"
+                                       type="tel" inputmode="tel" pattern="[0-9+\-\s()]*"
+                                       oninput="this.value = this.value.replace(/[^0-9+\-\s()]/g, '')"
+                                       @required($field->required)
+                                       class="w-full rounded-lg border border-line px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-brand/20">
+                            @elseif($field->type === 'number')
+                                <input name="{{ $field->key }}" x-model="form['{{ $field->key }}']"
+                                       type="number" step="any" inputmode="decimal"
+                                       oninput="this.value = this.value.replace(/[^0-9.\-]/g, '')"
+                                       @required($field->required)
+                                       class="w-full rounded-lg border border-line px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-brand/20">
+                            @elseif($field->type === 'date')
+                                <input name="{{ $field->key }}" x-model="form['{{ $field->key }}']"
+                                       type="date" @required($field->required)
+                                       class="w-full rounded-lg border border-line px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-brand/20">
+                            @elseif($field->type === 'time')
+                                <input name="{{ $field->key }}" x-model="form['{{ $field->key }}']"
+                                       type="time" @required($field->required)
+                                       class="w-full rounded-lg border border-line px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-brand/20">
                             @else
                                 <input name="{{ $field->key }}"
                                        x-model="form['{{ $field->key }}']"
-                                       type="{{ $field->type === 'email' ? 'email' : ($field->type === 'phone' ? 'tel' : 'text') }}"
+                                       type="{{ $field->type === 'email' ? 'email' : 'text' }}"
                                        @required($field->required)
                                        class="w-full rounded-lg border border-line px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-brand/20">
                             @endif
@@ -269,11 +305,6 @@
                             <input type="checkbox" name="access_operations" value="1" class="rounded border-line text-brand"
                                    x-model="form.access_operations">
                             Operation
-                        </label>
-                        <label class="flex items-center gap-2 text-[13px] font-semibold text-ink">
-                            <input type="checkbox" name="access_inventory" value="1" class="rounded border-line text-brand"
-                                   x-model="form.access_inventory">
-                            Inventory
                         </label>
                     </div>
                 </div>

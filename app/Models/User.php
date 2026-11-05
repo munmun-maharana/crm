@@ -131,7 +131,7 @@ class User extends Authenticatable
 
     public function canAccessInventory(): bool
     {
-        return $this->isAdmin() || $this->isCoordinator() || $this->isOperation();
+        return false;
     }
 
     /** Mobile app tab access — Dashboard is always allowed. */
@@ -147,7 +147,7 @@ class User extends Authenticatable
 
     public function appAccessInventory(): bool
     {
-        return $this->appAccessFlag('access_inventory', $this->canAccessInventory());
+        return false;
     }
 
     public function appAccessFlags(): array

@@ -108,14 +108,17 @@ class UserController extends Controller
                 continue;
             }
 
-            $typeRule = match ($field->type) {
-                'email' => 'email',
-                'phone' => 'string',
-                'textarea' => 'string',
-                'select' => 'string',
-                default => 'string',
+            $typeRules = match ($field->type) {
+                'email' => ['email'],
+                'phone' => ['string', 'regex:/^[0-9+\-\s()]*$/'],
+                'number' => ['numeric'],
+                'date' => ['date'],
+                'time' => ['string'],
+                'textarea' => ['string'],
+                'select' => ['string'],
+                default => ['string'],
             };
-            $rules[$field->key] = array_merge($base, [$typeRule, 'max:500']);
+            $rules[$field->key] = array_merge($base, $typeRules, ['max:500']);
         }
 
         // Always allow role for quick table updates when form fields incomplete

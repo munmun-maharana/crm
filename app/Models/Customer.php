@@ -77,6 +77,79 @@ class Customer extends Model
             : $date.' · Anytime';
     }
 
+    /**
+     * Single combined Date cell HTML for the table:
+     * - Initially shows Entry/Created Date
+     * - When Follow-up is scheduled, shows Follow-up Date
+     * - When Booking is confirmed, shows Booking Confirmation Date
+     */
+    public function actionDateCellHtml(): string
+    {
+        if ($this->follow_up && $this->follow_up_at) {
+            $timeLine = $this->follow_up_has_time
+                ? e($this->follow_up_at->format('h:i A'))
+                : 'Anytime';
+
+            return '<span class="inline-flex px-2 py-0.5 rounded bg-amber-50 text-amber-800 font-semibold">'
+                .e($this->follow_up_at->format('d M Y')).'</span>'
+                .'<div class="text-[10px] text-slate-400 mt-0.5">Follow-up · '.$timeLine.'</div>';
+        }
+
+        if ($this->follow_up_at) {
+            $slotTime = $this->meta['booking_slot_time'] ?? null;
+            $sub = $slotTime ? e($slotTime) : ($this->follow_up_has_time ? e($this->follow_up_at->format('h:i A')) : 'Booked');
+
+            return '<span class="inline-flex px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 font-semibold">'
+                .e($this->follow_up_at->format('d M Y')).'</span>'
+                .'<div class="text-[10px] text-emerald-600 font-medium mt-0.5">'.$sub.'</div>';
+        }
+
+        $entryDate = $this->fieldValue('date') ?: ($this->created_at ? $this->created_at->format('d M Y') : null);
+        if ($entryDate) {
+            return '<span class="inline-flex px-2 py-0.5 rounded bg-slate-100 text-slate-700 font-semibold">'
+                .e((string) $entryDate).'</span>'
+                .'<div class="text-[10px] text-slate-400 mt-0.5">Created</div>';
+        }
+
+        return '<span class="text-slate-400">—</span>';
+    }
+
+    /**
+     * Compact HTML for the left-side customer list showing:
+     * - Booking Date & Time or Follow-up Date & Time (when present)
+     * - Created / Entry Date
+     */
+    public function listDateSummaryHtml(): string
+    {
+        $parts = [];
+
+        if ($this->follow_up && $this->follow_up_at) {
+            $timeStr = $this->follow_up_has_time
+                ? $this->follow_up_at->format('h:i A')
+                : 'Anytime';
+            $parts[] = '<div class="text-[11px] font-semibold text-amber-800 truncate">'
+                .'⏰ FU: '.e($this->follow_up_at->format('d M Y')).' · '.e($timeStr)
+                .'</div>';
+        } elseif ($this->follow_up_at) {
+            $slotTime = $this->meta['booking_slot_time']
+                ?? $this->meta['booking_time']
+                ?? ($this->follow_up_has_time ? $this->follow_up_at->format('h:i A') : null);
+            $timeSuffix = $slotTime ? ' · '.e((string) $slotTime) : '';
+            $parts[] = '<div class="text-[11px] font-semibold text-emerald-700 truncate">'
+                .'📅 Booked: '.e($this->follow_up_at->format('d M Y')).$timeSuffix
+                .'</div>';
+        }
+
+        $entryDate = $this->fieldValue('date') ?: ($this->created_at ? $this->created_at->format('d M Y') : null);
+        if ($entryDate) {
+            $parts[] = '<div class="text-[10.5px] text-slate-400 truncate">'
+                .'Created: <span class="font-medium text-slate-600">'.e((string) $entryDate).'</span>'
+                .'</div>';
+        }
+
+        return implode('', $parts);
+    }
+
     public function assignee(): BelongsTo
     {
         return $this->belongsTo(User::class, 'assigned_to');

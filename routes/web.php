@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\ActivationRequestController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\BookingSlotController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\FieldController;
@@ -40,24 +41,18 @@ Route::middleware('auth')->group(function () {
     Route::post('/customers/{customer}/activities', [CustomerController::class, 'addActivity'])->name('customers.activities');
     Route::post('/customers/{customer}/auto/{channel}', [CustomerController::class, 'autoAction'])->name('customers.auto');
     Route::post('/customers/{customer}/compose', [CustomerController::class, 'compose'])->name('customers.compose');
-    Route::post('/customers/{customer}/activation-requests', [ActivationRequestController::class, 'store'])->name('customers.activation-requests');
-    Route::post('/customers/{customer}/activation-requests/start', [ActivationRequestController::class, 'start'])->name('customers.activation-requests.start');
 
     Route::get('/requests', [CustomerController::class, 'requests'])->name('requests.index');
 
-    Route::get('/activation', [ActivationRequestController::class, 'index'])->name('activation.index');
-    Route::put('/activation/{activation}', [ActivationRequestController::class, 'update'])->name('activation.update');
+    Route::get('/activation', fn () => redirect()->route('dashboard'))->name('activation.index');
+    Route::get('/inventory', fn () => redirect()->route('dashboard'))->name('inventory.index');
 
-    Route::get('/inventory', [InventoryController::class, 'index'])->name('inventory.index');
-    Route::get('/inventory/user-stock', [InventoryController::class, 'userStock'])->name('inventory.user-stock');
-    Route::post('/inventory/shift-stock', [InventoryController::class, 'shiftStock'])->name('inventory.shift-stock');
-    Route::post('/inventory', [InventoryController::class, 'store'])->name('inventory.store');
-    Route::get('/inventory/{inventory}/history', [InventoryController::class, 'history'])->name('inventory.history');
-    Route::put('/inventory/{inventory}', [InventoryController::class, 'update'])->name('inventory.update');
-    Route::delete('/inventory/{inventory}', [InventoryController::class, 'destroy'])->name('inventory.destroy');
+    Route::get('/booking-slots', [BookingSlotController::class, 'index'])->name('booking-slots.index');
+    Route::post('/booking-slots/{bookingSlot}/book', [BookingSlotController::class, 'book'])->name('booking-slots.book');
 
     Route::get('/upload', [UploadController::class, 'index'])->name('upload.index');
     Route::get('/upload/demo', [UploadController::class, 'demo'])->name('upload.demo');
+    Route::get('/upload/export', [UploadController::class, 'export'])->name('upload.export');
     Route::post('/upload', [UploadController::class, 'store'])->name('upload.store');
 
     Route::middleware('admin')->group(function () {
@@ -83,9 +78,11 @@ Route::middleware('auth')->group(function () {
         Route::put('/operation-setting', [OperationSettingController::class, 'update'])->name('operation-settings.update');
         Route::put('/whatsapp-setting', [WhatsappSettingController::class, 'update'])->name('whatsapp-settings.update');
 
-        Route::post('/inventory-types', [InventoryTypeController::class, 'store'])->name('inventory-types.store');
-        Route::put('/inventory-types/{inventoryType}', [InventoryTypeController::class, 'update'])->name('inventory-types.update');
-        Route::delete('/inventory-types/{inventoryType}', [InventoryTypeController::class, 'destroy'])->name('inventory-types.destroy');
+        Route::post('/booking-slots', [BookingSlotController::class, 'store'])->name('booking-slots.store');
+        Route::put('/booking-slots/setting', [BookingSlotController::class, 'updateSetting'])->name('booking-slots.setting');
+        Route::put('/booking-slots/{bookingSlot}', [BookingSlotController::class, 'update'])->name('booking-slots.update');
+        Route::delete('/booking-slots/date', [BookingSlotController::class, 'destroyDate'])->name('booking-slots.destroy-date');
+        Route::delete('/booking-slots/{bookingSlot}', [BookingSlotController::class, 'destroy'])->name('booking-slots.destroy');
 
         Route::get('/users', [UserController::class, 'index'])->name('users.index');
         Route::post('/users', [UserController::class, 'store'])->name('users.store');

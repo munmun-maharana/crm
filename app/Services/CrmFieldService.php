@@ -21,7 +21,13 @@ class CrmFieldService
 
     public function tableFields(string $pipeline = 'crm'): Collection
     {
-        return CrmField::inPipeline($pipeline)->active()->ordered()->where('in_table', true)->get();
+        return CrmField::inPipeline($pipeline)
+            ->active()
+            ->ordered()
+            ->where('in_table', true)
+            ->get()
+            ->reject(fn (CrmField $f) => in_array(strtolower($f->key), ['date', 'entry_date', 'created_date', 'created_at'], true))
+            ->values();
     }
 
     public function allOrdered(string $pipeline = 'crm'): Collection
@@ -35,12 +41,18 @@ class CrmFieldService
         foreach ($fields as $field) {
             $rule = [$field->required ? 'required' : 'nullable'];
 
-            $rule[] = match ($field->type) {
-                'email' => 'email',
-                'textarea' => 'string',
-                'select' => 'string',
-                default => 'string',
+            $typeRules = match ($field->type) {
+                'email' => ['email'],
+                'phone' => ['string', 'regex:/^[0-9+\-\s()]*$/'],
+                'number' => ['numeric'],
+                'date' => ['date'],
+                'time' => ['string'],
+                'textarea' => ['string'],
+                'select' => ['string'],
+                default => ['string'],
             };
+
+            $rule = array_merge($rule, $typeRules);
 
             if ($field->key === 'assigned_to') {
                 $rules[$field->key] = [$field->required ? 'required' : 'nullable', 'exists:users,id'];

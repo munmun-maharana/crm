@@ -111,12 +111,6 @@
                 if ($navUser->canAccessOperations()) {
                     $links[] = ['operations.index', 'TEAM OPS'];
                 }
-                if ($navUser->canAccessInventory()) {
-                    $links[] = ['inventory.index', 'Inventory'];
-                }
-                if ($navUser->canSeeAllRecords()) {
-                    $links[] = ['activation.index', 'Activation'];
-                }
                 if ($navUser->isAdmin()) {
                     $links = array_merge($links, [
                         ['users.index', 'Users'],
@@ -130,12 +124,6 @@
                     <span class="uppercase tracking-wide">{{ $label }}</span>
                 </a>
             @endforeach
-
-            <div class="px-2 pt-4 pb-2 text-[11px] font-semibold text-slate-500">Automations</div>
-            <div class="px-3 py-1.5 text-[12px] text-ink">Auto Call</div>
-            <div class="px-3 py-1.5 text-[12px] text-ink">Auto WhatsApp</div>
-            <div class="px-3 py-1.5 text-[12px] text-ink">Auto Email</div>
-            <div class="px-3 py-1.5 text-[12px] text-ink">Auto SMS</div>
         </nav>
         <div class="p-3 border-t border-line text-[12px]">
             <div class="flex items-center justify-between gap-2">
@@ -501,6 +489,124 @@
     </div>
 </div>
 
+{{-- Two-Step Booking Slot Popup Modal --}}
+<div class="fixed inset-0 z-[85] flex items-center justify-center p-4"
+     x-show="bookingModalOpen"
+     x-cloak>
+    <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs transition-opacity"
+         x-show="bookingModalOpen"
+         x-transition.opacity.duration.200ms
+         @click="if (!bookingModalSubmitting) bookingModalOpen = false"></div>
+
+    <div class="relative w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden border border-line z-10"
+         x-show="bookingModalOpen"
+         x-transition:enter="transition ease-out duration-250"
+         x-transition:enter-start="opacity-0 scale-95"
+         x-transition:enter-end="opacity-100 scale-100"
+         x-transition:leave="transition ease-in duration-150"
+         x-transition:leave-start="opacity-100 scale-100"
+         x-transition:leave-end="opacity-0 scale-95"
+         @click.stop>
+
+        {{-- Header --}}
+        <div class="px-5 py-4 border-b border-line flex items-center justify-between bg-slate-50">
+            <div class="flex items-center gap-3">
+                <div class="w-9 h-9 rounded-xl bg-brand-soft text-brand flex items-center justify-center shrink-0">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                    </svg>
+                </div>
+                <div>
+                    <h3 class="text-sm font-bold text-ink" x-text="bookingModalStep === 1 ? 'Book Time Slot' : 'Confirm Slot Booking'"></h3>
+                    <p class="text-[11px] text-slate-500" x-text="bookingModalStep === 1 ? 'Enter customer name to reserve this slot' : 'Please review and confirm booking details'"></p>
+                </div>
+            </div>
+            <button type="button" @click="bookingModalOpen = false" :disabled="bookingModalSubmitting" class="w-8 h-8 rounded-lg hover:bg-slate-200/60 text-slate-400 hover:text-slate-600 flex items-center justify-center text-sm font-bold">✕</button>
+        </div>
+
+        {{-- Error Alert --}}
+        <div x-show="bookingModalError" x-cloak class="mx-5 mt-4 rounded-xl border border-rose-200 bg-rose-50 px-3.5 py-2.5 text-[12px] text-rose-700 font-medium flex items-center gap-2">
+            <span>⚠</span>
+            <span x-text="bookingModalError"></span>
+        </div>
+
+        {{-- Step 1: Enter Customer Name --}}
+        <div x-show="bookingModalStep === 1" class="p-5 space-y-4">
+            <div class="rounded-xl bg-mist/70 border border-line p-3.5 flex items-center justify-between gap-3">
+                <div>
+                    <div class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Selected Slot</div>
+                    <div class="text-[13px] font-bold text-ink mt-0.5" x-text="bookingModalSlot?.label || ''"></div>
+                </div>
+                <div class="text-right">
+                    <div class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Date</div>
+                    <div class="text-[13px] font-bold text-brand mt-0.5" x-text="bookingSlotsDateFormatted"></div>
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">Customer Name <span class="text-rose-500">*</span></label>
+                <input type="text"
+                       id="bookingCustomerNameInput"
+                       x-model="bookingModalCustomerName"
+                       @keydown.enter.prevent="proceedToBookingConfirm()"
+                       list="crmCustomerNamesDatalist"
+                       placeholder="Enter customer name…"
+                       class="w-full rounded-xl border border-line bg-white px-3.5 py-2.5 text-[13px] text-ink focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand">
+            </div>
+
+            <div class="pt-2 flex items-center justify-end gap-2.5 border-t border-line">
+                <button type="button"
+                        @click="bookingModalOpen = false"
+                        class="px-4 py-2 rounded-xl border border-line text-slate-600 hover:bg-slate-100 text-[13px] font-semibold transition">
+                    Cancel
+                </button>
+                <button type="button"
+                        @click="proceedToBookingConfirm()"
+                        class="px-5 py-2 rounded-xl bg-brand hover:bg-brand-dark text-white text-[13px] font-semibold transition shadow-sm shadow-brand/20">
+                    Continue →
+                </button>
+            </div>
+        </div>
+
+        {{-- Step 2: Confirmation Popup --}}
+        <div x-show="bookingModalStep === 2" x-cloak class="p-5 space-y-4">
+            <div class="rounded-xl border border-emerald-200 bg-emerald-50/50 p-4 space-y-3">
+                <div class="flex items-center justify-between border-b border-emerald-200/60 pb-2.5">
+                    <span class="text-[12px] font-semibold text-slate-500">Customer Name</span>
+                    <span class="text-[14px] font-bold text-ink" x-text="bookingModalCustomerName"></span>
+                </div>
+                <div class="flex items-center justify-between border-b border-emerald-200/60 pb-2.5">
+                    <span class="text-[12px] font-semibold text-slate-500">Selected Date</span>
+                    <span class="text-[13px] font-bold text-slate-800" x-text="bookingSlotsDateFormatted + ' (' + bookingSlotsDate + ')'"></span>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-[12px] font-semibold text-slate-500">Booking Time</span>
+                    <span class="text-[13px] font-bold text-emerald-700 bg-emerald-100 px-2.5 py-0.5 rounded-md" x-text="bookingModalSlot?.label || ''"></span>
+                </div>
+            </div>
+
+            <p class="text-[12px] text-slate-500 text-center">
+                Once confirmed, this slot will be assigned to <strong class="text-ink" x-text="bookingModalCustomerName"></strong> and marked as <strong class="text-rose-600">Booked</strong>.
+            </p>
+
+            <div class="pt-2 flex items-center justify-between gap-2.5 border-t border-line">
+                <button type="button"
+                        @click="bookingModalStep = 1; bookingModalError = ''"
+                        :disabled="bookingModalSubmitting"
+                        class="px-4 py-2 rounded-xl border border-line text-slate-600 hover:bg-slate-100 text-[13px] font-semibold transition">
+                    ← Back
+                </button>
+                <button type="button"
+                        @click="confirmSlotBooking()"
+                        :disabled="bookingModalSubmitting"
+                        class="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-[13px] font-bold transition shadow-sm shadow-emerald-600/20 disabled:opacity-60">
+                    <span x-text="bookingModalSubmitting ? 'Booking…' : '✓ Confirm Booking'"></span>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
 function crmShell() {
     return {
@@ -528,6 +634,151 @@ function crmShell() {
         emailModalData: null,
         selectedIds: [],
         lastSelectId: null,
+        excelOpen: false,
+        bookingSlotsOpen: false,
+        bookingSlotsDate: '{{ now()->toDateString() }}',
+        bookingSlotsDateFormatted: '{{ now()->format("d M Y") }}',
+        bookingSlotsLoading: false,
+        bookingSlotsList: [],
+        bookingSlotsCounts: { total: 0, available: 0, booked: 0, cancelled: 0 },
+        bookingModalOpen: false,
+        bookingModalStep: 1,
+        bookingModalSlot: null,
+        bookingModalCustomerName: '',
+        bookingModalSubmitting: false,
+        bookingModalError: '',
+        async toggleBookingSlots() {
+            this.bookingSlotsOpen = !this.bookingSlotsOpen;
+            if (this.bookingSlotsOpen) {
+                await this.loadBookingSlots(this.bookingSlotsDate);
+            }
+        },
+        async loadBookingSlots(date) {
+            if (date) this.bookingSlotsDate = date;
+            this.bookingSlotsLoading = true;
+            try {
+                const res = await fetch(`{{ route('booking-slots.index') }}?date=${encodeURIComponent(this.bookingSlotsDate)}`, {
+                    headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    this.bookingSlotsDate = data.date || this.bookingSlotsDate;
+                    this.bookingSlotsDateFormatted = data.formatted_date || this.bookingSlotsDate;
+                    this.bookingSlotsList = data.slots || [];
+                    this.bookingSlotsCounts = data.counts || { total: 0, available: 0, booked: 0, cancelled: 0 };
+                }
+            } catch (e) {
+                console.error('Failed to load booking slots', e);
+            } finally {
+                this.bookingSlotsLoading = false;
+            }
+        },
+        shiftBookingSlotsDate(days) {
+            const parts = (this.bookingSlotsDate || '').split('-').map(Number);
+            const d = parts.length === 3 ? new Date(parts[0], parts[1] - 1, parts[2]) : new Date();
+            d.setDate(d.getDate() + days);
+            const ymd = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+            this.loadBookingSlots(ymd);
+        },
+        scrollBookingSlider(dir) {
+            const el = document.getElementById('bookingSlotsSlider');
+            if (el) {
+                el.scrollBy({ left: dir * 280, behavior: 'smooth' });
+            }
+        },
+        openBookSlotModal(slot) {
+            if (!slot || slot.status !== 'available') return;
+            this.bookingModalSlot = slot;
+            if (slot.slot_date) {
+                this.bookingSlotsDate = slot.slot_date;
+            }
+            this.bookingModalCustomerName = this.title || '';
+            this.bookingModalStep = 1;
+            this.bookingModalError = '';
+            this.bookingModalOpen = true;
+            this.$nextTick(() => {
+                const input = document.getElementById('bookingCustomerNameInput');
+                if (input) input.focus();
+            });
+        },
+        proceedToBookingConfirm() {
+            const name = (this.bookingModalCustomerName || '').trim();
+            if (!name) {
+                this.bookingModalError = 'Please enter the customer name.';
+                return;
+            }
+            this.bookingModalCustomerName = name;
+            this.bookingModalError = '';
+            this.bookingModalStep = 2;
+        },
+        async confirmSlotBooking() {
+            if (!this.bookingModalSlot || this.bookingModalSubmitting) return;
+            const name = (this.bookingModalCustomerName || '').trim();
+            if (!name) {
+                this.bookingModalStep = 1;
+                this.bookingModalError = 'Please enter the customer name.';
+                return;
+            }
+            this.bookingModalSubmitting = true;
+            this.bookingModalError = '';
+            try {
+                const res = await fetch(`{{ url('/booking-slots') }}/${this.bookingModalSlot.id}/book`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content
+                    },
+                    body: JSON.stringify({
+                        customer_name: name,
+                        customer_id: this.selectedId || null
+                    })
+                });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) {
+                    this.bookingModalError = data.message || 'Could not book this slot. It may already be booked.';
+                    await this.loadBookingSlots(this.bookingSlotsDate);
+                    return;
+                }
+                this.bookingModalOpen = false;
+                await this.loadBookingSlots(this.bookingSlotsDate);
+                window.dispatchEvent(new CustomEvent('booking-slots-updated', { detail: { date: this.bookingSlotsDate } }));
+                if (data.customer_id != null) {
+                    const fuCell = document.querySelector(`[data-fu-cell="${data.customer_id}"]`);
+                    if (fuCell && data.follow_up_html != null) {
+                        fuCell.innerHTML = data.follow_up_html;
+                    }
+                    const fuList = document.querySelector(`[data-fu-list="${data.customer_id}"]`);
+                    if (fuList && data.list_date_html != null) {
+                        fuList.innerHTML = data.list_date_html;
+                    }
+                    if (data.customer_status != null) {
+                        const statusCell = document.querySelector(`[data-status-cell="${data.customer_id}"]`);
+                        if (statusCell) {
+                            statusCell.textContent = data.customer_status;
+                            if (data.status_tone_class) {
+                                statusCell.className = `inline-flex px-2 py-0.5 rounded text-[11px] font-bold capitalize ${data.status_tone_class}`;
+                            }
+                        }
+                        const statusList = document.querySelector(`[data-status-list="${data.customer_id}"]`);
+                        if (statusList) {
+                            statusList.textContent = data.customer_status;
+                            if (data.status_tone_class) {
+                                statusList.className = `text-[10px] font-semibold px-1.5 py-0.5 rounded capitalize shrink-0 ${data.status_tone_class}`;
+                            }
+                        }
+                    }
+                    if (Number(this.selectedId) === Number(data.customer_id)) {
+                        await this.selectCustomer(data.customer_id);
+                    }
+                }
+            } catch (e) {
+                this.bookingModalError = 'Network error while booking slot.';
+            } finally {
+                this.bookingModalSubmitting = false;
+            }
+        },
         isSelected(id) {
             return this.selectedIds.map(Number).includes(Number(id));
         },
@@ -914,14 +1165,8 @@ function crmShell() {
                 const cell = document.querySelector(`[data-fu-cell="${data.customer_id}"]`);
                 if (cell && data.follow_up_html != null) cell.innerHTML = data.follow_up_html;
                 const listBadge = document.querySelector(`[data-fu-list="${data.customer_id}"]`);
-                if (listBadge) {
-                    if (data.follow_up && data.follow_up_label) {
-                        listBadge.textContent = data.follow_up_label;
-                        listBadge.classList.remove('hidden');
-                    } else {
-                        listBadge.textContent = '';
-                        listBadge.classList.add('hidden');
-                    }
+                if (listBadge && data.list_date_html != null) {
+                    listBadge.innerHTML = data.list_date_html;
                 }
                 if (data.status != null) {
                     const statusCell = document.querySelector(`[data-status-cell="${data.customer_id}"]`);
@@ -960,6 +1205,21 @@ function toggleFollowUpFields(id, on) {
     if (!wrap) return;
     wrap.style.display = on ? 'flex' : 'none';
     if (on && dateEl && !dateEl.value) dateEl.value = nextDayYmd();
+}
+function handleStatusChangeFollowUp(id, statusVal) {
+    const s = String(statusVal || '').trim().toLowerCase();
+    if (['confirmed', 'confirm', 'converted', 'cancelled', 'lost'].includes(s)) {
+        const chk = document.getElementById('followUpCheck-' + id);
+        const timeChk = document.getElementById('followUpTimeOn-' + id);
+        if (chk) {
+            chk.checked = false;
+            toggleFollowUpFields(id, false);
+        }
+        if (timeChk) {
+            timeChk.checked = false;
+            toggleFollowUpTime(id, false);
+        }
+    }
 }
 function toggleFollowUpTime(id, on) {
     const timeEl = document.getElementById('followUpTime-' + id);
@@ -1018,75 +1278,6 @@ async function assignToOperations(customerId) {
         alert('Could not assign to Operation Team');
     }
 }
-
-async function submitActivationItemRequest(form, customerId) {
-    const itemIds = Array.from(form.querySelectorAll('select[name="inventory_item_ids[]"]'))
-        .map(el => el.value)
-        .filter(Boolean)
-        .map(Number);
-    const notes = form.querySelector('[name="notes"]')?.value || '';
-    const activationRequestId = form.querySelector('[name="activation_request_id"]')?.value || null;
-    if (!itemIds.length) {
-        alert('Select at least one device from a category.');
-        return;
-    }
-    try {
-        const payload = { inventory_item_ids: itemIds, notes };
-        if (activationRequestId) payload.activation_request_id = Number(activationRequestId);
-
-        const res = await fetch(`{{ url('/customers') }}/${customerId}/activation-requests`, {
-            method: 'POST',
-            headers: {
-                'Accept': 'application/json',
-                'Content-Type': 'application/json',
-                'X-Requested-With': 'XMLHttpRequest',
-                'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content
-            },
-            body: JSON.stringify(payload)
-        });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) {
-            alert(data.message || Object.values(data.errors || {})?.[0]?.[0] || 'Could not submit request');
-            return;
-        }
-        const root = Alpine.$data(document.body);
-        if (root?.selectCustomer) {
-            await root.selectCustomer(customerId);
-        } else {
-            alert(data.message || 'Activation request submitted.');
-        }
-    } catch (e) {
-        alert('Could not submit activation request');
-    }
-}
-
-async function startActivationRequest(customerId) {
-    try {
-        const res = await fetch(`{{ url('/customers') }}/${customerId}/activation-requests/start`, {
-            method: 'POST',
-            headers: {
-                'Accept': 'application/json',
-                'X-Requested-With': 'XMLHttpRequest',
-                'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content
-            }
-        });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) {
-            alert(data.message || 'Could not start activation request');
-            return;
-        }
-        const root = Alpine.$data(document.body);
-        if (root?.selectCustomer) await root.selectCustomer(customerId);
-    } catch (e) {
-        alert('Could not start activation request');
-    }
-}
-
-function toggleActivationForm(requestId) {
-    const form = document.getElementById('act-form-' + requestId);
-    if (form) form.classList.toggle('hidden');
-}
-
 
 async function runAutoAction(customerId, channel) {
     if (channel !== 'call') {

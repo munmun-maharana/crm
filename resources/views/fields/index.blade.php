@@ -8,21 +8,22 @@
 <div class="grid grid-cols-1 xl:grid-cols-3 gap-4">
     <div class="rounded-xl border border-line bg-white p-4 h-fit">
         <h3 class="text-sm font-semibold mb-3">Add new field</h3>
-        <form method="POST" action="{{ route('fields.store') }}" class="space-y-2.5">
+        <form method="POST" action="{{ route('fields.store') }}" class="space-y-2.5" x-data="{ newType: 'text' }">
             @csrf
             <input name="label" required placeholder="Field title *" class="w-full rounded-lg border border-line px-3 py-2 text-[13px]">
-            <select name="type" class="w-full rounded-lg border border-line px-3 py-2 text-[13px]">
-                <option value="text">Text</option>
-                <option value="email">Email</option>
-                <option value="phone">Phone</option>
-                <option value="textarea">Textarea</option>
-                <option value="select">Select (dropdown)</option>
+            <select name="type" x-model="newType" class="w-full rounded-lg border border-line px-3 py-2 text-[13px]">
+                @foreach(\App\Models\CrmField::TYPES as $typeKey => $typeLabel)
+                    <option value="{{ $typeKey }}">{{ $typeLabel }}</option>
+                @endforeach
             </select>
-            <input name="options" placeholder="Select options (comma separated)" class="w-full rounded-lg border border-line px-3 py-2 text-[13px]">
+            <div x-show="newType === 'select'" x-cloak>
+                <input name="options" placeholder="Select options (comma separated)" class="w-full rounded-lg border border-line px-3 py-2 text-[13px]">
+            </div>
             <label class="flex items-center gap-2 text-[12px]"><input type="checkbox" name="required" value="1"> Required</label>
             <label class="flex items-center gap-2 text-[12px]"><input type="checkbox" name="in_form" value="1" checked> Show in form</label>
             <label class="flex items-center gap-2 text-[12px]"><input type="checkbox" name="in_table" value="1"> Show in table</label>
             <label class="flex items-center gap-2 text-[12px]"><input type="checkbox" name="in_excel" value="1" checked> Use in Excel</label>
+            <label class="flex items-center gap-2 text-[12px]"><input type="checkbox" name="in_update" value="1"> Show in Add update</label>
             <button class="w-full rounded-lg bg-brand text-white font-semibold py-2 text-[13px]">Add field</button>
         </form>
     </div>
@@ -50,6 +51,7 @@
                         <th class="text-center font-bold px-2 py-2.5 border-b border-r border-line">Form</th>
                         <th class="text-center font-bold px-2 py-2.5 border-b border-r border-line">Table</th>
                         <th class="text-center font-bold px-2 py-2.5 border-b border-r border-line">Excel</th>
+                        <th class="text-center font-bold px-2 py-2.5 border-b border-r border-line">Update</th>
                         <th class="text-center font-bold px-2 py-2.5 border-b border-r border-line">On</th>
                         <th class="text-center font-bold px-3 py-2.5 border-b border-line">Action</th>
                     </tr>
@@ -57,7 +59,7 @@
                 <tbody id="fieldsSortable">
                     @foreach($fields as $field)
                         @php $fid = 'field-form-'.$field->id; @endphp
-                        <tr class="border-b border-line hover:bg-mist/40 bg-white" data-id="{{ $field->id }}">
+                        <tr class="border-b border-line hover:bg-mist/40 bg-white" data-id="{{ $field->id }}" x-data="{ rowType: '{{ $field->type }}' }">
                             <td class="px-2 py-2.5 border-r border-line text-center align-middle">
                                 <button type="button" class="drag-handle cursor-grab active:cursor-grabbing w-8 h-8 inline-flex items-center justify-center rounded-lg border border-line text-slate-500 hover:bg-mist hover:text-ink" title="Drag to reorder">
                                     <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M9 5h2v2H9V5zm4 0h2v2h-2V5zM9 9h2v2H9V9zm4 0h2v2h-2V9zm-4 4h2v2H9v-2zm4 0h2v2h-2v-2zm-4 4h2v2H9v-2zm4 0h2v2h-2v-2z"/></svg>
@@ -68,22 +70,21 @@
                                 <input form="{{ $fid }}" name="label" value="{{ $field->label }}"
                                        class="w-full min-w-[140px] rounded border border-line px-2 py-1.5 text-[12px] font-semibold bg-white">
                                 <div class="text-[10px] text-slate-400 mt-0.5">key: {{ $field->key }}@if($field->is_system) · system @endif</div>
-                                @if($field->type === 'select' || $field->key === 'status')
-                                    <input form="{{ $fid }}" name="options"
-                                           value="{{ implode(', ', $field->options ?? []) }}"
-                                           class="w-full mt-1 rounded border border-line px-2 py-1 text-[11px]"
-                                           placeholder="options: a, b, c">
-                                @endif
+                                <input form="{{ $fid }}" name="options"
+                                       x-show="rowType === 'select' || '{{ $field->key }}' === 'status'" x-cloak
+                                       value="{{ implode(', ', $field->options ?? []) }}"
+                                       class="w-full mt-1 rounded border border-line px-2 py-1 text-[11px]"
+                                       placeholder="options: a, b, c">
                             </td>
 
                             <td class="px-3 py-2.5 border-r border-line align-middle">
                                 @if($field->is_system)
                                     <input form="{{ $fid }}" type="hidden" name="type" value="{{ $field->type }}">
                                 @endif
-                                <select form="{{ $fid }}" name="type"
+                                <select form="{{ $fid }}" name="type" x-model="rowType"
                                         class="w-full min-w-[100px] rounded border border-line px-2 py-1.5 text-[12px] bg-white"
                                         @disabled($field->is_system)>
-                                    @foreach(['text','email','phone','textarea','select'] as $t)
+                                    @foreach(\App\Models\CrmField::TYPES as $t => $tLabel)
                                         <option value="{{ $t }}" @selected($field->type === $t)>{{ $t }}</option>
                                     @endforeach
                                 </select>
@@ -116,6 +117,15 @@
                             </td>
 
                             <td class="px-2 py-2.5 border-r border-line text-center align-middle bg-slate-50/50">
+                                @if($field->key === 'status')
+                                    <input form="{{ $fid }}" type="hidden" name="in_update" value="1">
+                                    <input type="checkbox" checked disabled title="Status is always in Add update">
+                                @else
+                                    <input form="{{ $fid }}" type="checkbox" name="in_update" value="1" @checked($field->in_update)>
+                                @endif
+                            </td>
+
+                            <td class="px-2 py-2.5 border-r border-line text-center align-middle">
                                 @if($field->key === 'name')
                                     <input form="{{ $fid }}" type="hidden" name="active" value="1">
                                     <input type="checkbox" checked disabled>

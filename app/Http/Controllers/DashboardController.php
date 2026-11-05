@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\BookingSlot;
 use App\Models\CrmField;
 use App\Models\Customer;
+use App\Models\WhatsappSetting;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -106,6 +108,7 @@ class DashboardController extends Controller
         $falloffChartColors = array_values(array_slice($falloffColors, 0, max(1, count($falloffLabels))));
 
         $recent = $leads()->with('assignee')->latest()->take(8)->get();
+        $whatsappTargetPhone = WhatsappSetting::current()->normalizedPhone();
 
         return view('dashboard', compact(
             'statusCards',
@@ -119,7 +122,8 @@ class DashboardController extends Controller
             'falloffData',
             'falloffChartColors',
             'recent',
-            'listRoute'
+            'listRoute',
+            'whatsappTargetPhone'
         ));
     }
 

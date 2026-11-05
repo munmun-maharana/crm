@@ -25,12 +25,13 @@ class FieldController extends Controller
 
         $data = $request->validate([
             'label' => ['required', 'string', 'max:80'],
-            'type' => ['required', 'in:text,email,phone,textarea,select'],
+            'type' => ['required', CrmField::typeRule()],
             'options' => ['nullable', 'string'],
             'required' => ['nullable', 'boolean'],
             'in_form' => ['nullable', 'boolean'],
             'in_table' => ['nullable', 'boolean'],
             'in_excel' => ['nullable', 'boolean'],
+            'in_update' => ['nullable', 'boolean'],
             'maps_from' => ['nullable', 'string', 'max:80'],
         ]);
 
@@ -62,6 +63,7 @@ class FieldController extends Controller
             'in_form' => $request->boolean('in_form', true),
             'in_table' => $request->boolean('in_table'),
             'in_excel' => $pipeline === 'crm' ? $request->boolean('in_excel', true) : false,
+            'in_update' => $pipeline === 'crm' ? $request->boolean('in_update') : false,
             'is_system' => false,
             'sort_order' => $maxSort + 1,
         ]);
@@ -82,13 +84,14 @@ class FieldController extends Controller
 
         $data = $request->validate([
             'label' => ['required', 'string', 'max:80'],
-            'type' => ['required', 'in:text,email,phone,textarea,select'],
+            'type' => ['required', CrmField::typeRule()],
             'options' => ['nullable', 'string'],
             'required' => ['nullable', 'boolean'],
             'active' => ['nullable', 'boolean'],
             'in_form' => ['nullable', 'boolean'],
             'in_table' => ['nullable', 'boolean'],
             'in_excel' => ['nullable', 'boolean'],
+            'in_update' => ['nullable', 'boolean'],
             'sort_order' => ['nullable', 'integer', 'min:0'],
             'maps_from' => ['nullable', 'string', 'max:80'],
         ]);
@@ -98,6 +101,7 @@ class FieldController extends Controller
         $inForm = $request->boolean('in_form');
         $inTable = $request->boolean('in_table');
         $inExcel = $request->boolean('in_excel');
+        $inUpdate = $request->boolean('in_update');
 
         if ($field->key === 'name') {
             $required = true;
@@ -132,6 +136,7 @@ class FieldController extends Controller
             'in_form' => $inForm,
             'in_table' => $field->pipeline === 'operations' ? $field->in_table : $inTable,
             'in_excel' => $field->pipeline === 'operations' ? false : $inExcel,
+            'in_update' => $field->pipeline === 'crm' ? $inUpdate : false,
             'sort_order' => $data['sort_order'] ?? $field->sort_order,
             'maps_from' => $mapsFrom,
         ]);
