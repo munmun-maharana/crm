@@ -23,12 +23,12 @@
     ];
 @endphp
 
-<div class="px-5 py-4 space-y-5 w-full">
-    {{-- One row: profile + action icons --}}
-    <div class="flex items-center gap-3">
+<div class="px-3 sm:px-5 py-4 space-y-5 w-full">
+    {{-- One row: profile + action icons (wraps on mobile) --}}
+    <div class="flex flex-wrap sm:flex-nowrap items-center gap-3">
         <div class="w-11 h-11 rounded-full bg-brand text-white flex items-center justify-center font-semibold text-sm shrink-0">{{ strtoupper($initials) }}</div>
         <div class="min-w-0 flex-1">
-            <div class="flex items-center gap-2 min-w-0">
+            <div class="flex flex-wrap sm:flex-nowrap items-center gap-x-2 gap-y-1 min-w-0">
                 <div class="text-[15px] font-semibold truncate">{{ $customer->name }}</div>
                 <span class="text-[10px] font-semibold px-1.5 py-0.5 rounded capitalize bg-brand-soft text-brand shrink-0">{{ $customer->status }}</span>
                 @if($customer->follow_up && $customer->follow_up_at)
@@ -49,7 +49,7 @@
             @endif
         </div>
 
-        <div class="flex items-center gap-1.5 shrink-0">
+        <div class="flex flex-wrap items-center gap-1.5 shrink-0 w-full sm:w-auto">
             <button type="button" title="Call" onclick="runAutoAction({{ $customer->id }}, 'call')"
                     class="w-9 h-9 inline-flex items-center justify-center rounded-lg border border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
@@ -87,7 +87,7 @@
         $extraFields = collect($formFields ?? [])->reject(fn ($f) => in_array($f->key, $headerKeys, true));
     @endphp
     @if($extraFields->isNotEmpty())
-        <div class="rounded border border-line p-3 grid grid-cols-2 gap-2 text-[12px]">
+        <div class="rounded border border-line p-3 grid grid-cols-1 sm:grid-cols-2 gap-2 text-[12px] break-words">
             @foreach($extraFields as $field)
                 @php $v = $customer->fieldValue($field->key); @endphp
                 @if($v !== null && $v !== '')
@@ -156,7 +156,7 @@
                 <input name="title" placeholder="Title (optional)"
                        class="flex-1 min-w-[140px] rounded-lg border border-line bg-white px-3 py-1.5 text-[12px] outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 transition">
 
-                <div class="inline-flex items-center gap-1 rounded-lg border border-line bg-mist/40 p-1 shrink-0">
+                <div class="inline-flex flex-wrap items-center gap-1 rounded-lg border border-line bg-mist/40 p-1 shrink-0 max-w-full">
                     <label class="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[11px] font-semibold cursor-pointer transition
                                   has-[:checked]:bg-amber-100 has-[:checked]:text-amber-900 text-slate-600 hover:bg-white">
                         <input type="checkbox" name="follow_up" value="1" id="followUpCheck-{{ $customer->id }}"
@@ -165,7 +165,7 @@
                                onchange="toggleFollowUpFields({{ $customer->id }}, this.checked)">
                         Follow up
                     </label>
-                    <div id="followUpFields-{{ $customer->id }}" class="items-center gap-1"
+                    <div id="followUpFields-{{ $customer->id }}" class="items-center gap-1 flex-wrap"
                          style="display: {{ $customer->follow_up ? 'flex' : 'none' }}">
                         <input type="date" name="follow_up_date" id="followUpDate-{{ $customer->id }}"
                                value="{{ $customer->follow_up_at?->format('Y-m-d') }}"

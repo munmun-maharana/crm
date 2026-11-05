@@ -6,7 +6,7 @@
 
 @section('content')
 <div x-data="{ tab: '{{ $tab }}' }">
-    <div class="mb-4 inline-flex rounded-xl border border-line bg-white p-1">
+    <div class="crm-tabs mb-4 inline-flex rounded-xl border border-line bg-white p-1">
         <button type="button" @click="tab = 'assign'"
                 class="px-3.5 py-1.5 rounded-lg text-[13px] font-semibold"
                 :class="tab === 'assign' ? 'bg-brand-soft text-brand' : 'text-slate-500 hover:bg-mist'">

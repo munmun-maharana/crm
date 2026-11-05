@@ -48,7 +48,7 @@
 @endphp
 
 <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-    <div class="flex flex-wrap items-center gap-1 rounded-xl border border-line bg-white p-1 w-fit">
+    <div class="flex flex-wrap items-center gap-1 rounded-xl border border-line bg-white p-1 w-fit max-w-full">
         @forelse($types as $type)
             @php $tabAll = (int) ($statusTotals[$type->id]['all'] ?? 0); @endphp
             <a href="{{ route('inventory.index', ['type' => $type->id]) }}"
@@ -83,7 +83,7 @@
         @foreach($statCards as $key => [$label, $tone, $hint])
             <div class="stat-card rounded-2xl border border-line bg-white px-4 py-3.5">
                 <div class="text-[11px] font-bold uppercase tracking-wide {{ $tone }}">{{ $label }}</div>
-                <div class="text-[28px] font-extrabold text-ink leading-none mt-1">{{ (int) ($typeCounts[$key] ?? 0) }}</div>
+                <div class="text-[24px] sm:text-[28px] font-extrabold text-ink leading-none mt-1">{{ (int) ($typeCounts[$key] ?? 0) }}</div>
                 <div class="text-[11px] text-slate-400 mt-1">{{ $hint }}</div>
             </div>
         @endforeach
@@ -482,7 +482,7 @@
                                 </div>
                             </div>
                         </div>
-                        <table class="w-full text-[12px]">
+                        <table class="w-full text-[12px] no-min">
                             <thead>
                                 <tr class="text-slate-400 uppercase tracking-wide text-[10px]">
                                     <th class="text-left font-bold px-5 py-1.5">Type / item</th>

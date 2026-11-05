@@ -22,8 +22,8 @@
 <div class="h-full flex flex-col"
      x-init="@if($openId) $nextTick(() => selectCustomer({{ (int) $openId }})) @endif">
 
-    <div class="shrink-0 border-b border-line px-4 py-2.5 flex items-center gap-3 bg-white">
-        <form method="GET" id="crmFilterForm" class="flex flex-1 items-center gap-3 min-w-0">
+    <div class="shrink-0 border-b border-line px-3 sm:px-4 py-2.5 flex flex-wrap items-center gap-2 sm:gap-3 bg-white">
+        <form method="GET" id="crmFilterForm" class="flex flex-1 basis-full sm:basis-0 order-last sm:order-none items-center gap-3 min-w-0">
             <div class="crm-toolbar-group">
                 <label class="crm-toolbar-search">
                     <svg class="w-4 h-4 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M11 18a7 7 0 100-14 7 7 0 000 14z"/></svg>
@@ -51,7 +51,7 @@
             <span id="crmSearchHint" class="text-[11px] text-slate-400 hidden shrink-0">Searching…</span>
         </form>
 
-        <div class="flex items-center gap-2 shrink-0">
+        <div class="flex items-center gap-2 shrink-0 ml-auto sm:ml-0">
             <button type="button" x-show="selectedId" x-cloak title="Back to list"
                     x-transition.opacity.duration.200ms
                     @click="closeDesk()"
@@ -82,7 +82,7 @@
     @endif
 
     <div class="flex-1 min-h-0 desk-stage">
-        <div class="desk-pane overflow-y-auto crm-scroll bg-mist/30 p-4"
+        <div class="desk-pane overflow-y-auto crm-scroll bg-mist/30 p-2 sm:p-4"
              x-show="!selectedId"
              x-cloak
              x-transition:enter="transition ease-out duration-300"
@@ -93,7 +93,7 @@
              x-transition:leave-end="opacity-0 -translate-x-6 scale-[0.985]">
             @php $pageIds = $customers->pluck('id')->map(fn ($id) => (int) $id)->values(); @endphp
             <script>window.CRM_PAGE_IDS = @json($pageIds);</script>
-            <div class="rounded-xl border border-line bg-white overflow-hidden shadow-sm select-none">
+            <div class="rounded-xl border border-line bg-white overflow-x-auto shadow-sm select-none">
                 <table class="w-full text-[13px]">
                     <thead class="bg-mist text-slate-500 text-[11px] uppercase tracking-wide">
                         <tr>
@@ -231,7 +231,7 @@
             @endif
         </div>
 
-        <div class="desk-pane bg-mist/30 p-4"
+        <div class="desk-pane bg-mist/30 p-0 sm:p-4"
              x-show="selectedId"
              x-cloak
              x-transition:enter="transition ease-out duration-300"
@@ -241,8 +241,8 @@
              x-transition:leave-start="opacity-100 translate-x-0"
              x-transition:leave-end="opacity-0 translate-x-6">
             <template x-if="selectedId">
-                <div class="flex h-full min-h-0 rounded-xl border border-line bg-white overflow-hidden shadow-sm" :key="deskKey">
-                    <section class="w-[340px] shrink-0 border-r border-line flex flex-col bg-white slide-list">
+                <div class="flex h-full min-h-0 sm:rounded-xl border-0 sm:border border-line bg-white overflow-hidden shadow-sm" :key="deskKey">
+                    <section class="hidden md:flex w-[280px] lg:w-[340px] shrink-0 border-r border-line flex-col bg-white slide-list">
                         <div class="shrink-0 px-3 py-2.5 border-b border-line flex items-center gap-1 text-[12px]">
                             @php
                                 $listRoute = $listRoute ?? 'customers.index';
@@ -284,12 +284,12 @@
                     </section>
 
                     <section class="flex-1 min-w-0 flex flex-col bg-white slide-read">
-                        <div class="shrink-0 px-5 py-3 border-b border-line flex items-center justify-between gap-3">
+                        <div class="shrink-0 px-3 sm:px-5 py-3 border-b border-line flex items-center justify-between gap-2 sm:gap-3">
                             <div class="min-w-0">
-                                <div class="text-[20px] font-semibold truncate" x-text="title">Customer</div>
-                                <div class="text-[12px] text-slate-500">Chat, updates & full details</div>
+                                <div class="text-[17px] sm:text-[20px] font-semibold truncate" x-text="title">Customer</div>
+                                <div class="text-[12px] text-slate-500 hidden sm:block">Chat, updates &amp; full details</div>
                             </div>
-                            <div class="flex items-center gap-2">
+                            <div class="flex items-center gap-2 shrink-0">
                                 <button type="button"
                                         class="rounded border border-line px-3 py-1.5 text-[12px] font-semibold text-brand hover:bg-mist"
                                         @click="fetch('{{ url('/customers') }}/'+selectedId,{headers:{Accept:'application/json'}}).then(r=>r.json()).then(d=>openEditForm(d.customer))">Edit</button>
@@ -312,12 +312,12 @@
                   x-transition:leave="transition ease-in duration-150"
                   x-transition:leave-start="opacity-100 translate-y-0 scale-100"
                   x-transition:leave-end="opacity-0 translate-y-4 scale-95"
-                  class="absolute bottom-5 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 rounded-full bg-white border border-line shadow-[0_16px_40px_rgba(32,31,30,.18)] px-2.5 py-2"
+                  class="absolute bottom-3 sm:bottom-5 left-2 right-2 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 z-30 flex flex-wrap sm:flex-nowrap items-center justify-center gap-2 rounded-2xl sm:rounded-full bg-white border border-line shadow-[0_16px_40px_rgba(32,31,30,.18)] px-2.5 py-2"
                   @submit="prepareBulkMap($event)">
                 @csrf
                 <span class="inline-flex items-center justify-center min-w-7 h-7 rounded-full bg-brand text-white text-[12px] font-bold px-2" x-text="selectedIds.length"></span>
                 <span class="text-[12px] font-semibold text-slate-700 pr-1">Bulk map</span>
-                <select name="assigned_to" required class="rounded-full border border-line px-3 py-1.5 text-[13px] bg-mist/50 min-w-[150px] focus:outline-none focus:ring-2 focus:ring-brand/20">
+                <select name="assigned_to" required class="rounded-full border border-line px-3 py-1.5 text-[13px] bg-mist/50 min-w-[130px] sm:min-w-[150px] focus:outline-none focus:ring-2 focus:ring-brand/20">
                     <option value="">Choose user</option>
                     @foreach($agents as $a)
                         <option value="{{ $a->id }}">{{ $a->name }}</option>
@@ -327,7 +327,7 @@
                     Map selected
                 </button>
 
-                <span class="w-px h-5 bg-line"></span>
+                <span class="w-px h-5 bg-line hidden sm:block"></span>
 
                 <button type="button" @click="sendBulkWhatsapp()"
                         class="inline-flex items-center gap-1.5 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-3.5 py-1.5 text-[12px] shadow-sm transition shrink-0"

@@ -13,7 +13,7 @@
 <div class="h-full flex flex-col">
     <div class="shrink-0 border-b border-line px-3 py-2 flex items-center gap-2 bg-white">
         <div class="text-[15px] font-semibold">Requests</div>
-        <div class="text-[12px] text-slate-500">Interested & request leads</div>
+        <div class="text-[12px] text-slate-500 hidden sm:block">Interested &amp; request leads</div>
         <button type="button" x-show="selectedId" x-cloak
                 x-transition.opacity.duration.200ms
                 @click="closeDesk()"
@@ -21,7 +21,7 @@
     </div>
 
     <div class="flex-1 min-h-0 desk-stage">
-        <div class="desk-pane overflow-y-auto crm-scroll bg-mist/30 p-4"
+        <div class="desk-pane overflow-y-auto crm-scroll bg-mist/30 p-2 sm:p-4"
              x-show="!selectedId" x-cloak
              x-transition:enter="transition ease-out duration-300"
              x-transition:enter-start="opacity-0 translate-x-4 scale-[0.985]"
@@ -29,7 +29,7 @@
              x-transition:leave="transition ease-in duration-220"
              x-transition:leave-start="opacity-100 translate-x-0 scale-100"
              x-transition:leave-end="opacity-0 -translate-x-6 scale-[0.985]">
-            <div class="rounded-xl border border-line bg-white overflow-hidden shadow-sm">
+            <div class="rounded-xl border border-line bg-white overflow-x-auto shadow-sm">
                 <table class="w-full text-[13px]">
                     <thead class="bg-mist text-slate-500 text-[11px] uppercase tracking-wide">
                         <tr>
@@ -62,7 +62,7 @@
             @endif
         </div>
 
-        <div class="desk-pane bg-mist/30 p-4"
+        <div class="desk-pane bg-mist/30 p-0 sm:p-4"
              x-show="selectedId" x-cloak
              x-transition:enter="transition ease-out duration-300"
              x-transition:enter-start="opacity-0 translate-x-8"
@@ -71,8 +71,8 @@
              x-transition:leave-start="opacity-100 translate-x-0"
              x-transition:leave-end="opacity-0 translate-x-6">
             <template x-if="selectedId">
-                <div class="flex h-full min-h-0 rounded-xl border border-line bg-white overflow-hidden shadow-sm" :key="deskKey">
-                    <section class="w-[340px] shrink-0 border-r border-line flex flex-col bg-white slide-list">
+                <div class="flex h-full min-h-0 sm:rounded-xl border-0 sm:border border-line bg-white overflow-hidden shadow-sm" :key="deskKey">
+                    <section class="hidden md:flex w-[280px] lg:w-[340px] shrink-0 border-r border-line flex-col bg-white slide-list">
                         <div class="shrink-0 px-3 py-2.5 border-b border-line flex items-center justify-between text-[12px] text-slate-500">
                             <span class="font-semibold text-brand border-b-2 border-brand pb-1">All</span>
                             <span>By date ▾</span>
@@ -97,8 +97,8 @@
                         </div>
                     </section>
                     <section class="flex-1 min-w-0 flex flex-col bg-white slide-read">
-                        <div class="shrink-0 px-5 py-3 border-b border-line flex items-center justify-between">
-                            <div class="text-[20px] font-semibold truncate" x-text="title"></div>
+                        <div class="shrink-0 px-3 sm:px-5 py-3 border-b border-line flex items-center justify-between gap-2">
+                            <div class="text-[17px] sm:text-[20px] font-semibold truncate min-w-0" x-text="title"></div>
                             <button type="button" @click="closeDesk()" class="w-8 h-8 rounded hover:bg-mist text-slate-500 transition hover:rotate-90 duration-200">✕</button>
                         </div>
                         <div class="flex-1 overflow-y-auto crm-scroll" x-html="html"></div>

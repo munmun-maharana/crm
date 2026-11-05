@@ -34,10 +34,10 @@
 
         <form method="POST" action="{{ route('upload.store') }}" enctype="multipart/form-data" class="space-y-4">
             @csrf
-            <label class="flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-line bg-mist/40 px-6 py-10 cursor-pointer hover:border-brand/40 transition">
+            <label class="flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-line bg-mist/40 px-4 sm:px-6 py-8 sm:py-10 cursor-pointer hover:border-brand/40 transition text-center">
                 <span class="text-sm font-semibold">Drop Excel file or click</span>
                 <span class="text-[12px] text-slate-400">.xlsx · .xls · .csv (max 10MB)</span>
-                <input type="file" name="file" accept=".xlsx,.xls,.csv" required class="text-[12px] mt-2">
+                <input type="file" name="file" accept=".xlsx,.xls,.csv" required class="text-[12px] mt-2 max-w-full">
             </label>
             <button class="w-full rounded-lg bg-brand text-white font-semibold py-2.5 text-[13px]">Upload & import</button>
         </form>

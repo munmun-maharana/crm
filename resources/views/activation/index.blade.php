@@ -15,23 +15,23 @@
 @endphp
 
 <form method="get" class="mb-4 flex flex-wrap items-end gap-2">
-    <div>
+    <div class="w-full sm:w-auto">
         <label class="block text-[11px] font-semibold text-slate-500 mb-1">Search</label>
         <input type="text" name="q" value="{{ $q }}" placeholder="Customer / phone / company"
-               class="rounded-lg border border-line px-3 py-2 text-[13px] w-56">
+               class="rounded-lg border border-line px-3 py-2 text-[13px] w-full sm:w-56">
     </div>
-    <div>
+    <div class="flex-1 sm:flex-none min-w-[120px]">
         <label class="block text-[11px] font-semibold text-slate-500 mb-1">Status</label>
-        <select name="status" class="rounded-lg border border-line px-3 py-2 text-[13px]">
+        <select name="status" class="rounded-lg border border-line px-3 py-2 text-[13px] w-full">
             <option value="">All</option>
             @foreach($statuses as $key => $label)
                 <option value="{{ $key }}" @selected($status === $key)>{{ $label }}</option>
             @endforeach
         </select>
     </div>
-    <div>
+    <div class="flex-1 sm:flex-none min-w-[120px]">
         <label class="block text-[11px] font-semibold text-slate-500 mb-1">Category</label>
-        <select name="type" class="rounded-lg border border-line px-3 py-2 text-[13px]">
+        <select name="type" class="rounded-lg border border-line px-3 py-2 text-[13px] w-full">
             <option value="">All</option>
             @foreach($types as $type)
                 <option value="{{ $type->id }}" @selected((int) $typeId === (int) $type->id)>{{ $type->name }}</option>

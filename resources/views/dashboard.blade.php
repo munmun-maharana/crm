@@ -7,11 +7,11 @@
     : (auth()->user()->isOperation() ? 'Operations queue' : 'Only leads mapped to you'))
 
 @section('content')
-<div class="grid gap-3 mb-5" style="grid-template-columns: repeat({{ min(10, max(2, count($statusCards))) }}, minmax(0, 1fr));">
+<div class="grid gap-2 sm:gap-3 mb-5 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:[grid-template-columns:repeat(var(--cols),minmax(0,1fr))]" style="--cols: {{ min(10, max(2, count($statusCards))) }};">
     @foreach($statusCards as $card)
-        <a href="{{ $card['url'] ?? '#' }}" class="stat-card block rounded-2xl border border-line bg-white px-4 py-3.5 hover:border-brand/40 hover:shadow-sm transition">
-            <div class="text-[11px] uppercase tracking-[0.14em] text-slate-400 font-bold">{{ $card['label'] }}</div>
-            <div class="mt-1 text-2xl font-extrabold text-{{ $card['tone'] }}-700">{{ $card['value'] }}</div>
+        <a href="{{ $card['url'] ?? '#' }}" class="stat-card block rounded-2xl border border-line bg-white px-3 sm:px-4 py-3 sm:py-3.5 hover:border-brand/40 hover:shadow-sm transition min-w-0">
+            <div class="text-[10px] sm:text-[11px] uppercase tracking-[0.1em] sm:tracking-[0.14em] text-slate-400 font-bold truncate" title="{{ $card['label'] }}">{{ $card['label'] }}</div>
+            <div class="mt-1 text-xl sm:text-2xl font-extrabold text-{{ $card['tone'] }}-700">{{ $card['value'] }}</div>
         </a>
     @endforeach
 </div>

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>@yield('title', 'CRM')</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -63,17 +63,41 @@
         .crm-toolbar-search input::placeholder{color:#a19f9d}
         .crm-toolbar-split{width:1px;height:18px;background:#e1dfdd;flex-shrink:0}
         .crm-toolbar-select{border:0;background:transparent url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23605e5c' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") no-repeat right 10px center;font-size:12.5px;font-weight:600;color:#201f1e;padding:0 28px 0 12px;height:100%;outline:none;appearance:none;-webkit-appearance:none;cursor:pointer;max-width:150px}
+
+        /* ---------- Mobile / tablet responsiveness ---------- */
+        .crm-scroll{-webkit-overflow-scrolling:touch}
+        table th{white-space:nowrap}
+        @media (max-width:1023px){
+            /* any card that clips a table should scroll it horizontally instead */
+            .crm-main .overflow-hidden:has(> table){overflow-x:auto}
+            .crm-main table{min-width:560px}
+            .crm-main .no-min-table table, .crm-main table.no-min{min-width:0}
+        }
+        @media (max-width:639px){
+            .crm-tabs{display:flex!important;flex-wrap:nowrap!important;overflow-x:auto;max-width:100%;scrollbar-width:none}
+            .crm-tabs::-webkit-scrollbar{display:none}
+            .crm-tabs > *{flex-shrink:0;white-space:nowrap}
+            .crm-toolbar-group{max-width:none}
+            .crm-toolbar-search{min-width:0;padding:0 8px}
+            .crm-toolbar-select{max-width:105px;padding:0 22px 0 8px;font-size:12px;background-position:right 6px center}
+        }
     </style>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     @stack('head')
 </head>
 <body class="font-sans text-ink antialiased bg-white" x-data="crmShell()" x-cloak>
-<div class="h-screen flex">
-    {{-- Left nav — Outlook style --}}
-    <aside class="w-[200px] shrink-0 border-r border-line bg-white flex flex-col h-full">
-        <div class="px-4 py-4 border-b border-line">
+<div class="h-full flex" @keydown.escape.window="navOpen = false">
+    {{-- Mobile nav backdrop --}}
+    <div class="fixed inset-0 z-[55] bg-ink/30 lg:hidden" x-show="navOpen" x-cloak
+         x-transition.opacity.duration.200ms @click="navOpen = false"></div>
+
+    {{-- Left nav — Outlook style (off-canvas on mobile) --}}
+    <aside class="fixed inset-y-0 left-0 z-[56] w-[250px] lg:w-[200px] lg:static lg:z-auto lg:translate-x-0 shrink-0 border-r border-line bg-white flex flex-col h-full transition-transform duration-300 ease-out shadow-xl lg:shadow-none"
+           :class="navOpen ? 'translate-x-0' : '-translate-x-full'">
+        <div class="px-4 py-4 border-b border-line flex items-center justify-between">
             <div class="text-[18px] font-bold tracking-tight text-ink">Pulse<span class="text-brand">CRM</span></div>
+            <button type="button" class="lg:hidden w-8 h-8 rounded hover:bg-mist text-slate-500" @click="navOpen = false" aria-label="Close menu">✕</button>
         </div>
         <nav class="p-2 flex-1 overflow-y-auto crm-scroll text-[13px]">
             @php
@@ -149,18 +173,27 @@
         </div>
     </aside>
 
-    <div class="flex-1 min-w-0 h-full flex flex-col">
+    <div class="crm-main flex-1 min-w-0 h-full flex flex-col">
+        {{-- Mobile top bar --}}
+        <div class="lg:hidden shrink-0 h-12 border-b border-line bg-white px-2 flex items-center gap-2">
+            <button type="button" @click="navOpen = true" aria-label="Open menu"
+                    class="w-9 h-9 inline-flex items-center justify-center rounded-lg text-slate-600 hover:bg-mist">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+            </button>
+            <div class="text-[16px] font-bold tracking-tight text-ink">Pulse<span class="text-brand">CRM</span></div>
+            <div class="ml-auto text-[12px] text-slate-500 truncate max-w-[45%]">{{ auth()->user()->name }}</div>
+        </div>
         @hasSection('split')
             @yield('split')
         @else
-            <header class="shrink-0 border-b border-line bg-white px-5 py-3 flex items-center justify-between gap-3">
-                <div>
-                    <h1 class="text-[18px] font-semibold">@yield('heading', 'Dashboard')</h1>
+            <header class="shrink-0 border-b border-line bg-white px-3 sm:px-5 py-3 flex flex-wrap items-center justify-between gap-2 sm:gap-3">
+                <div class="min-w-0">
+                    <h1 class="text-[16px] sm:text-[18px] font-semibold truncate">@yield('heading', 'Dashboard')</h1>
                     <p class="text-[12px] text-slate-500">@yield('subheading')</p>
                 </div>
-                <div class="flex items-center gap-2">@yield('actions')</div>
+                <div class="flex flex-wrap items-center gap-2">@yield('actions')</div>
             </header>
-            <div class="flex-1 overflow-y-auto crm-scroll bg-mist/40 p-5">
+            <div class="flex-1 overflow-y-auto crm-scroll bg-mist/40 p-3 sm:p-5">
                 @if(session('success'))
                     <div class="mb-3 rounded border border-emerald-200 bg-emerald-50 text-emerald-800 px-3 py-2 text-[13px]">{{ session('success') }}</div>
                 @endif
@@ -374,8 +407,8 @@
          @click.stop>
 
         {{-- Modal Header --}}
-        <div class="px-6 py-4 border-b border-line flex items-center justify-between bg-slate-50 shrink-0">
-            <div class="flex items-center gap-3">
+        <div class="px-4 sm:px-6 py-4 border-b border-line flex items-center justify-between bg-slate-50 shrink-0">
+            <div class="flex items-center gap-3 min-w-0">
                 <div class="w-10 h-10 rounded-xl bg-rose-50 border border-rose-200 flex items-center justify-center text-rose-600 shadow-xs">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
                 </div>
@@ -389,12 +422,12 @@
         </div>
 
         {{-- Recipient Email Input & Quick Copy --}}
-        <div class="px-6 py-3.5 bg-slate-50/70 border-b border-line shrink-0 space-y-2">
+        <div class="px-4 sm:px-6 py-3.5 bg-slate-50/70 border-b border-line shrink-0 space-y-2">
             <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-600">
                 Recipient Email (Enter Manually)
             </label>
-            <div class="flex items-center gap-2">
-                <div class="relative flex-1">
+            <div class="flex flex-wrap sm:flex-nowrap items-center gap-2">
+                <div class="relative flex-1 min-w-[200px]">
                     <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.206"/></svg>
                     </div>
@@ -413,9 +446,9 @@
         </div>
 
         {{-- Live Table Preview --}}
-        <div class="flex-1 overflow-y-auto crm-scroll p-6 bg-slate-100/60 min-h-[220px]">
-            <div class="flex items-center justify-between mb-2.5">
-                <div class="flex items-center gap-2">
+        <div class="flex-1 overflow-y-auto crm-scroll p-3 sm:p-6 bg-slate-100/60 min-h-[220px]">
+            <div class="flex flex-wrap items-center justify-between gap-2 mb-2.5">
+                <div class="flex flex-wrap items-center gap-2">
                     <span class="text-[11px] font-bold uppercase tracking-wider text-slate-600">Live Table Preview</span>
                     <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-[#8fe3eb]/40 text-slate-800 border border-[#8fe3eb]">
                         Cyan Header (#8fe3eb) &amp; Black Borders
@@ -434,10 +467,10 @@
         </div>
 
         {{-- Instructions Notice --}}
-        <div class="px-6 py-3 bg-amber-50/90 border-t border-amber-200/80 flex items-center justify-between gap-3 text-[12px] text-amber-900 shrink-0">
+        <div class="px-4 sm:px-6 py-3 bg-amber-50/90 border-t border-amber-200/80 flex items-center justify-between gap-3 text-[12px] text-amber-900 shrink-0">
             <div class="flex items-center gap-2.5 min-w-0">
                 <span class="w-6 h-6 rounded-full bg-amber-200/80 text-amber-800 font-bold flex items-center justify-center text-[12px] shrink-0">ℹ</span>
-                <span class="truncate">
+                <span class="sm:truncate">
                     In Gmail compose: press <kbd class="px-1.5 py-0.5 rounded bg-white border border-amber-300 font-mono text-[11px] font-bold shadow-xs text-amber-900">Ctrl + V</kbd> to paste this exact colored Excel table!
                 </span>
             </div>
@@ -447,12 +480,12 @@
         </div>
 
         {{-- Footer --}}
-        <div class="px-6 py-4 border-t border-line bg-white flex items-center justify-between gap-3 shrink-0">
+        <div class="px-4 sm:px-6 py-3 sm:py-4 border-t border-line bg-white flex flex-wrap items-center justify-between gap-2 sm:gap-3 shrink-0">
             <button type="button" @click="emailModalOpen = false"
                     class="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 text-[13px] font-semibold transition">
                 Close
             </button>
-            <div class="flex items-center gap-2.5">
+            <div class="flex flex-wrap items-center gap-2 sm:gap-2.5">
                 <button type="button" @click="copyEmailTableToClipboard()"
                         class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-[13px] font-semibold shadow-xs transition">
                     <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
@@ -471,6 +504,7 @@
 <script>
 function crmShell() {
     return {
+        navOpen: false,
         changePasswordOpen: {{ $errors->updatePassword->any() ? 'true' : 'false' }},
         selectedId: null,
         title: '',
