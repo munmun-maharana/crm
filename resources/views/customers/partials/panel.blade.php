@@ -14,10 +14,11 @@
     $statusOptions = $statusOptions ?? (! empty($statusField?->options) ? $statusField->options : ['new', 'interested', 'contacted', 'converted', 'lost', 'request']);
     $updateFields = \App\Models\CrmField::inPipeline($customer->pipeline ?? 'crm')
         ->active()
-        ->where('in_update', true)
         ->where('key', '!=', 'status')
         ->ordered()
-        ->get();
+        ->get()
+        ->filter(fn ($f) => (bool) ($f->in_update ?? false))
+        ->values();
 @endphp
 
 <div class="px-3 sm:px-4 py-2.5 space-y-3 w-full">

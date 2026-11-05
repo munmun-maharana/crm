@@ -185,7 +185,10 @@ class Customer extends Model
             return $query->where('pipeline', 'operations');
         }
 
-        return $query->where('assigned_to', $user->id);
+        return $query->where(function ($q) use ($user) {
+            $q->where('assigned_to', $user->id)
+              ->orWhereNull('assigned_to');
+        });
     }
 
     public function accessibleBy(User $user): bool
@@ -194,12 +197,15 @@ class Customer extends Model
             return true;
         }
 
-        if ($user->isOperation()) {
-            return $this->isOperations();
+        if ($this->isOperations() && $user->canAccessOperations()) {
+            return $this->assigned_to === null || (int) $this->assigned_to === (int) $user->id || $user->isOperation();
         }
 
-        // Assigned records in either CRM or Operations (e.g. front office with ops access)
-        return (int) $this->assigned_to === (int) $user->id;
+        if (! $this->isOperations() && $user->canAccessCrm()) {
+            return $this->assigned_to === null || (int) $this->assigned_to === (int) $user->id;
+        }
+
+        return $this->assigned_to === null || (int) $this->assigned_to === (int) $user->id;
     }
 
     public function activities(): HasMany

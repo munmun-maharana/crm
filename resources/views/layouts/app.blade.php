@@ -953,11 +953,14 @@ function crmShell() {
                 const res = await fetch(`{{ url('/customers') }}/${id}`, {
                     headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
                 });
+                const data = await res.json().catch(() => ({}));
                 if (!res.ok) {
-                    this.html = '<div class="p-8 text-center text-rose-600 text-sm">This customer is not mapped to you.</div>';
+                    const msg = res.status === 403
+                        ? 'This customer is not mapped to you.'
+                        : (data.message || `Could not load customer details (HTTP ${res.status}).`);
+                    this.html = `<div class="p-8 text-center text-rose-600 text-sm">${msg}</div>`;
                     return;
                 }
-                const data = await res.json();
                 this.title = data.customer.name;
                 this.html = data.html;
             } finally {

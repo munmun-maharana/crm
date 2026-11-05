@@ -234,10 +234,11 @@ class CustomerController extends Controller
 
         $updateFields = CrmField::inPipeline($customer->pipeline ?? 'crm')
             ->active()
-            ->where('in_update', true)
             ->where('key', '!=', 'status')
             ->ordered()
-            ->get();
+            ->get()
+            ->filter(fn ($f) => (bool) ($f->in_update ?? false))
+            ->values();
 
         $fieldChanges = [];
         $currentMeta = is_array($customer->meta) ? $customer->meta : [];

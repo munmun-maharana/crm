@@ -96,22 +96,22 @@ class User extends Authenticatable
 
     public function isAdmin(): bool
     {
-        return $this->role === self::ROLE_ADMIN;
+        return strtolower(trim((string) $this->role)) === self::ROLE_ADMIN;
     }
 
     public function isCoordinator(): bool
     {
-        return $this->role === self::ROLE_COORDINATOR;
+        return strtolower(trim((string) $this->role)) === self::ROLE_COORDINATOR;
     }
 
     public function isFrontOffice(): bool
     {
-        return $this->role === self::ROLE_FRONT_OFFICE;
+        return strtolower(trim((string) $this->role)) === self::ROLE_FRONT_OFFICE;
     }
 
     public function isOperation(): bool
     {
-        return $this->role === self::ROLE_OPERATION;
+        return strtolower(trim((string) $this->role)) === self::ROLE_OPERATION;
     }
 
     public function canSeeAllRecords(): bool
@@ -121,12 +121,12 @@ class User extends Authenticatable
 
     public function canAccessCrm(): bool
     {
-        return $this->isAdmin() || $this->isCoordinator() || $this->isFrontOffice();
+        return $this->isAdmin() || $this->isCoordinator() || $this->isFrontOffice() || $this->appAccessFlag('access_crm', false);
     }
 
     public function canAccessOperations(): bool
     {
-        return $this->isAdmin() || $this->isCoordinator() || $this->isOperation();
+        return $this->isAdmin() || $this->isCoordinator() || $this->isOperation() || $this->appAccessFlag('access_operations', false);
     }
 
     public function canAccessInventory(): bool
