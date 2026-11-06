@@ -227,9 +227,23 @@
                 </template>
 
                 <div>
-                    <label class="block text-[11px] font-bold text-slate-500 mb-1">Message *</label>
-                    <textarea x-model="compose.message" rows="6" required placeholder="Type your message…"
-                              class="w-full rounded-lg border border-line px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-brand/20 resize-y"></textarea>
+                    <div class="flex items-center justify-between gap-2 mb-1">
+                        <label class="block text-[11px] font-bold text-slate-500">Message *</label>
+                        <div class="flex flex-wrap items-center gap-1">
+                            <button type="button"
+                                    @click="applyComposeTemplate('booking_confirmed')"
+                                    class="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 px-2.5 py-0.5 text-[10.5px] font-bold transition">
+                                🎉 Booking Confirmed!
+                            </button>
+                            <button type="button"
+                                    @click="applyComposeTemplate('follow_up')"
+                                    class="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-800 px-2 py-0.5 text-[10.5px] font-semibold transition">
+                                ⏰ Follow-up
+                            </button>
+                        </div>
+                    </div>
+                    <textarea x-model="compose.message" rows="12" required placeholder="Type your message…"
+                              class="w-full rounded-lg border border-line px-3 py-2 text-[13px] leading-relaxed focus:outline-none focus:ring-2 focus:ring-brand/20 resize-y"></textarea>
                 </div>
 
                 <div>
@@ -622,7 +636,7 @@ function crmShell() {
         form: { id: null },
         composeOpen: false,
         composeSending: false,
-        compose: { channel: 'whatsapp', customerId: null, name: '', phone: '', email: '', message: '', subject: '', link: '' },
+        compose: { channel: 'whatsapp', customerId: null, customer: null, name: '', phone: '', email: '', message: '', subject: '', link: '' },
         emailModalOpen: false,
         emailModalLoading: false,
         emailModalCopied: false,
@@ -1050,6 +1064,121 @@ function crmShell() {
         closeForm() {
             this.formOpen = false;
         },
+        buildComposeTemplate(type, c) {
+            if (!c) return '';
+            const meta = (c.meta && typeof c.meta === 'object') ? c.meta : {};
+            const pick = (keys) => {
+                for (const k of keys) {
+                    const val = meta[k] ?? c[k];
+                    if (val !== undefined && val !== null && String(val).trim() !== '') {
+                        return Array.isArray(val) ? val.join(', ') : String(val).trim();
+                    }
+                }
+                return '';
+            };
+
+            const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+            const formatLongDate = (raw) => {
+                if (!raw) return '';
+                const d = new Date(raw);
+                if (isNaN(d.getTime())) return String(raw);
+                return String(d.getDate()).padStart(2, '0') + ' ' + months[d.getMonth()] + ' ' + d.getFullYear();
+            };
+
+            const customerName = c.name || 'Customer';
+            const bookingDate = formatLongDate(c.follow_up_at || meta.date || new Date());
+            let slotTime = pick(['booking_slot_time', 'booking_time']);
+            if (!slotTime && c.follow_up_has_time && c.follow_up_at) {
+                const dt = new Date(c.follow_up_at);
+                if (!isNaN(dt.getTime())) {
+                    slotTime = dt.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+                }
+            }
+            slotTime = slotTime ? slotTime.replace(/\s+to\s+/i, ' – ') : 'As Scheduled';
+
+            const carModel = pick(['car_model', 'model', 'vehicle_model', 'vehicle_type', 'vehicle']);
+            const serviceDetails = pick(['service_details', 'service_type', 'service', 'package']);
+            let vehicleBullets = [];
+            if (carModel) {
+                vehicleBullets = carModel.split(/[\n,]+/).map(s => s.trim()).filter(Boolean).map(s => `• ${s}`);
+            }
+            if (serviceDetails) {
+                if (vehicleBullets.length === 1) {
+                    vehicleBullets[0] = `${vehicleBullets[0]} (${serviceDetails})`;
+                } else {
+                    vehicleBullets.push(`• Service: ${serviceDetails}`);
+                }
+            }
+            if (vehicleBullets.length === 0) {
+                vehicleBullets.push('• Vehicle Cleaning');
+            }
+
+            const rawAmount = pick(['seal_price', 'sale_price', 'selling_price', 'price', 'mrp', 'amount']);
+            let formattedAmount = '—';
+            if (rawAmount !== '') {
+                const num = Number(String(rawAmount).replace(/[^0-9.]/g, ''));
+                formattedAmount = !isNaN(num) && num > 0
+                    ? '₹' + num.toLocaleString('en-IN')
+                    : (String(rawAmount).startsWith('₹') ? rawAmount : '₹' + rawAmount);
+            }
+
+            const rawPay = pick(['payment_status', 'payment']).toLowerCase();
+            let paymentStatus = 'Pending';
+            if (rawPay === 'yes' || rawPay === 'paid' || rawPay === 'done' || rawPay === 'completed') {
+                paymentStatus = 'Paid';
+            } else if (rawPay && rawPay !== 'no' && rawPay !== 'unpaid' && rawPay !== 'pending') {
+                paymentStatus = pick(['payment_status', 'payment']);
+            }
+
+            const location = c.city || pick(['city', 'location', 'address']) || 'Bhubaneswar';
+
+            if (type === 'follow_up') {
+                return [
+                    `Hello ${customerName},`,
+                    ``,
+                    `This is a quick follow-up regarding your vehicle cleaning enquiry.`,
+                    `🚗 *Vehicle Details:*`,
+                    ...vehicleBullets,
+                    `💰 *Estimated Amount:* ${formattedAmount}`,
+                    `📍 *Location:* ${location}`,
+                    ``,
+                    `Please let us know your preferred date and time slot so we can confirm your booking.`,
+                    ``,
+                    `*Thank you!*`
+                ].join('\n');
+            }
+
+            return [
+                `🎉 *Booking Confirmed!*`,
+                ``,
+                `Dear ${customerName},`,
+                ``,
+                `Your vehicle cleaning booking has been confirmed!`,
+                ``,
+                `📅 *Booking Date:* ${bookingDate}`,
+                `⏰ *Time:* ${slotTime}`,
+                `🚗 *Vehicle Details:*`,
+                ...vehicleBullets,
+                ``,
+                `💰 *Total Amount:* ${formattedAmount}`,
+                `💳 *Payment Status:* ${paymentStatus}`,
+                ``,
+                `📍 *Location:* ${location}`,
+                ``,
+                `Thank you for choosing our service! We look forward to serving you.`,
+                ``,
+                `*For any queries or changes, please contact us.*`
+            ].join('\n');
+        },
+        applyComposeTemplate(type) {
+            if (!this.compose.customer) return;
+            this.compose.message = this.buildComposeTemplate(type, this.compose.customer);
+            if (this.compose.channel === 'email') {
+                this.compose.subject = type === 'booking_confirmed'
+                    ? ('Booking Confirmed! - ' + (this.compose.name || ''))
+                    : ('Follow-up - ' + (this.compose.name || ''));
+            }
+        },
         async openCompose(customerId, channel) {
             if (!customerId) {
                 alert('Pehle customer select / open karein');
@@ -1072,14 +1201,16 @@ function crmShell() {
                     alert('Email missing.');
                     return;
                 }
+                const defaultMsg = this.buildComposeTemplate('booking_confirmed', c);
                 this.compose = {
                     channel,
                     customerId: c.id,
+                    customer: c,
                     name: c.name || '',
                     phone: c.phone || '',
                     email: c.email || '',
-                    message: '',
-                    subject: channel === 'email' ? ('Hello ' + (c.name || '')) : '',
+                    message: defaultMsg,
+                    subject: channel === 'email' ? ('Booking Confirmed! - ' + (c.name || '')) : '',
                     link: ''
                 };
                 this.composeOpen = true;

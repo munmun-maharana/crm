@@ -63,7 +63,7 @@ class FieldController extends Controller
             'in_form' => $request->boolean('in_form', true),
             'in_table' => $request->boolean('in_table'),
             'in_excel' => $pipeline === 'crm' ? $request->boolean('in_excel', true) : false,
-            'in_update' => $pipeline === 'crm' ? $request->boolean('in_update') : false,
+            'in_update' => in_array($pipeline, ['crm', 'operations'], true) ? $request->boolean('in_update') : false,
             'is_system' => false,
             'sort_order' => $maxSort + 1,
         ]);
@@ -136,7 +136,7 @@ class FieldController extends Controller
             'in_form' => $inForm,
             'in_table' => $field->pipeline === 'operations' ? $field->in_table : $inTable,
             'in_excel' => $field->pipeline === 'operations' ? false : $inExcel,
-            'in_update' => $field->pipeline === 'crm' ? $inUpdate : false,
+            'in_update' => in_array($field->pipeline, ['crm', 'operations'], true) ? $inUpdate : false,
             'sort_order' => $data['sort_order'] ?? $field->sort_order,
             'maps_from' => $mapsFrom,
         ]);

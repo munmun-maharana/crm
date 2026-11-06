@@ -1,6 +1,7 @@
 @php
     $typeColor = [
         'note' => 'bg-slate-100 text-slate-700',
+        'feedback' => 'bg-emerald-100 text-emerald-800',
         'chat' => 'bg-violet-100 text-violet-700',
         'call' => 'bg-sky-100 text-sky-700',
         'whatsapp' => 'bg-emerald-100 text-emerald-700',
@@ -130,10 +131,28 @@
                         </div>
                     @endif
                     @foreach($visibleExtras as $field)
-                        @php $v = $customer->fieldValue($field->key); @endphp
+                        @php
+                            $v = $customer->fieldValue($field->key);
+                            $strVal = trim(is_array($v) ? implode(', ', $v) : (string) $v);
+                            $isMapField = str_contains(strtolower($field->key), 'map') || str_contains(strtolower($field->label), 'map');
+                            $isUrlVal = (bool) filter_var($strVal, FILTER_VALIDATE_URL) || (bool) preg_match('~^https?://~i', $strVal);
+                        @endphp
                         <div>
                             <div class="text-slate-400 text-[10px]">{{ $field->label }}</div>
-                            <div class="font-semibold text-ink">{{ is_array($v) ? implode(', ', $v) : $v }}</div>
+                            @if($isMapField || $isUrlVal)
+                                @php
+                                    $mapHref = $isUrlVal
+                                        ? $strVal
+                                        : 'https://www.google.com/maps/search/?api=1&query=' . rawurlencode($strVal);
+                                @endphp
+                                <a href="{{ $mapHref }}" target="_blank" rel="noopener noreferrer"
+                                   class="mt-0.5 inline-flex items-center gap-1 rounded-md border border-brand/30 bg-brand-soft hover:bg-brand hover:text-white text-brand px-2 py-0.5 text-[10.5px] font-bold transition shadow-2xs">
+                                    <svg class="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                                    <span>{{ $isMapField ? 'Open Map URL' : 'Open URL' }}</span>
+                                </a>
+                            @else
+                                <div class="font-semibold text-ink">{{ $strVal }}</div>
+                            @endif
                         </div>
                     @endforeach
                 </div>
@@ -143,8 +162,8 @@
         </div>
     </div>
 
-    @unless($customer->isOperations())
     <form action="{{ route('customers.activities', $customer) }}"
+          enctype="multipart/form-data"
           class="rounded-lg border border-line bg-white shadow-xs overflow-hidden"
           onsubmit="event.preventDefault(); Alpine.$data(document.body).postActivity(this)">
         @csrf
@@ -154,8 +173,8 @@
                     <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                 </span>
                 <div class="min-w-0 flex items-baseline gap-1.5">
-                    <div class="text-[12.5px] font-semibold text-ink leading-tight">Add update</div>
-                    <div class="text-[10.5px] text-slate-400 truncate hidden sm:inline">Note, status change & follow-up</div>
+                    <div class="text-[12.5px] font-semibold text-ink leading-tight">{{ $customer->isOperations() ? 'Upload feedback & update' : 'Add update' }}</div>
+                    <div class="text-[10.5px] text-slate-400 truncate hidden sm:inline">{{ $customer->isOperations() ? 'Feedback note, optional image & field updates' : 'Note, status change & follow-up' }}</div>
                 </div>
             </div>
             <button type="submit"
@@ -170,7 +189,8 @@
                 <div class="relative shrink-0">
                     <select name="type"
                             class="appearance-none rounded-md border border-line bg-mist/50 hover:bg-white focus:bg-white focus:border-brand focus:ring-2 focus:ring-brand/20 pl-2 pr-6 py-1 text-[11.5px] font-medium text-ink outline-none transition">
-                        <option value="note">Note</option>
+                        <option value="feedback" @selected($customer->isOperations())>Feedback</option>
+                        <option value="note" @selected(! $customer->isOperations())>Note</option>
                         <option value="call">Call</option>
                         <option value="whatsapp">WhatsApp</option>
                         <option value="email">Email</option>
@@ -232,9 +252,19 @@
                 </div>
             </div>
 
-            <textarea name="body" id="activityBody-{{ $customer->id }}" rows="2" placeholder="What happened / note…"
+            <textarea name="body" id="activityBody-{{ $customer->id }}" rows="2" placeholder="{{ $customer->isOperations() ? 'Write feedback / what happened…' : 'What happened / note…' }}"
                       class="w-full rounded-md border border-line bg-mist/20 px-2.5 py-1.5 text-[12px] leading-snug outline-none resize-y min-h-[52px]
                              focus:bg-white focus:border-brand focus:ring-2 focus:ring-brand/20 transition"></textarea>
+
+            <div class="flex flex-wrap items-center gap-2">
+                <label class="inline-flex items-center gap-1.5 rounded-md border border-dashed border-slate-300 bg-mist/40 hover:bg-brand-soft/50 hover:border-brand px-2.5 py-1 text-[11px] font-semibold text-slate-600 hover:text-brand cursor-pointer transition">
+                    <svg class="w-3.5 h-3.5 shrink-0 text-brand" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                    <span>Upload Image (Optional)</span>
+                    <input type="file" name="images[]" accept="image/*" multiple class="hidden"
+                           onchange="const info = this.closest('div').querySelector('[data-img-info]'); if (info) { info.textContent = this.files.length ? Array.from(this.files).map(f => f.name).join(', ') : 'No image selected'; }">
+                </label>
+                <span data-img-info class="text-[10.5px] text-slate-400 truncate max-w-[260px]">No image selected</span>
+            </div>
 
             @php $noteTemplates = $noteTemplates ?? collect(); @endphp
             @if($noteTemplates->isNotEmpty())
@@ -318,9 +348,20 @@
                         @endif
                         @if(!empty($a->meta['field_changes']) && is_array($a->meta['field_changes']))
                             @foreach($a->meta['field_changes'] as $fLabel => $fChg)
-                                <span class="inline-flex px-1.5 py-0.2 rounded text-[9.5px] font-bold bg-sky-100 text-sky-800">
-                                    {{ $fLabel }}: {{ $fChg['to'] ?? '' }}
-                                </span>
+                                @php
+                                    $toVal = trim((string) ($fChg['to'] ?? ''));
+                                    $toIsUrl = (bool) filter_var($toVal, FILTER_VALIDATE_URL) || (bool) preg_match('~^https?://~i', $toVal);
+                                @endphp
+                                @if($toIsUrl)
+                                    <a href="{{ $toVal }}" target="_blank" rel="noopener noreferrer"
+                                       class="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[9.5px] font-bold bg-sky-100 text-sky-800 hover:bg-sky-200 transition">
+                                        <span>📍 {{ $fLabel }}: Open Map URL ↗</span>
+                                    </a>
+                                @else
+                                    <span class="inline-flex px-1.5 py-0.2 rounded text-[9.5px] font-bold bg-sky-100 text-sky-800">
+                                        {{ $fLabel }}: {{ $toVal }}
+                                    </span>
+                                @endif
                             @endforeach
                         @endif
                         @if(!empty($a->meta['slot_date']) && !empty($a->meta['slot_time']))
@@ -342,6 +383,26 @@
                         <span class="ml-auto text-[10.5px] text-slate-400">{{ $a->created_at?->diffForHumans() }}</span>
                     </div>
                     <div class="text-[12px] text-slate-700 whitespace-pre-wrap leading-snug">{{ $a->body }}</div>
+                    @php
+                        $timelineImages = $a->meta['images'] ?? [];
+                    @endphp
+                    @if(!empty($timelineImages) && is_array($timelineImages))
+                        <div class="mt-1.5 flex flex-wrap gap-2">
+                            @foreach($timelineImages as $img)
+                                @php
+                                    $imgUrl = is_array($img) ? ($img['url'] ?? '') : (string) $img;
+                                    $imgName = is_array($img) ? ($img['name'] ?? 'Image') : 'Image';
+                                @endphp
+                                @if($imgUrl !== '')
+                                    <a href="{{ $imgUrl }}" target="_blank" rel="noopener noreferrer"
+                                       class="group relative block w-20 h-20 rounded-lg border border-line overflow-hidden bg-mist shadow-2xs hover:border-brand transition"
+                                       title="Click to view full image ({{ $imgName }})">
+                                        <img src="{{ $imgUrl }}" alt="{{ $imgName }}" class="w-full h-full object-cover group-hover:scale-105 transition duration-200">
+                                    </a>
+                                @endif
+                            @endforeach
+                        </div>
+                    @endif
                     <div class="text-[10px] text-slate-400 mt-0.5">{{ $a->user?->name ?: 'System' }}</div>
                 </div>
             @empty
@@ -349,5 +410,4 @@
             @endforelse
         </div>
     </div>
-    @endunless
 </div>

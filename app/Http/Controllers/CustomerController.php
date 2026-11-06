@@ -189,7 +189,7 @@ class CustomerController extends Controller
             : ['new', 'interested', 'contacted', 'converted', 'lost', 'request'];
 
         $data = $request->validate([
-            'type' => ['required', 'in:note,call,whatsapp,email,sms'],
+            'type' => ['required', 'in:note,feedback,call,whatsapp,email,sms'],
             'status_change' => ['nullable', 'string', 'max:100'],
             'title' => ['nullable', 'string', 'max:120'],
             'body' => ['nullable', 'string'],
@@ -197,11 +197,36 @@ class CustomerController extends Controller
             'follow_up_date' => ['nullable', 'date'],
             'follow_up_time_on' => ['nullable', 'boolean'],
             'follow_up_time' => ['nullable', 'date_format:H:i'],
+            'images' => ['nullable', 'array', 'max:5'],
+            'images.*' => ['nullable', 'image', 'max:10240'],
         ]);
 
         $activityType = $data['type'];
         $title = trim((string) ($data['title'] ?? ''));
         $body = trim((string) ($data['body'] ?? ''));
+
+        $uploadedImages = [];
+        if ($request->hasFile('images')) {
+            $uploadDir = public_path('uploads/activities/'.$customer->id);
+            if (! is_dir($uploadDir)) {
+                @mkdir($uploadDir, 0755, true);
+            }
+            foreach ((array) $request->file('images') as $imgFile) {
+                if (! $imgFile || ! $imgFile->isValid()) {
+                    continue;
+                }
+                $origName = $imgFile->getClientOriginalName();
+                $ext = strtolower($imgFile->getClientOriginalExtension() ?: 'jpg');
+                $safeName = uniqid('img_', true).'.'.$ext;
+                $imgFile->move($uploadDir, $safeName);
+                $relPath = 'uploads/activities/'.$customer->id.'/'.$safeName;
+                $uploadedImages[] = [
+                    'name' => $origName,
+                    'path' => $relPath,
+                    'url' => asset($relPath),
+                ];
+            }
+        }
 
         $statusChangeVal = trim((string) ($data['status_change'] ?? ''));
         $targetStatus = null;
@@ -293,8 +318,10 @@ class CustomerController extends Controller
                     $parts[] = "{$label}: {$chg['from']} → {$chg['to']}";
                 }
                 $body = "Updated " . implode(', ', $parts) . ".";
+            } elseif (! empty($uploadedImages)) {
+                $body = "Uploaded " . count($uploadedImages) . " image(s).";
             } else {
-                return response()->json(['ok' => false, 'message' => 'Please write a note, change status/fields, or set a follow-up.'], 422);
+                return response()->json(['ok' => false, 'message' => 'Please write feedback/note, upload an image, change status/fields, or set a follow-up.'], 422);
             }
         }
 
@@ -347,6 +374,9 @@ class CustomerController extends Controller
         if (! empty($fieldChanges)) {
             $meta['field_changes'] = $fieldChanges;
         }
+        if (! empty($uploadedImages)) {
+            $meta['images'] = $uploadedImages;
+        }
 
         CustomerActivity::create([
             'customer_id' => $customer->id,
@@ -356,6 +386,46 @@ class CustomerController extends Controller
             'body' => $body,
             'meta' => $meta ?: null,
         ]);
+
+        // If this is a TEAM OPS record linked to a CRM record, sync mapped field updates & mirror the feedback
+        if ($customer->isOperations() && $customer->source_customer_id) {
+            $sourceCustomer = Customer::find($customer->source_customer_id);
+            if ($sourceCustomer) {
+                if (is_array($inputUpdateFields) && $updateFields->isNotEmpty()) {
+                    $srcMeta = is_array($sourceCustomer->meta) ? $sourceCustomer->meta : [];
+                    $srcCore = [];
+                    foreach ($updateFields as $uf) {
+                        $mappedCrmKey = trim((string) ($uf->maps_from ?? ''));
+                        if ($mappedCrmKey === '' || ! array_key_exists($uf->key, $inputUpdateFields)) {
+                            continue;
+                        }
+                        $val = trim((string) ($inputUpdateFields[$uf->key] ?? ''));
+                        if (in_array($mappedCrmKey, CrmField::CORE_KEYS, true)) {
+                            $srcCore[$mappedCrmKey] = $val !== '' ? $val : null;
+                        } else {
+                            if ($val === '') {
+                                unset($srcMeta[$mappedCrmKey]);
+                            } else {
+                                $srcMeta[$mappedCrmKey] = $val;
+                            }
+                        }
+                    }
+                    if (! empty($srcCore) || $srcMeta !== (is_array($sourceCustomer->meta) ? $sourceCustomer->meta : [])) {
+                        $srcCore['meta'] = $srcMeta ?: null;
+                        $sourceCustomer->update($srcCore);
+                    }
+                }
+
+                CustomerActivity::create([
+                    'customer_id' => $sourceCustomer->id,
+                    'user_id' => $request->user()->id,
+                    'type' => $activityType,
+                    'title' => 'OPS · '.$title,
+                    'body' => $body,
+                    'meta' => $meta ?: null,
+                ]);
+            }
+        }
         if ($request->wantsJson()) {
             $customer->load(['assignee', 'activities.user']);
             $formFields = $this->formFieldsFor($request, $customer->pipeline ?? 'crm');
