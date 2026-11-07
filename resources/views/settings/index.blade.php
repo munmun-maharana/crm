@@ -560,9 +560,10 @@
                                     <td class="px-3 py-2.5 border-r border-line">
                                         <select form="{{ $sfid }}" name="status" x-model="st"
                                                 class="rounded border border-line px-2 py-1 text-[12px] font-semibold"
-                                                :class="st === 'available' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : (st === 'booked' ? 'bg-rose-50 text-rose-800 border-rose-200' : 'bg-slate-100 text-slate-600')">
+                                                :class="st === 'available' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : (st === 'booked' ? 'bg-rose-50 text-rose-800 border-rose-200' : (st === 'success' ? 'bg-teal-50 text-teal-800 border-teal-200' : 'bg-slate-100 text-slate-600'))">
                                             <option value="available">Available</option>
                                             <option value="booked">Booked</option>
+                                            <option value="success">Success</option>
                                             <option value="cancelled">Cancelled</option>
                                         </select>
                                     </td>
@@ -570,7 +571,7 @@
                                         <input form="{{ $sfid }}" type="text" name="customer_name"
                                                value="{{ $bSlot->customer_name }}"
                                                placeholder="Customer name (if booked)"
-                                               :required="st === 'booked'"
+                                               :required="st === 'booked' || st === 'success'"
                                                class="w-full min-w-[160px] rounded border border-line bg-white px-2.5 py-1 text-[12px] font-semibold">
                                     </td>
                                     <td class="px-3 py-2.5 text-center whitespace-nowrap">
@@ -671,7 +672,6 @@
                     <label class="flex items-center gap-2 text-[12px]"><input type="checkbox" name="required" value="1"> Required</label>
                     <label class="flex items-center gap-2 text-[12px]"><input type="checkbox" name="in_form" value="1" checked> Show in form</label>
                     <label class="flex items-center gap-2 text-[12px]"><input type="checkbox" name="in_table" value="1"> Show in table</label>
-                    <label class="flex items-center gap-2 text-[12px]"><input type="checkbox" name="in_update" value="1"> Show in Feedback / Add update</label>
                     <button class="w-full rounded-lg bg-brand text-white font-semibold py-2 text-[13px]">Add field</button>
                 </form>
             </div>
@@ -698,7 +698,6 @@
                                 <th class="text-left font-bold px-3 py-2.5 border-b border-r border-line">Type</th>
                                 <th class="text-center font-bold px-2 py-2.5 border-b border-r border-line">Req</th>
                                 <th class="text-center font-bold px-2 py-2.5 border-b border-r border-line">Form</th>
-                                <th class="text-center font-bold px-2 py-2.5 border-b border-r border-line" title="Show in Feedback / Add update">Update</th>
                                 <th class="text-center font-bold px-2 py-2.5 border-b border-r border-line">On</th>
                                 <th class="text-center font-bold px-3 py-2.5 border-b border-line">Action</th>
                             </tr>
@@ -762,14 +761,6 @@
                                         @endif
                                     </td>
                                     <td class="px-2 py-2.5 border-r border-line text-center align-middle bg-slate-50/50">
-                                        @if($field->key === 'status')
-                                            <input form="{{ $fid }}" type="hidden" name="in_update" value="0">
-                                            <input type="checkbox" disabled title="Status has its own dropdown">
-                                        @else
-                                            <input form="{{ $fid }}" type="checkbox" name="in_update" value="1" @checked($field->in_update)>
-                                        @endif
-                                    </td>
-                                    <td class="px-2 py-2.5 border-r border-line text-center align-middle">
                                         @if($field->key === 'name')
                                             <input form="{{ $fid }}" type="hidden" name="active" value="1">
                                             <input type="checkbox" checked disabled>

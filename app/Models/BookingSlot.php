@@ -10,11 +10,13 @@ class BookingSlot extends Model
 {
     public const STATUS_AVAILABLE = 'available';
     public const STATUS_BOOKED = 'booked';
+    public const STATUS_SUCCESS = 'success';
     public const STATUS_CANCELLED = 'cancelled';
 
     public const STATUSES = [
         self::STATUS_AVAILABLE => 'Available',
         self::STATUS_BOOKED => 'Booked',
+        self::STATUS_SUCCESS => 'Success',
         self::STATUS_CANCELLED => 'Cancelled',
     ];
 
@@ -70,6 +72,11 @@ class BookingSlot extends Model
     public function isBooked(): bool
     {
         return $this->status === self::STATUS_BOOKED;
+    }
+
+    public function isSuccess(): bool
+    {
+        return $this->status === self::STATUS_SUCCESS;
     }
 
     public function isCancelled(): bool

@@ -41,6 +41,7 @@ class BookingSlotController extends Controller
             'total' => $slots->count(),
             'available' => $slots->where('status', BookingSlot::STATUS_AVAILABLE)->count(),
             'booked' => $slots->where('status', BookingSlot::STATUS_BOOKED)->count(),
+            'success' => $slots->where('status', BookingSlot::STATUS_SUCCESS)->count(),
             'cancelled' => $slots->where('status', BookingSlot::STATUS_CANCELLED)->count(),
         ];
 
@@ -74,7 +75,7 @@ class BookingSlotController extends Controller
             /** @var BookingSlot $locked */
             $locked = BookingSlot::query()->lockForUpdate()->findOrFail($bookingSlot->id);
 
-            if ($locked->status === BookingSlot::STATUS_BOOKED) {
+            if (in_array($locked->status, [BookingSlot::STATUS_BOOKED, BookingSlot::STATUS_SUCCESS], true)) {
                 return [
                     'ok' => false,
                     'status_code' => 409,
@@ -176,7 +177,7 @@ class BookingSlotController extends Controller
                     $opAttrs['follow_up_has_time'] = true;
 
                     if (! $opCopy) {
-                        $opAttrs['status'] = 'new';
+                        $opAttrs['status'] = 'Pending';
                         $opCopy = Customer::create($opAttrs);
 
                         CustomerActivity::create([
@@ -396,7 +397,7 @@ class BookingSlotController extends Controller
             'slot_date' => ['nullable', 'date'],
             'start_time' => ['required', 'date_format:H:i'],
             'end_time' => ['required', 'date_format:H:i'],
-            'status' => ['required', 'in:available,booked,cancelled'],
+            'status' => ['required', 'in:available,booked,success,cancelled'],
             'customer_name' => ['nullable', 'string', 'max:160'],
             'notes' => ['nullable', 'string', 'max:500'],
         ]);
@@ -434,17 +435,19 @@ class BookingSlotController extends Controller
         $status = $data['status'];
         $customerName = trim((string) ($data['customer_name'] ?? ''));
 
-        if ($status === BookingSlot::STATUS_BOOKED && $customerName === '') {
+        if (in_array($status, [BookingSlot::STATUS_BOOKED, BookingSlot::STATUS_SUCCESS], true) && $customerName === '') {
             if ($request->wantsJson()) {
-                return response()->json(['ok' => false, 'message' => 'Customer name is required when status is Booked.'], 422);
+                return response()->json(['ok' => false, 'message' => 'Customer name is required when status is Booked or Success.'], 422);
             }
 
-            return back()->withErrors(['customer_name' => 'Customer name is required when status is Booked.']);
+            return back()->withErrors(['customer_name' => 'Customer name is required when status is Booked or Success.']);
         }
 
         if ($status === BookingSlot::STATUS_AVAILABLE) {
             $customerName = '';
         }
+
+        $isOccupied = in_array($status, [BookingSlot::STATUS_BOOKED, BookingSlot::STATUS_SUCCESS], true);
 
         $bookingSlot->update([
             'slot_date' => $targetDate,
@@ -454,8 +457,8 @@ class BookingSlotController extends Controller
             'status' => $status,
             'customer_name' => $customerName !== '' ? $customerName : null,
             'customer_id' => $status === BookingSlot::STATUS_AVAILABLE ? null : $bookingSlot->customer_id,
-            'booked_by' => $status === BookingSlot::STATUS_BOOKED ? ($bookingSlot->booked_by ?: $request->user()->id) : null,
-            'booked_at' => $status === BookingSlot::STATUS_BOOKED ? ($bookingSlot->booked_at ?: now()) : null,
+            'booked_by' => $isOccupied ? ($bookingSlot->booked_by ?: $request->user()->id) : null,
+            'booked_at' => $isOccupied ? ($bookingSlot->booked_at ?: now()) : null,
             'notes' => isset($data['notes']) ? trim((string) $data['notes']) : $bookingSlot->notes,
         ]);
 

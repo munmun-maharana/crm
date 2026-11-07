@@ -92,6 +92,9 @@
             <div class="flex items-center gap-1.5">
                 <span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800" x-text="'Available: ' + (counts.available || 0)"></span>
                 <span class="px-2 py-0.5 rounded-full bg-rose-100 text-rose-800" x-text="'Booked: ' + (counts.booked || 0)"></span>
+                <template x-if="(counts.success || 0) > 0">
+                    <span class="px-2 py-0.5 rounded-full bg-teal-100 text-teal-800" x-text="'Success: ' + counts.success"></span>
+                </template>
                 <template x-if="(counts.cancelled || 0) > 0">
                     <span class="px-2 py-0.5 rounded-full bg-slate-200 text-slate-700" x-text="'Cancelled: ' + counts.cancelled"></span>
                 </template>
@@ -128,6 +131,7 @@
                         <div :class="{
                                  'border-emerald-300 bg-white hover:border-emerald-400 cursor-pointer': slot.status === 'available',
                                  'border-rose-200 bg-rose-50/70': slot.status === 'booked',
+                                 'border-teal-300 bg-teal-50/70': slot.status === 'success',
                                  'border-slate-200 bg-slate-100 opacity-75': slot.status === 'cancelled'
                              }"
                              @click="slot.status === 'available' ? openBookSlotModal(slot) : null"
@@ -140,6 +144,7 @@
                                           :class="{
                                               'bg-emerald-100 text-emerald-800': slot.status === 'available',
                                               'bg-rose-100 text-rose-800': slot.status === 'booked',
+                                              'bg-teal-600 text-white': slot.status === 'success',
                                               'bg-slate-200 text-slate-600': slot.status === 'cancelled'
                                           }"
                                           x-text="slot.status"></span>
@@ -149,15 +154,17 @@
                                     <div class="text-[11px] font-medium text-emerald-700 mt-0.5">Available — Click to book for a customer</div>
                                 </template>
 
-                                <template x-if="slot.status === 'booked'">
+                                <template x-if="slot.status === 'booked' || slot.status === 'success'">
                                     <div class="space-y-1 mt-1">
-                                        <div class="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11.5px] font-bold text-rose-900">
+                                        <div class="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11.5px] font-bold"
+                                             :class="slot.status === 'success' ? 'text-teal-900' : 'text-rose-900'">
                                             <span class="inline-flex items-center gap-1 truncate">
-                                                <svg class="w-3.5 h-3.5 text-rose-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+                                                <svg class="w-3.5 h-3.5 shrink-0" :class="slot.status === 'success' ? 'text-teal-600' : 'text-rose-600'" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
                                                 <span class="truncate" x-text="slot.customer_name || 'Customer'"></span>
                                             </span>
                                             <template x-if="slot.customer_phone">
-                                                <span class="inline-flex items-center gap-1 text-[10.5px] font-semibold text-rose-800 bg-rose-100/80 px-1.5 py-0.2 rounded">
+                                                <span class="inline-flex items-center gap-1 text-[10.5px] font-semibold px-1.5 py-0.2 rounded"
+                                                      :class="slot.status === 'success' ? 'text-teal-800 bg-teal-100/80' : 'text-rose-800 bg-rose-100/80'">
                                                     <span>📞</span>
                                                     <span x-text="slot.customer_phone"></span>
                                                 </span>
@@ -166,13 +173,13 @@
                                         <template x-if="slot.car_model || slot.service_type || slot.price">
                                             <div class="flex flex-wrap items-center gap-1 text-[10.5px] text-slate-700">
                                                 <template x-if="slot.car_model">
-                                                    <span class="inline-flex items-center gap-1 rounded bg-white/90 border border-rose-200/80 px-1.5 py-0.2 font-semibold">
+                                                    <span class="inline-flex items-center gap-1 rounded bg-white/90 border border-line px-1.5 py-0.2 font-semibold">
                                                         <span class="text-slate-400">Model:</span>
                                                         <span class="text-ink" x-text="slot.car_model"></span>
                                                     </span>
                                                 </template>
                                                 <template x-if="slot.service_type">
-                                                    <span class="inline-flex items-center gap-1 rounded bg-white/90 border border-rose-200/80 px-1.5 py-0.2 font-semibold">
+                                                    <span class="inline-flex items-center gap-1 rounded bg-white/90 border border-line px-1.5 py-0.2 font-semibold">
                                                         <span class="text-slate-400">Service:</span>
                                                         <span class="text-ink" x-text="slot.service_type"></span>
                                                     </span>

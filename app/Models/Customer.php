@@ -263,7 +263,7 @@ class Customer extends Model
         if (empty($core['name'])) {
             $core['name'] = $this->name ?: 'Untitled';
         }
-        $core['status'] = 'new';
+        $core['status'] = 'Pending';
         if (array_key_exists('assigned_to', $core)) {
             $core['assigned_to'] = $core['assigned_to'] ?: null;
         }

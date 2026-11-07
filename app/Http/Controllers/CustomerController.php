@@ -231,11 +231,22 @@ class CustomerController extends Controller
         $statusChangeVal = trim((string) ($data['status_change'] ?? ''));
         $targetStatus = null;
         if ($statusChangeVal !== '') {
-            $matched = collect($statusOptions)->first(fn ($s) => strtolower(trim((string)$s)) === strtolower($statusChangeVal));
-            $targetStatus = $matched ?: $statusChangeVal;
+            $lowerVal = strtolower($statusChangeVal);
+            if ($customer->isOperations() && in_array($lowerVal, ['success', 'wash success', 'completed'], true)) {
+                $targetStatus = 'Success';
+            } elseif ($customer->isOperations() && in_array($lowerVal, ['cancel', 'cancelled', 'canceled'], true)) {
+                $targetStatus = 'Cancelled';
+            } elseif ($customer->isOperations() && $lowerVal === 'pending') {
+                $targetStatus = 'Pending';
+            } else {
+                $matched = collect($statusOptions)->first(fn ($s) => strtolower(trim((string)$s)) === $lowerVal);
+                $targetStatus = $matched ?: $statusChangeVal;
+            }
         }
 
-        $statusChanged = $targetStatus !== null && strtolower((string)$targetStatus) !== strtolower((string)$customer->status);
+        $isWashAction = $request->boolean('wash_action');
+        $statusChanged = ($targetStatus !== null && strtolower((string)$targetStatus) !== strtolower((string)$customer->status))
+            || ($isWashAction && $targetStatus !== null);
         $oldStatus = $customer->status;
 
         $followUp = $request->boolean('follow_up');
@@ -243,7 +254,7 @@ class CustomerController extends Controller
         $followDate = $data['follow_up_date'] ?? null;
         $followTime = $data['follow_up_time'] ?? null;
 
-        if ($statusChanged && in_array(strtolower((string) $targetStatus), ['confirmed', 'confirm', 'converted'], true)) {
+        if ($statusChanged && in_array(strtolower((string) $targetStatus), ['confirmed', 'confirm', 'converted', 'success'], true)) {
             $followUp = false;
             $hasTime = false;
             $followDate = null;
@@ -387,13 +398,25 @@ class CustomerController extends Controller
             'meta' => $meta ?: null,
         ]);
 
-        // If this is a TEAM OPS record linked to a CRM record, sync mapped field updates & mirror the feedback
-        if ($customer->isOperations() && $customer->source_customer_id) {
-            $sourceCustomer = Customer::find($customer->source_customer_id);
+        // If this is a TEAM OPS record, sync status & mapped field updates to CRM customer and Booking Slot
+        if ($customer->isOperations()) {
+            $sourceCustomer = $customer->source_customer_id
+                ? Customer::find($customer->source_customer_id)
+                : Customer::query()
+                    ->where('pipeline', 'crm')
+                    ->whereRaw('LOWER(name) = ?', [strtolower(trim((string) $customer->name))])
+                    ->latest('id')
+                    ->first();
+
             if ($sourceCustomer) {
+                $srcCore = [];
+                if ($statusChanged && $targetStatus !== null) {
+                    $srcCore['status'] = $targetStatus;
+                    $srcCore['last_contact_at'] = now();
+                }
+
                 if (is_array($inputUpdateFields) && $updateFields->isNotEmpty()) {
                     $srcMeta = is_array($sourceCustomer->meta) ? $sourceCustomer->meta : [];
-                    $srcCore = [];
                     foreach ($updateFields as $uf) {
                         $mappedCrmKey = trim((string) ($uf->maps_from ?? ''));
                         if ($mappedCrmKey === '' || ! array_key_exists($uf->key, $inputUpdateFields)) {
@@ -410,10 +433,13 @@ class CustomerController extends Controller
                             }
                         }
                     }
-                    if (! empty($srcCore) || $srcMeta !== (is_array($sourceCustomer->meta) ? $sourceCustomer->meta : [])) {
+                    if ($srcMeta !== (is_array($sourceCustomer->meta) ? $sourceCustomer->meta : [])) {
                         $srcCore['meta'] = $srcMeta ?: null;
-                        $sourceCustomer->update($srcCore);
                     }
+                }
+
+                if (! empty($srcCore)) {
+                    $sourceCustomer->update($srcCore);
                 }
 
                 CustomerActivity::create([
@@ -425,6 +451,44 @@ class CustomerController extends Controller
                     'meta' => $meta ?: null,
                 ]);
             }
+
+            if ($statusChanged && $targetStatus !== null) {
+                $lowerTarget = strtolower((string) $targetStatus);
+                $newSlotStatus = match (true) {
+                    in_array($lowerTarget, ['success', 'wash success', 'completed', 'converted'], true) => \App\Models\BookingSlot::STATUS_SUCCESS,
+                    in_array($lowerTarget, ['cancel', 'cancelled', 'canceled', 'lost'], true) => \App\Models\BookingSlot::STATUS_CANCELLED,
+                    default => \App\Models\BookingSlot::STATUS_BOOKED,
+                };
+
+                $targetIds = array_values(array_filter([
+                    $customer->id,
+                    $customer->source_customer_id,
+                    $sourceCustomer?->id,
+                ]));
+
+                $slotQuery = \App\Models\BookingSlot::query()->where(function ($q) use ($targetIds, $customer) {
+                    if (! empty($targetIds)) {
+                        $q->whereIn('customer_id', $targetIds);
+                    }
+                    if (trim((string) $customer->name) !== '') {
+                        $q->orWhereRaw('LOWER(customer_name) = ?', [strtolower(trim((string) $customer->name))]);
+                    }
+                });
+
+                $slotsToUpdate = collect();
+                if ($customer->follow_up_at) {
+                    $slotsToUpdate = (clone $slotQuery)
+                        ->whereDate('slot_date', $customer->follow_up_at->toDateString())
+                        ->get();
+                }
+                if ($slotsToUpdate->isEmpty()) {
+                    $slotsToUpdate = $slotQuery->latest('slot_date')->limit(1)->get();
+                }
+
+                foreach ($slotsToUpdate as $bSlot) {
+                    $bSlot->update(['status' => $newSlotStatus]);
+                }
+            }
         }
         if ($request->wantsJson()) {
             $customer->load(['assignee', 'activities.user']);
@@ -435,11 +499,13 @@ class CustomerController extends Controller
 
             $toneMap = [
                 'new' => 'text-sky-700 bg-sky-50',
+                'pending' => 'text-amber-800 bg-amber-100',
                 'no answer' => 'text-slate-700 bg-slate-100',
                 'follow-up' => 'text-amber-800 bg-amber-100',
                 'interested' => 'text-teal-700 bg-teal-50',
                 'contacted' => 'text-blue-700 bg-blue-50',
                 'converted' => 'text-emerald-700 bg-emerald-50',
+                'success' => 'text-emerald-700 bg-emerald-50',
                 'cancelled' => 'text-rose-700 bg-rose-50',
                 'lost' => 'text-rose-700 bg-rose-50',
                 'confirmed' => 'text-emerald-700 bg-emerald-50',
@@ -623,7 +689,7 @@ class CustomerController extends Controller
         }
 
         $copy = Customer::create($customer->mappedOperationAttributes());
-        $copy->update(['status' => 'new']);
+        $copy->update(['status' => 'Pending']);
 
         $setting = OperationSetting::current();
         $oldStatus = $customer->status;

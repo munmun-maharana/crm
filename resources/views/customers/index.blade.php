@@ -7,11 +7,13 @@
     $openId = request('open');
     $statusTone = [
         'new' => 'text-sky-700 bg-sky-50',
+        'pending' => 'text-amber-800 bg-amber-100',
         'no answer' => 'text-slate-700 bg-slate-100',
         'follow-up' => 'text-amber-800 bg-amber-100',
         'interested' => 'text-teal-700 bg-teal-50',
         'contacted' => 'text-blue-700 bg-blue-50',
         'converted' => 'text-emerald-700 bg-emerald-50',
+        'success' => 'text-emerald-700 bg-emerald-50',
         'cancelled' => 'text-rose-700 bg-rose-50',
         'lost' => 'text-rose-700 bg-rose-50',
         'confirmed' => 'text-emerald-700 bg-emerald-50',
@@ -150,6 +152,9 @@
                     <div class="flex items-center gap-1.5 text-[11px] font-semibold">
                         <span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800" x-text="'Available: ' + (bookingSlotsCounts.available || 0)"></span>
                         <span class="px-2 py-0.5 rounded-full bg-rose-100 text-rose-800" x-text="'Booked: ' + (bookingSlotsCounts.booked || 0)"></span>
+                        <template x-if="(bookingSlotsCounts.success || 0) > 0">
+                            <span class="px-2 py-0.5 rounded-full bg-teal-100 text-teal-800" x-text="'Success: ' + bookingSlotsCounts.success"></span>
+                        </template>
                         <template x-if="(bookingSlotsCounts.cancelled || 0) > 0">
                             <span class="px-2 py-0.5 rounded-full bg-slate-200 text-slate-700" x-text="'Cancelled: ' + bookingSlotsCounts.cancelled"></span>
                         </template>
@@ -194,6 +199,7 @@
                                  :class="{
                                      'border-emerald-300 bg-white hover:bg-emerald-50/60 hover:border-emerald-400 cursor-pointer shadow-2xs': slot.status === 'available',
                                      'border-rose-200 bg-rose-50/70 cursor-not-allowed opacity-95': slot.status === 'booked',
+                                     'border-teal-300 bg-teal-50/70 cursor-not-allowed opacity-95': slot.status === 'success',
                                      'border-slate-200 bg-slate-100 cursor-not-allowed opacity-75': slot.status === 'cancelled'
                                  }"
                                  class="w-full rounded-xl border p-3.5 flex items-center justify-between gap-3 transition select-none">
@@ -205,6 +211,7 @@
                                               :class="{
                                                   'bg-emerald-100 text-emerald-800': slot.status === 'available',
                                                   'bg-rose-100 text-rose-800': slot.status === 'booked',
+                                                  'bg-teal-600 text-white': slot.status === 'success',
                                                   'bg-slate-200 text-slate-600': slot.status === 'cancelled'
                                               }"
                                               x-text="slot.status"></span>
@@ -214,15 +221,17 @@
                                         <template x-if="slot.status === 'available'">
                                             <span class="text-[11px] font-medium text-emerald-700">Available — Click to book for a customer</span>
                                         </template>
-                                        <template x-if="slot.status === 'booked'">
+                                        <template x-if="slot.status === 'booked' || slot.status === 'success'">
                                             <div class="space-y-1 mt-0.5">
-                                                <div class="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[12px] font-bold text-rose-900">
+                                                <div class="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[12px] font-bold"
+                                                     :class="slot.status === 'success' ? 'text-teal-900' : 'text-rose-900'">
                                                     <span class="inline-flex items-center gap-1 truncate" :title="slot.customer_name">
-                                                        <svg class="w-3.5 h-3.5 text-rose-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
-                                                        <span class="truncate" x-text="'Booked: ' + (slot.customer_name || 'Customer')"></span>
+                                                        <svg class="w-3.5 h-3.5 shrink-0" :class="slot.status === 'success' ? 'text-teal-600' : 'text-rose-600'" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+                                                        <span class="truncate" x-text="(slot.status === 'success' ? 'Success: ' : 'Booked: ') + (slot.customer_name || 'Customer')"></span>
                                                     </span>
                                                     <template x-if="slot.customer_phone">
-                                                        <span class="inline-flex items-center gap-1 text-[11px] font-semibold text-rose-800 bg-rose-100/80 px-1.5 py-0.2 rounded">
+                                                        <span class="inline-flex items-center gap-1 text-[11px] font-semibold px-1.5 py-0.2 rounded"
+                                                              :class="slot.status === 'success' ? 'text-teal-800 bg-teal-100/80' : 'text-rose-800 bg-rose-100/80'">
                                                             <span>📞</span>
                                                             <span x-text="slot.customer_phone"></span>
                                                         </span>
@@ -231,13 +240,13 @@
                                                 <template x-if="slot.car_model || slot.service_type || slot.price">
                                                     <div class="flex flex-wrap items-center gap-1.5 text-[11px] text-slate-700">
                                                         <template x-if="slot.car_model">
-                                                            <span class="inline-flex items-center gap-1 rounded bg-white/90 border border-rose-200/80 px-1.5 py-0.5 font-semibold text-slate-700">
+                                                            <span class="inline-flex items-center gap-1 rounded bg-white/90 border border-line px-1.5 py-0.5 font-semibold text-slate-700">
                                                                 <span class="text-slate-400">Model:</span>
                                                                 <span class="text-ink" x-text="slot.car_model"></span>
                                                             </span>
                                                         </template>
                                                         <template x-if="slot.service_type">
-                                                            <span class="inline-flex items-center gap-1 rounded bg-white/90 border border-rose-200/80 px-1.5 py-0.5 font-semibold text-slate-700">
+                                                            <span class="inline-flex items-center gap-1 rounded bg-white/90 border border-line px-1.5 py-0.5 font-semibold text-slate-700">
                                                                 <span class="text-slate-400">Service:</span>
                                                                 <span class="text-ink" x-text="slot.service_type"></span>
                                                             </span>
@@ -267,6 +276,11 @@
                                     <template x-if="slot.status === 'booked'">
                                         <span class="inline-flex items-center gap-1 rounded-lg bg-rose-100 text-rose-700 px-2.5 py-1 text-[11px] font-bold">
                                             Locked
+                                        </span>
+                                    </template>
+                                    <template x-if="slot.status === 'success'">
+                                        <span class="inline-flex items-center gap-1 rounded-lg bg-teal-600 text-white px-2.5 py-1 text-[11px] font-bold">
+                                            ✓ Success
                                         </span>
                                     </template>
                                 </div>

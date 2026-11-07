@@ -162,6 +162,71 @@
         </div>
     </div>
 
+    @if($customer->isOperations())
+        @php
+            $curOpStatus = strtolower(trim((string) $customer->status));
+            $activeWashState = match (true) {
+                in_array($curOpStatus, ['success', 'wash success', 'completed', 'converted'], true) => 'success',
+                in_array($curOpStatus, ['cancel', 'cancelled', 'canceled', 'lost'], true) => 'cancelled',
+                default => 'pending',
+            };
+        @endphp
+        <form action="{{ route('customers.activities', $customer) }}"
+              class="rounded-lg border border-line bg-white shadow-xs overflow-hidden p-3"
+              onsubmit="event.preventDefault(); Alpine.$data(document.body).postActivity(this)">
+            @csrf
+            <input type="hidden" name="type" value="feedback">
+            <input type="hidden" name="wash_action" value="1">
+            <input type="hidden" name="status_change" id="opsWashStatus-{{ $customer->id }}" value="{{ ucfirst($activeWashState) }}">
+
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                <div class="flex items-center gap-2">
+                    <span class="w-7 h-7 rounded-lg bg-brand-soft text-brand inline-flex items-center justify-center shrink-0">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    </span>
+                    <div>
+                        <div class="text-[12.5px] font-bold text-ink leading-tight">Wash Status</div>
+                        <div class="text-[10.5px] text-slate-400">Syncs status with CRM & Booking Slot</div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-3 gap-2 sm:w-auto w-full">
+                    {{-- Pending (Default) --}}
+                    <button type="button"
+                            onclick="const f = this.closest('form'); f.querySelector('[name=status_change]').value = 'Pending'; Alpine.$data(document.body).postActivity(f);"
+                            class="inline-flex items-center justify-center gap-1.5 rounded-lg border px-3.5 py-2 text-[12px] font-bold transition shadow-2xs
+                                   {{ $activeWashState === 'pending'
+                                       ? 'border-amber-500 bg-amber-500 text-white ring-2 ring-amber-500/25'
+                                       : 'border-amber-200 bg-amber-50/70 text-amber-800 hover:bg-amber-100' }}">
+                        <span>⏳</span>
+                        <span>Pending</span>
+                    </button>
+
+                    {{-- Wash Success --}}
+                    <button type="button"
+                            onclick="const f = this.closest('form'); f.querySelector('[name=status_change]').value = 'Success'; Alpine.$data(document.body).postActivity(f);"
+                            class="inline-flex items-center justify-center gap-1.5 rounded-lg border px-3.5 py-2 text-[12px] font-bold transition shadow-2xs
+                                   {{ $activeWashState === 'success'
+                                       ? 'border-emerald-600 bg-emerald-600 text-white ring-2 ring-emerald-600/25'
+                                       : 'border-emerald-200 bg-emerald-50/70 text-emerald-800 hover:bg-emerald-100' }}">
+                        <span>✓</span>
+                        <span>Wash Success</span>
+                    </button>
+
+                    {{-- Cancel --}}
+                    <button type="button"
+                            onclick="const f = this.closest('form'); f.querySelector('[name=status_change]').value = 'Cancelled'; Alpine.$data(document.body).postActivity(f);"
+                            class="inline-flex items-center justify-center gap-1.5 rounded-lg border px-3.5 py-2 text-[12px] font-bold transition shadow-2xs
+                                   {{ $activeWashState === 'cancelled'
+                                       ? 'border-rose-600 bg-rose-600 text-white ring-2 ring-rose-600/25'
+                                       : 'border-rose-200 bg-rose-50/70 text-rose-800 hover:bg-rose-100' }}">
+                        <span>✕</span>
+                        <span>Cancel</span>
+                    </button>
+                </div>
+            </div>
+        </form>
+    @else
     <form action="{{ route('customers.activities', $customer) }}"
           enctype="multipart/form-data"
           class="rounded-lg border border-line bg-white shadow-xs overflow-hidden"
@@ -173,8 +238,8 @@
                     <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                 </span>
                 <div class="min-w-0 flex items-baseline gap-1.5">
-                    <div class="text-[12.5px] font-semibold text-ink leading-tight">{{ $customer->isOperations() ? 'Upload feedback & update' : 'Add update' }}</div>
-                    <div class="text-[10.5px] text-slate-400 truncate hidden sm:inline">{{ $customer->isOperations() ? 'Feedback note, optional image & field updates' : 'Note, status change & follow-up' }}</div>
+                    <div class="text-[12.5px] font-semibold text-ink leading-tight">Add update</div>
+                    <div class="text-[10.5px] text-slate-400 truncate hidden sm:inline">Note, status change & follow-up</div>
                 </div>
             </div>
             <button type="submit"
@@ -189,8 +254,7 @@
                 <div class="relative shrink-0">
                     <select name="type"
                             class="appearance-none rounded-md border border-line bg-mist/50 hover:bg-white focus:bg-white focus:border-brand focus:ring-2 focus:ring-brand/20 pl-2 pr-6 py-1 text-[11.5px] font-medium text-ink outline-none transition">
-                        <option value="feedback" @selected($customer->isOperations())>Feedback</option>
-                        <option value="note" @selected(! $customer->isOperations())>Note</option>
+                        <option value="note">Note</option>
                         <option value="call">Call</option>
                         <option value="whatsapp">WhatsApp</option>
                         <option value="email">Email</option>
@@ -252,19 +316,9 @@
                 </div>
             </div>
 
-            <textarea name="body" id="activityBody-{{ $customer->id }}" rows="2" placeholder="{{ $customer->isOperations() ? 'Write feedback / what happened…' : 'What happened / note…' }}"
+            <textarea name="body" id="activityBody-{{ $customer->id }}" rows="2" placeholder="What happened / note…"
                       class="w-full rounded-md border border-line bg-mist/20 px-2.5 py-1.5 text-[12px] leading-snug outline-none resize-y min-h-[52px]
                              focus:bg-white focus:border-brand focus:ring-2 focus:ring-brand/20 transition"></textarea>
-
-            <div class="flex flex-wrap items-center gap-2">
-                <label class="inline-flex items-center gap-1.5 rounded-md border border-dashed border-slate-300 bg-mist/40 hover:bg-brand-soft/50 hover:border-brand px-2.5 py-1 text-[11px] font-semibold text-slate-600 hover:text-brand cursor-pointer transition">
-                    <svg class="w-3.5 h-3.5 shrink-0 text-brand" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-                    <span>Upload Image (Optional)</span>
-                    <input type="file" name="images[]" accept="image/*" multiple class="hidden"
-                           onchange="const info = this.closest('div').querySelector('[data-img-info]'); if (info) { info.textContent = this.files.length ? Array.from(this.files).map(f => f.name).join(', ') : 'No image selected'; }">
-                </label>
-                <span data-img-info class="text-[10.5px] text-slate-400 truncate max-w-[260px]">No image selected</span>
-            </div>
 
             @php $noteTemplates = $noteTemplates ?? collect(); @endphp
             @if($noteTemplates->isNotEmpty())
@@ -333,6 +387,7 @@
             @endif
         </div>
     </form>
+    @endif
 
     <div>
         <div class="text-[11px] font-semibold text-slate-500 mb-1.5">Chat & updates</div>
