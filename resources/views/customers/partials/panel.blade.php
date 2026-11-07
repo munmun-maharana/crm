@@ -175,7 +175,7 @@
               class="rounded-lg border border-line bg-white shadow-xs overflow-hidden p-3"
               onsubmit="event.preventDefault(); Alpine.$data(document.body).postActivity(this)">
             @csrf
-            <input type="hidden" name="type" value="feedback">
+            <input type="hidden" name="type" value="status">
             <input type="hidden" name="wash_action" value="1">
             <input type="hidden" name="status_change" id="opsWashStatus-{{ $customer->id }}" value="{{ ucfirst($activeWashState) }}">
 

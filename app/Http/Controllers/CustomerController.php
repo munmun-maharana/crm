@@ -189,7 +189,7 @@ class CustomerController extends Controller
             : ['new', 'interested', 'contacted', 'converted', 'lost', 'request'];
 
         $data = $request->validate([
-            'type' => ['required', 'in:note,feedback,call,whatsapp,email,sms'],
+            'type' => ['required', 'in:note,feedback,status,call,whatsapp,email,sms'],
             'status_change' => ['nullable', 'string', 'max:100'],
             'title' => ['nullable', 'string', 'max:120'],
             'body' => ['nullable', 'string'],
@@ -201,7 +201,7 @@ class CustomerController extends Controller
             'images.*' => ['nullable', 'image', 'max:10240'],
         ]);
 
-        $activityType = $data['type'];
+        $activityType = $data['type'] === 'feedback' ? 'status' : $data['type'];
         $title = trim((string) ($data['title'] ?? ''));
         $body = trim((string) ($data['body'] ?? ''));
 
