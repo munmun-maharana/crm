@@ -672,6 +672,7 @@
                     <label class="flex items-center gap-2 text-[12px]"><input type="checkbox" name="required" value="1"> Required</label>
                     <label class="flex items-center gap-2 text-[12px]"><input type="checkbox" name="in_form" value="1" checked> Show in form</label>
                     <label class="flex items-center gap-2 text-[12px]"><input type="checkbox" name="in_table" value="1"> Show in table</label>
+                    <label class="flex items-center gap-2 text-[12px]"><input type="checkbox" name="in_update" value="1"> Show in Wash Success update</label>
                     <button class="w-full rounded-lg bg-brand text-white font-semibold py-2 text-[13px]">Add field</button>
                 </form>
             </div>
@@ -698,6 +699,7 @@
                                 <th class="text-left font-bold px-3 py-2.5 border-b border-r border-line">Type</th>
                                 <th class="text-center font-bold px-2 py-2.5 border-b border-r border-line">Req</th>
                                 <th class="text-center font-bold px-2 py-2.5 border-b border-r border-line">Form</th>
+                                <th class="text-center font-bold px-2 py-2.5 border-b border-r border-line" title="Show in Wash Success feedback & update">Update</th>
                                 <th class="text-center font-bold px-2 py-2.5 border-b border-r border-line">On</th>
                                 <th class="text-center font-bold px-3 py-2.5 border-b border-line">Action</th>
                             </tr>
@@ -761,6 +763,14 @@
                                         @endif
                                     </td>
                                     <td class="px-2 py-2.5 border-r border-line text-center align-middle bg-slate-50/50">
+                                        @if($field->key === 'status')
+                                            <input form="{{ $fid }}" type="hidden" name="in_update" value="0">
+                                            <input type="checkbox" disabled title="Status has its own buttons">
+                                        @else
+                                            <input form="{{ $fid }}" type="checkbox" name="in_update" value="1" @checked($field->in_update)>
+                                        @endif
+                                    </td>
+                                    <td class="px-2 py-2.5 border-r border-line text-center align-middle">
                                         @if($field->key === 'name')
                                             <input form="{{ $fid }}" type="hidden" name="active" value="1">
                                             <input type="checkbox" checked disabled>

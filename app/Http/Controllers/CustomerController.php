@@ -276,6 +276,29 @@ class CustomerController extends Controller
             ->filter(fn ($f) => (bool) ($f->in_update ?? false))
             ->values();
 
+        if ($customer->isOperations() && $updateFields->isEmpty()) {
+            $crmUpdateKeys = CrmField::inPipeline('crm')
+                ->active()
+                ->where('key', '!=', 'status')
+                ->get()
+                ->filter(fn ($f) => (bool) ($f->in_update ?? false))
+                ->pluck('key')
+                ->all();
+
+            $opAll = CrmField::inPipeline('operations')
+                ->active()
+                ->where('key', '!=', 'status')
+                ->ordered()
+                ->get();
+
+            $updateFields = $opAll->filter(fn ($f) => in_array($f->maps_from, $crmUpdateKeys, true) || in_array($f->key, $crmUpdateKeys, true))->values();
+
+            if ($updateFields->isEmpty()) {
+                $skipKeys = ['name', 'email', 'phone', 'company', 'status', 'assigned_to', 'notes', 'date', 'entry_date', 'created_date', 'created_at'];
+                $updateFields = $opAll->reject(fn ($f) => in_array(strtolower($f->key), $skipKeys, true))->values();
+            }
+        }
+
         $fieldChanges = [];
         $currentMeta = is_array($customer->meta) ? $customer->meta : [];
         $coreFieldUpdates = [];
