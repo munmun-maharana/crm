@@ -53,9 +53,9 @@
      }">
 
     <div class="grid grid-cols-1 xl:grid-cols-3 gap-4">
-        <div class="rounded-2xl border border-line bg-white p-4 h-fit">
+        <div class="rounded-2xl border border-sky-200/80 bg-sky-50/75 p-4 h-fit">
             <div class="flex items-center justify-between gap-2 mb-3">
-                <h3 class="text-sm font-extrabold">Create user</h3>
+                <h3 class="text-sm font-extrabold text-sky-950">Create user</h3>
                 <a href="{{ route('settings.index', ['tab' => 'user-fields']) }}" class="text-[11px] font-semibold text-brand hover:underline">Manage fields</a>
             </div>
             <form method="POST" action="{{ route('users.store') }}" class="space-y-2.5">
@@ -117,9 +117,9 @@
                     <p class="text-[12px] text-slate-400">No form fields. Add them in Setting → User Fields.</p>
                 @endforelse
 
-                <div class="rounded-xl border border-line bg-mist/40 p-3 space-y-2">
-                    <div class="text-[11px] font-bold uppercase tracking-wide text-slate-500">App access level</div>
-                    <p class="text-[11px] text-slate-400">Dashboard always on · tick tabs for mobile app</p>
+                <div class="rounded-xl bg-indigo-100/60 p-3 space-y-2">
+                    <div class="text-[11px] font-bold uppercase tracking-wide text-indigo-900">App access level</div>
+                    <p class="text-[11px] text-indigo-700/80">Dashboard always on · tick tabs for mobile app</p>
                     <label class="flex items-center gap-2 text-[13px] font-semibold text-ink">
                         <input type="checkbox" name="access_crm" value="1" class="rounded border-line text-brand"
                                @checked(old('access_crm'))>
@@ -138,10 +138,10 @@
             </form>
         </div>
 
-        <div class="xl:col-span-2 rounded-2xl border border-line bg-white overflow-hidden">
+        <div class="xl:col-span-2 rounded-2xl border border-emerald-200/80 bg-emerald-50/50 overflow-hidden">
             <div class="overflow-x-auto">
                 <table class="w-full text-[13px]">
-                    <thead class="bg-mist/80 text-slate-500 text-[11px] uppercase tracking-wide">
+                    <thead class="bg-emerald-100/75 text-emerald-950 text-[11px] uppercase tracking-wide border-b border-emerald-200/80">
                         <tr>
                             @foreach($tableFields as $field)
                                 <th class="text-left font-bold px-4 py-2.5">{{ $field->label }}</th>

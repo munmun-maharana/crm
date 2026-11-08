@@ -24,11 +24,18 @@
 <div class="h-full flex flex-col"
      x-init="@if($openId) $nextTick(() => selectCustomer({{ (int) $openId }})) @endif @if(request('excel')) excelOpen = true; @endif">
 
-    <div class="shrink-0 border-b border-line px-3 sm:px-4 py-2.5 flex flex-wrap items-center gap-2 sm:gap-3 bg-white">
+    @php
+        $topListRoute = $listRoute ?? (($pipeline ?? 'crm') === 'operations' ? 'operations.index' : 'customers.index');
+        $isTodayFuActive = ($filter ?? '') === 'follow_up_today';
+    @endphp
+    <div class="shrink-0 min-h-14 lg:h-14 border-b border-line px-3 sm:px-4 py-1.5 flex flex-wrap items-center gap-2 sm:gap-3 bg-sky-50/80">
         <form method="GET" id="crmFilterForm" class="flex flex-1 basis-full sm:basis-0 order-last sm:order-none items-center gap-3 min-w-0">
+            @if(!empty($filter))
+                <input type="hidden" name="filter" value="{{ $filter }}">
+            @endif
             <div class="crm-toolbar-group">
                 <label class="crm-toolbar-search">
-                    <svg class="w-4 h-4 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M11 18a7 7 0 100-14 7 7 0 000 14z"/></svg>
+                    <svg class="w-4 h-4 text-rose-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M11 18a7 7 0 100-14 7 7 0 000 14z"/></svg>
                     <input type="text" name="q" id="crmSearch" value="{{ $q }}"
                            placeholder="Search name, phone, email…"
                            autocomplete="off">
@@ -60,6 +67,18 @@
                     class="w-9 h-9 inline-flex items-center justify-center rounded-lg border border-line text-slate-600 hover:bg-mist">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
             </button>
+
+            <a href="{{ route($topListRoute, array_filter([
+                    'q' => $q ?: null,
+                    'status' => $status ?: null,
+                    'assigned_to' => $assignedTo ?: null,
+                    'filter' => $isTodayFuActive ? null : 'follow_up_today',
+                ])) }}"
+               title="{{ $isTodayFuActive ? 'Showing Today Follow-up (Click to show all)' : 'Filter Today Follow-up' }}"
+               class="h-9 inline-flex items-center gap-1.5 rounded-lg px-3 text-[12px] font-semibold transition {{ $isTodayFuActive ? 'bg-amber-600 text-white ring-2 ring-amber-300 shadow-xs' : 'bg-amber-500 text-white hover:bg-amber-600' }}">
+                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                <span>Today Follow-up</span>
+            </a>
 
             <button type="button" title="Booking Slots"
                     @click="toggleBookingSlots()"
@@ -310,10 +329,11 @@
              x-transition:leave-start="opacity-100 translate-x-0 scale-100"
              x-transition:leave-end="opacity-0 -translate-x-6 scale-[0.985]">
             @php $pageIds = $customers->pluck('id')->map(fn ($id) => (int) $id)->values(); @endphp
-            <script>window.CRM_PAGE_IDS = @json($pageIds);</script>
-            <div class="rounded-xl border border-line bg-white overflow-x-auto shadow-sm select-none">
+            <script id="crm-page-ids-json" type="application/json">@json($pageIds)</script>
+            <script>window.CRM_PAGE_IDS = JSON.parse(document.getElementById('crm-page-ids-json')?.textContent || '[]');</script>
+            <div class="rounded-xl border border-indigo-200/80 bg-indigo-50/35 overflow-x-auto shadow-xs select-none">
                 <table class="w-full text-[13px]">
-                    <thead class="bg-mist text-slate-500 text-[11px] uppercase tracking-wide">
+                    <thead class="bg-indigo-100/75 text-indigo-950 text-[11px] uppercase tracking-wide border-b border-indigo-200/80">
                         <tr>
                             @if(auth()->user()->canSeeAllRecords())
                                 <th class="text-left font-bold px-3 py-2.5 w-10">
@@ -451,7 +471,7 @@
             @endif
         </div>
 
-        <div class="desk-pane bg-mist/30 p-0 sm:p-4"
+        <div class="desk-pane bg-slate-50/50 p-0 sm:p-4"
              x-show="selectedId"
              x-cloak
              x-transition:enter="transition ease-out duration-300"
@@ -461,54 +481,54 @@
              x-transition:leave-start="opacity-100 translate-x-0"
              x-transition:leave-end="opacity-0 translate-x-6">
             <template x-if="selectedId">
-                <div class="flex h-full min-h-0 sm:rounded-xl border-0 sm:border border-line bg-white overflow-hidden shadow-sm" :key="deskKey">
-                    <section class="hidden md:flex w-[280px] lg:w-[340px] shrink-0 border-r border-line flex-col bg-white slide-list">
-                        <div class="shrink-0 px-3 py-2.5 border-b border-line flex items-center gap-1 text-[12px]">
+                <div class="flex h-full min-h-0 sm:rounded-xl border-0 sm:border border-line bg-white overflow-hidden shadow-xs" :key="deskKey">
+                    <section class="hidden md:flex w-[220px] lg:w-[245px] shrink-0 border-r border-line flex-col bg-teal-50/45 slide-list">
+                        <div class="shrink-0 h-10 px-2.5 border-b border-line bg-amber-100/70 flex items-center gap-1 text-[11px]">
                             @php
                                 $listRoute = $listRoute ?? 'customers.index';
                                 $deskFilter = $filter === 'follow_up_today' ? 'follow_up_today' : 'all';
                             @endphp
                             <a href="{{ route($listRoute, array_filter(['q' => $q ?: null, 'assigned_to' => $assignedTo ?: null])) }}"
-                               class="px-2.5 py-1 rounded-md font-semibold transition {{ $deskFilter === 'all' ? 'bg-brand-soft text-brand' : 'text-slate-500 hover:bg-mist hover:text-ink' }}">All</a>
+                               class="px-2 py-0.5 rounded font-semibold transition {{ $deskFilter === 'all' ? 'bg-brand-soft text-brand' : 'text-slate-600 hover:bg-white/60 hover:text-ink' }}">All</a>
                             <a href="{{ route($listRoute, array_filter(['q' => $q ?: null, 'assigned_to' => $assignedTo ?: null, 'filter' => 'follow_up_today'])) }}"
-                               class="px-2.5 py-1 rounded-md font-semibold transition {{ $deskFilter === 'follow_up_today' ? 'bg-amber-100 text-amber-900' : 'text-slate-500 hover:bg-mist hover:text-ink' }}">Follow-up Today</a>
+                               class="px-2 py-0.5 rounded font-semibold transition {{ $deskFilter === 'follow_up_today' ? 'bg-amber-200 text-amber-950' : 'text-slate-600 hover:bg-white/60 hover:text-ink' }}">Follow-up Today</a>
                         </div>
-                        <div class="flex-1 overflow-y-auto crm-scroll">
+                        <div class="flex-1 overflow-y-auto crm-scroll divide-y divide-teal-100/80">
                             @foreach($customers as $c)
                                 <button type="button"
-                                        class="list-item w-full text-left px-3 py-2.5 border-b border-line"
+                                        class="list-item w-full text-left px-2.5 py-1.5 leading-tight"
                                         :class="selectedId == {{ $c->id }} ? 'active' : ''"
                                         @click="selectCustomer({{ $c->id }})">
-                                    <div class="flex items-start justify-between gap-2">
-                                        <div class="font-semibold text-[14px] text-ink truncate">{{ $c->name }}</div>
-                                        <div class="text-[11px] text-slate-500 shrink-0 truncate max-w-[110px]" title="{{ $c->assignee?->name ?: 'Unassigned' }}">{{ $c->assignee?->name ?: 'Unassigned' }}</div>
+                                    <div class="flex items-center justify-between gap-1.5">
+                                        <div class="font-semibold text-[12.5px] text-ink truncate">{{ $c->name }}</div>
+                                        <div class="text-[10px] text-slate-400 shrink-0 truncate max-w-[85px]" title="{{ $c->assignee?->name ?: 'Unassigned' }}">{{ $c->assignee?->name ?: 'Unassigned' }}</div>
                                     </div>
                                     @if(($pipeline ?? 'crm') === 'operations' && $c->source_customer_id)
-                                        <div class="text-[11px] text-brand font-semibold mt-0.5">CRM #{{ $c->source_customer_id }}</div>
+                                        <div class="text-[10px] text-brand font-semibold mt-0.5">CRM #{{ $c->source_customer_id }}</div>
                                     @endif
                                     @if($c->company)
-                                        <div class="text-[11.5px] text-slate-500 truncate mt-0.5">{{ $c->company }}</div>
+                                        <div class="text-[10.5px] text-slate-500 truncate">{{ $c->company }}</div>
                                     @endif
-                                    <div class="mt-1 space-y-0.5" data-fu-list="{{ $c->id }}">
+                                    <div class="mt-0.5 space-y-0.5 text-[10.5px]" data-fu-list="{{ $c->id }}">
                                         {!! $c->listDateSummaryHtml() !!}
                                     </div>
-                                    <div class="mt-1.5 flex items-center gap-2 min-w-0">
-                                        <span class="text-[10px] font-semibold px-1.5 py-0.5 rounded capitalize shrink-0 {{ $statusTone[strtolower($c->status)] ?? ($statusTone[$c->status] ?? 'bg-mist text-slate-600') }}" data-status-list="{{ $c->id }}">{{ $c->status }}</span>
-                                        <span class="text-[11px] text-slate-400 truncate">{{ trim(($c->source ?: '').' · '.($c->city ?: ''), ' ·') }}</span>
+                                    <div class="mt-1 flex items-center gap-1.5 min-w-0">
+                                        <span class="text-[9.5px] font-semibold px-1.5 py-0.2 rounded capitalize shrink-0 {{ $statusTone[strtolower($c->status)] ?? ($statusTone[$c->status] ?? 'bg-mist text-slate-600') }}" data-status-list="{{ $c->id }}">{{ $c->status }}</span>
+                                        <span class="text-[10px] text-slate-400 truncate">{{ trim(($c->source ?: '').' · '.($c->city ?: ''), ' ·') }}</span>
                                     </div>
                                 </button>
                             @endforeach
                         </div>
                     </section>
 
-                    <section class="flex-1 min-w-0 flex flex-col bg-white slide-read">
-                        <div class="shrink-0 px-3 sm:px-4 py-2 border-b border-line flex items-center justify-between gap-2">
+                    <section class="flex-1 min-w-0 flex flex-col bg-slate-50/40 slide-read">
+                        <div class="shrink-0 h-10 px-3 sm:px-4 border-b border-line bg-violet-100/70 flex items-center justify-between gap-2">
                             <div class="min-w-0 flex items-baseline gap-2">
-                                <div class="text-[15px] sm:text-[16px] font-semibold truncate" x-text="title">Customer</div>
-                                <div class="text-[11px] text-slate-400 hidden sm:inline truncate">Chat, updates &amp; full details</div>
+                                <div class="text-[15px] sm:text-[16px] font-semibold truncate text-violet-950" x-text="title">Customer</div>
+                                <div class="text-[11px] text-violet-700/80 hidden sm:inline truncate">Chat, updates &amp; full details</div>
                             </div>
                             <div class="flex items-center gap-1.5 shrink-0">
-                                <button type="button" @click="closeDesk()" class="w-7 h-7 rounded hover:bg-mist text-slate-500 transition hover:rotate-90 duration-200 text-xs" title="Close">✕</button>
+                                <button type="button" @click="closeDesk()" class="w-7 h-7 rounded hover:bg-white/60 text-slate-600 transition hover:rotate-90 duration-200 text-xs" title="Close">✕</button>
                             </div>
                         </div>
                         <div class="flex-1 overflow-y-auto crm-scroll" x-html="html"></div>
@@ -572,12 +592,14 @@
                 'label' => $f->label,
                 'type' => $f->type,
                 'required' => (bool) $f->required,
+                'auto_select' => (bool) ($f->auto_select ?? false),
                 'options' => $f->options ?? [],
             ];
         })->values();
     @endphp
+    <script id="crm-form-fields-json" type="application/json">@json($crmFormFieldsJson)</script>
     <script>
-        window.CRM_FORM_FIELDS = @json($crmFormFieldsJson);
+        window.CRM_FORM_FIELDS = JSON.parse(document.getElementById('crm-form-fields-json')?.textContent || '[]');
     </script>
     <div class="fixed inset-0 z-50" x-show="formOpen" x-cloak>
         <div class="absolute inset-0 bg-ink/25 transition-opacity"
@@ -627,7 +649,9 @@
                             <textarea name="{{ $field->key }}" x-model="form['{{ $field->key }}']" rows="3" class="w-full rounded-lg border border-line px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-brand/20" @required($field->required)></textarea>
                         @elseif($field->type === 'select')
                             <select name="{{ $field->key }}" x-model="form['{{ $field->key }}']" class="w-full rounded-lg border border-line px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-brand/20" @required($field->required)>
-                                <option value="">Select</option>
+                                @unless($field->auto_select && !empty($field->options))
+                                    <option value="">Select</option>
+                                @endunless
                                 @foreach($field->options ?? [] as $opt)
                                     <option value="{{ $opt }}" :selected="String(form['{{ $field->key }}'] || '').trim().toLowerCase() === @js(strtolower(trim($opt)))">{{ ucfirst($opt) }}</option>
                                 @endforeach
@@ -655,21 +679,55 @@
                                 @required($field->required)
                             >
                         @elseif($field->type === 'date')
-                            <input
-                                name="{{ $field->key }}"
-                                x-model="form['{{ $field->key }}']"
-                                type="date"
-                                class="w-full rounded-lg border border-line px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-brand/20"
-                                @required($field->required)
-                            >
+                            <div class="flex items-center gap-1.5">
+                                <button type="button"
+                                        @click="shiftFormDate('{{ $field->key }}', -1)"
+                                        title="Previous date"
+                                        class="h-9 px-2.5 inline-flex items-center justify-center rounded-lg border border-line bg-mist/60 hover:bg-brand-soft hover:border-brand hover:text-brand text-slate-700 font-bold text-[13px] transition shrink-0">
+                                    ‹
+                                </button>
+                                <input
+                                    name="{{ $field->key }}"
+                                    x-model="form['{{ $field->key }}']"
+                                    type="date"
+                                    class="flex-1 min-w-0 rounded-lg border border-line px-3 py-2 text-[13px] font-medium focus:outline-none focus:ring-2 focus:ring-brand/20"
+                                    @required($field->required)
+                                >
+                                <button type="button"
+                                        @click="shiftFormDate('{{ $field->key }}', 1)"
+                                        title="Next date"
+                                        class="h-9 px-2.5 inline-flex items-center justify-center rounded-lg border border-line bg-mist/60 hover:bg-brand-soft hover:border-brand hover:text-brand text-slate-700 font-bold text-[13px] transition shrink-0">
+                                    ›
+                                </button>
+                                <button type="button"
+                                        @click="form['{{ $field->key }}'] = todayYmd()"
+                                        title="Set to Today"
+                                        class="h-9 px-2.5 inline-flex items-center justify-center rounded-lg border border-line bg-white hover:bg-mist text-brand font-semibold text-[11.5px] transition shrink-0">
+                                    Today
+                                </button>
+                            </div>
                         @elseif($field->type === 'time')
-                            <input
-                                name="{{ $field->key }}"
-                                x-model="form['{{ $field->key }}']"
-                                type="time"
-                                class="w-full rounded-lg border border-line px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-brand/20"
-                                @required($field->required)
-                            >
+                            <div class="flex items-center gap-1.5">
+                                <button type="button"
+                                        @click="shiftFormTime('{{ $field->key }}', -30)"
+                                        title="Previous 30 min"
+                                        class="h-9 px-2.5 inline-flex items-center justify-center rounded-lg border border-line bg-mist/60 hover:bg-brand-soft hover:border-brand hover:text-brand text-slate-700 font-bold text-[13px] transition shrink-0">
+                                    ‹
+                                </button>
+                                <input
+                                    name="{{ $field->key }}"
+                                    x-model="form['{{ $field->key }}']"
+                                    type="time"
+                                    class="flex-1 min-w-0 rounded-lg border border-line px-3 py-2 text-[13px] font-medium focus:outline-none focus:ring-2 focus:ring-brand/20"
+                                    @required($field->required)
+                                >
+                                <button type="button"
+                                        @click="shiftFormTime('{{ $field->key }}', 30)"
+                                        title="Next 30 min"
+                                        class="h-9 px-2.5 inline-flex items-center justify-center rounded-lg border border-line bg-mist/60 hover:bg-brand-soft hover:border-brand hover:text-brand text-slate-700 font-bold text-[13px] transition shrink-0">
+                                    ›
+                                </button>
+                            </div>
                         @else
                             <input
                                 name="{{ $field->key }}"

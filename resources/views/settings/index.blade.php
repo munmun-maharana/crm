@@ -6,7 +6,7 @@
 
 @section('content')
 <div x-data="{ tab: '{{ $tab }}' }">
-    <div class="crm-tabs mb-4 inline-flex flex-wrap rounded-xl border border-line bg-white p-1 gap-0.5">
+    <div class="crm-tabs mb-4 inline-flex flex-wrap rounded-xl border border-indigo-200/80 bg-indigo-100/70 p-1 gap-0.5">
         <button type="button" @click="tab = 'fields'"
                 class="px-3.5 py-1.5 rounded-lg text-[13px] font-semibold"
                 :class="tab === 'fields' ? 'bg-brand-soft text-brand' : 'text-slate-500 hover:bg-mist'">
@@ -53,8 +53,8 @@
 
     <div x-show="tab === 'fields'" x-cloak>
         <div class="grid grid-cols-1 xl:grid-cols-3 gap-4">
-            <div class="rounded-xl border border-line bg-white p-4 h-fit">
-                <h3 class="text-sm font-semibold mb-3">Add new field</h3>
+            <div class="rounded-xl border border-sky-200/80 bg-sky-50/75 p-4 h-fit">
+                <h3 class="text-sm font-semibold mb-3 text-sky-950">Add new field</h3>
                 <form method="POST" action="{{ route('fields.store') }}" class="space-y-2.5" x-data="{ newType: 'text' }">
                     @csrf
                     <input type="hidden" name="pipeline" value="crm">
@@ -72,12 +72,13 @@
                     <label class="flex items-center gap-2 text-[12px]"><input type="checkbox" name="in_table" value="1"> Show in table</label>
                     <label class="flex items-center gap-2 text-[12px]"><input type="checkbox" name="in_excel" value="1" checked> Use in Excel</label>
                     <label class="flex items-center gap-2 text-[12px]"><input type="checkbox" name="in_update" value="1"> Show in Add update</label>
+                    <label class="flex items-center gap-2 text-[12px]"><input type="checkbox" name="auto_select" value="1"> Auto select default option</label>
                     <button class="w-full rounded-lg bg-brand text-white font-semibold py-2 text-[13px]">Add field</button>
                 </form>
             </div>
 
-            <div class="xl:col-span-2 rounded-xl border border-line bg-white overflow-hidden">
-                <div class="px-4 py-3 border-b border-line text-[13px] text-slate-500 flex items-center justify-between gap-2">
+            <div class="xl:col-span-2 rounded-xl border border-emerald-200/80 bg-emerald-50/45 overflow-hidden">
+                <div class="px-4 py-3 border-b border-emerald-200/80 bg-emerald-100/70 text-[13px] text-emerald-950 flex items-center justify-between gap-2">
                     <span>Drag the <span class="font-semibold text-ink">☰</span> handle to move fields up / down</span>
                     <span id="reorderStatusCrm" class="text-[11px] text-emerald-600 font-semibold hidden">Order saved</span>
                 </div>
@@ -100,6 +101,7 @@
                                 <th class="text-center font-bold px-2 py-2.5 border-b border-r border-line">Table</th>
                                 <th class="text-center font-bold px-2 py-2.5 border-b border-r border-line">Excel</th>
                                 <th class="text-center font-bold px-2 py-2.5 border-b border-r border-line">Update</th>
+                                <th class="text-center font-bold px-2 py-2.5 border-b border-r border-line" title="Auto-select 1st option for Select dropdowns">Auto</th>
                                 <th class="text-center font-bold px-2 py-2.5 border-b border-r border-line">On</th>
                                 <th class="text-center font-bold px-3 py-2.5 border-b border-line">Action</th>
                             </tr>
@@ -165,7 +167,10 @@
                                             <input form="{{ $fid }}" type="checkbox" name="in_update" value="1" @checked($field->in_update)>
                                         @endif
                                     </td>
-                                    <td class="px-2 py-2.5 border-r border-line text-center align-middle">
+                                    <td class="px-2 py-2.5 border-r border-line text-center align-middle" title="Auto-select 1st option for Select dropdowns">
+                                        <input form="{{ $fid }}" type="checkbox" name="auto_select" value="1" @checked($field->auto_select)>
+                                    </td>
+                                    <td class="px-2 py-2.5 border-r border-line text-center align-middle bg-slate-50/50">
                                         @if($field->key === 'name')
                                             <input form="{{ $fid }}" type="hidden" name="active" value="1">
                                             <input type="checkbox" checked disabled>
@@ -207,8 +212,8 @@
 
     <div x-show="tab === 'notes'" x-cloak>
         <div class="grid grid-cols-1 xl:grid-cols-3 gap-4">
-            <div class="rounded-xl border border-line bg-white p-4 h-fit shadow-sm">
-                <h3 class="text-sm font-semibold mb-1">Add template</h3>
+            <div class="rounded-xl border border-sky-200/80 bg-sky-50/75 p-4 h-fit">
+                <h3 class="text-sm font-semibold mb-1 text-sky-950">Add template</h3>
                 <p class="text-[11px] text-slate-400 mb-3">Title shows as chip · body goes into the note</p>
                 <form method="POST" action="{{ route('note-templates.store') }}" class="space-y-2.5">
                     @csrf
@@ -222,8 +227,8 @@
                 </form>
             </div>
 
-            <div class="xl:col-span-2 rounded-xl border border-line bg-white overflow-hidden shadow-sm">
-                <div class="px-4 py-3 border-b border-line text-[13px] text-slate-500">
+            <div class="xl:col-span-2 rounded-xl border border-amber-200/80 bg-amber-50/55 overflow-hidden">
+                <div class="px-4 py-3 border-b border-amber-200/80 bg-amber-100/70 text-[13px] text-amber-950 font-semibold">
                     {{ $templates->count() }} template{{ $templates->count() === 1 ? '' : 's' }}
                 </div>
                 @forelse($templates as $t)
@@ -266,7 +271,7 @@
     </div>
 
     <div x-show="tab === 'whatsapp'" x-cloak class="max-w-2xl">
-        <div class="rounded-xl border border-line bg-white p-5 shadow-sm space-y-4">
+        <div class="rounded-xl border border-emerald-200/80 bg-emerald-50/65 p-5 space-y-4">
             <div class="flex items-center gap-3 pb-3 border-b border-line">
                 <span class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 inline-flex items-center justify-center shrink-0">
                     <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.82 9.82 0 0012.04 2zm0 1.82c4.46 0 8.09 3.63 8.09 8.09s-3.63 8.09-8.09 8.09c-1.42 0-2.8-.37-4.01-1.06l-.29-.17-3.12.82.83-3.04-.19-.31a8.05 8.05 0 01-1.22-4.33c0-4.46 3.63-8.09 8.09-8.09zm4.57 10.38c-.18-.09-1.06-.52-1.22-.58-.16-.06-.28-.09-.4.09-.12.18-.46.58-.56.7-.1.12-.2.13-.38.04-.18-.09-.76-.28-1.45-.89-.54-.48-.9-1.07-1.01-1.25-.1-.18-.01-.28.08-.37.08-.08.18-.2.27-.3.09-.1.12-.18.18-.3.06-.12.03-.22-.02-.31-.04-.09-.4-.96-.55-1.31-.14-.34-.29-.3-.4-.3h-.34c-.12 0-.31.04-.47.22-.16.18-.62.61-.62 1.48s.64 1.72.73 1.84c.09.12 1.25 1.91 3.03 2.68.42.18.75.29 1.01.37.42.13.81.11 1.11.07.34-.05 1.06-.43 1.21-.85.15-.42.15-.78.1-.85-.04-.07-.16-.12-.34-.21z"/></svg>
@@ -351,7 +356,7 @@
          }">
         <div class="grid grid-cols-1 xl:grid-cols-3 gap-4">
             {{-- Left: Create Booking Slots (Single Date or Date Range) --}}
-            <div class="rounded-xl border border-line bg-white p-4 h-fit shadow-sm space-y-3">
+            <div class="rounded-xl border border-sky-200/80 bg-sky-50/75 p-4 h-fit space-y-3">
                 <div>
                     <h3 class="text-sm font-bold text-ink">Create Booking Slots</h3>
                     <p class="text-[11px] text-slate-400 mt-0.5">Configure time slots date-wise or for a selected date range (e.g. 10:00 AM to 11:00 AM).</p>
@@ -491,8 +496,8 @@
             </div>
 
             {{-- Right: Manage Slots for Selected Date --}}
-            <div class="xl:col-span-2 rounded-xl border border-line bg-white overflow-hidden shadow-sm">
-                <div class="px-4 py-3 border-b border-line flex flex-wrap items-center justify-between gap-2 bg-mist/30">
+            <div class="xl:col-span-2 rounded-xl border border-violet-200/80 bg-violet-50/50 overflow-hidden">
+                <div class="px-4 py-3 border-b border-violet-200/80 flex flex-wrap items-center justify-between gap-2 bg-violet-100/75">
                     <form method="GET" action="{{ route('settings.index') }}" class="flex flex-wrap items-center gap-2">
                         <input type="hidden" name="tab" value="booking-slots">
                         <label class="text-[12px] font-semibold text-slate-600">Manage Date:</label>
@@ -607,7 +612,7 @@
     </div>
 
     <div x-show="tab === 'op-assign'" x-cloak class="max-w-xl">
-        <div class="rounded-xl border border-line bg-white p-5">
+        <div class="rounded-xl border border-amber-200/80 bg-amber-50/70 p-5">
             <p class="text-[13px] text-slate-500 mb-4">
                 Jab CRM me <span class="font-semibold text-ink">Assign to Operation Team</span> click hoga, customer ka status yahan wale status pe change hoga, aur ye title + note CRM history me auto add hoga.
             </p>
@@ -646,8 +651,8 @@
             Assign pe sirf connected fields ka data copy hota hai.
         </p>
         <div class="grid grid-cols-1 xl:grid-cols-3 gap-4">
-            <div class="rounded-xl border border-line bg-white p-4 h-fit">
-                <h3 class="text-sm font-semibold mb-3">Add Operation field</h3>
+            <div class="rounded-xl border border-sky-200/80 bg-sky-50/75 p-4 h-fit">
+                <h3 class="text-sm font-semibold mb-3 text-sky-950">Add Operation field</h3>
                 <form method="POST" action="{{ route('fields.store') }}" class="space-y-2.5" x-data="{ newType: 'text' }">
                     @csrf
                     <input type="hidden" name="pipeline" value="operations">
@@ -673,12 +678,13 @@
                     <label class="flex items-center gap-2 text-[12px]"><input type="checkbox" name="in_form" value="1" checked> Show in form</label>
                     <label class="flex items-center gap-2 text-[12px]"><input type="checkbox" name="in_table" value="1"> Show in table</label>
                     <label class="flex items-center gap-2 text-[12px]"><input type="checkbox" name="in_update" value="1"> Show in Wash Success update</label>
+                    <label class="flex items-center gap-2 text-[12px]"><input type="checkbox" name="auto_select" value="1"> Auto select default option</label>
                     <button class="w-full rounded-lg bg-brand text-white font-semibold py-2 text-[13px]">Add field</button>
                 </form>
             </div>
 
-            <div class="xl:col-span-2 rounded-xl border border-line bg-white overflow-hidden">
-                <div class="px-4 py-3 border-b border-line text-[13px] text-slate-500 flex items-center justify-between gap-2">
+            <div class="xl:col-span-2 rounded-xl border border-emerald-200/80 bg-emerald-50/45 overflow-hidden">
+                <div class="px-4 py-3 border-b border-emerald-200/80 bg-emerald-100/70 text-[13px] text-emerald-950 flex items-center justify-between gap-2">
                     <span>Connect each Operation field to a CRM field, then save the row</span>
                     <span id="reorderStatusOp" class="text-[11px] text-emerald-600 font-semibold hidden">Order saved</span>
                 </div>
@@ -700,6 +706,7 @@
                                 <th class="text-center font-bold px-2 py-2.5 border-b border-r border-line">Req</th>
                                 <th class="text-center font-bold px-2 py-2.5 border-b border-r border-line">Form</th>
                                 <th class="text-center font-bold px-2 py-2.5 border-b border-r border-line" title="Show in Wash Success feedback & update">Update</th>
+                                <th class="text-center font-bold px-2 py-2.5 border-b border-r border-line" title="Auto-select 1st option for Select dropdowns">Auto</th>
                                 <th class="text-center font-bold px-2 py-2.5 border-b border-r border-line">On</th>
                                 <th class="text-center font-bold px-3 py-2.5 border-b border-line">Action</th>
                             </tr>
@@ -770,7 +777,10 @@
                                             <input form="{{ $fid }}" type="checkbox" name="in_update" value="1" @checked($field->in_update)>
                                         @endif
                                     </td>
-                                    <td class="px-2 py-2.5 border-r border-line text-center align-middle">
+                                    <td class="px-2 py-2.5 border-r border-line text-center align-middle" title="Auto-select 1st option for Select dropdowns">
+                                        <input form="{{ $fid }}" type="checkbox" name="auto_select" value="1" @checked($field->auto_select)>
+                                    </td>
+                                    <td class="px-2 py-2.5 border-r border-line text-center align-middle bg-slate-50/50">
                                         @if($field->key === 'name')
                                             <input form="{{ $fid }}" type="hidden" name="active" value="1">
                                             <input type="checkbox" checked disabled>
@@ -815,8 +825,8 @@
             Users page form aur table inhi fields se banega. Naya field add karo — Create user form pe auto show hoga.
         </p>
         <div class="grid grid-cols-1 xl:grid-cols-3 gap-4">
-            <div class="rounded-xl border border-line bg-white p-4 h-fit">
-                <h3 class="text-sm font-semibold mb-3">Add user field</h3>
+            <div class="rounded-xl border border-sky-200/80 bg-sky-50/75 p-4 h-fit">
+                <h3 class="text-sm font-semibold mb-3 text-sky-950">Add user field</h3>
                 <form method="POST" action="{{ route('fields.store') }}" class="space-y-2.5" x-data="{ newType: 'text' }">
                     @csrf
                     <input type="hidden" name="pipeline" value="users">
@@ -836,8 +846,8 @@
                 </form>
             </div>
 
-            <div class="xl:col-span-2 rounded-xl border border-line bg-white overflow-hidden">
-                <div class="px-4 py-3 border-b border-line text-[13px] text-slate-500 flex items-center justify-between gap-2">
+            <div class="xl:col-span-2 rounded-xl border border-emerald-200/80 bg-emerald-50/45 overflow-hidden">
+                <div class="px-4 py-3 border-b border-emerald-200/80 bg-emerald-100/70 text-[13px] text-emerald-950 flex items-center justify-between gap-2">
                     <span>Drag to reorder · Form / Table checkboxes control Users page</span>
                     <span id="reorderStatusUser" class="text-[11px] text-emerald-600 font-semibold hidden">Order saved</span>
                 </div>
@@ -953,7 +963,7 @@
     </div>
 
     <div x-show="tab === 'security'" x-cloak>
-        <div class="max-w-xl rounded-xl border border-line bg-white p-6 shadow-xs">
+        <div class="max-w-xl rounded-xl border border-rose-200/80 bg-rose-50/65 p-6">
             <div class="flex items-center gap-3 mb-5 pb-4 border-b border-line">
                 <div class="w-10 h-10 rounded-xl bg-brand-soft text-brand flex items-center justify-center">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -64,6 +64,7 @@ class FieldController extends Controller
             'in_table' => $request->boolean('in_table'),
             'in_excel' => $pipeline === 'crm' ? $request->boolean('in_excel', true) : false,
             'in_update' => in_array($pipeline, ['crm', 'operations'], true) ? $request->boolean('in_update') : false,
+            'auto_select' => $request->boolean('auto_select'),
             'is_system' => false,
             'sort_order' => $maxSort + 1,
         ]);
@@ -92,6 +93,7 @@ class FieldController extends Controller
             'in_table' => ['nullable', 'boolean'],
             'in_excel' => ['nullable', 'boolean'],
             'in_update' => ['nullable', 'boolean'],
+            'auto_select' => ['nullable', 'boolean'],
             'sort_order' => ['nullable', 'integer', 'min:0'],
             'maps_from' => ['nullable', 'string', 'max:80'],
         ]);
@@ -102,6 +104,7 @@ class FieldController extends Controller
         $inTable = $request->boolean('in_table');
         $inExcel = $request->boolean('in_excel');
         $inUpdate = $request->boolean('in_update');
+        $autoSelect = $request->boolean('auto_select');
 
         if ($field->key === 'name') {
             $required = true;
@@ -137,6 +140,7 @@ class FieldController extends Controller
             'in_table' => $field->pipeline === 'operations' ? $field->in_table : $inTable,
             'in_excel' => $field->pipeline === 'operations' ? false : $inExcel,
             'in_update' => in_array($field->pipeline, ['crm', 'operations'], true) ? $inUpdate : false,
+            'auto_select' => $autoSelect,
             'sort_order' => $data['sort_order'] ?? $field->sort_order,
             'maps_from' => $mapsFrom,
         ]);

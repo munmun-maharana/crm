@@ -7,10 +7,23 @@
     : (auth()->user()->isOperation() ? 'Operations queue' : 'Only leads mapped to you'))
 
 @section('content')
+@php
+    $kpiBgs = [
+        'bg-sky-100/75 border-sky-200/90',
+        'bg-emerald-100/75 border-emerald-200/90',
+        'bg-amber-100/75 border-amber-200/90',
+        'bg-violet-100/75 border-violet-200/90',
+        'bg-rose-100/75 border-rose-200/90',
+        'bg-teal-100/75 border-teal-200/90',
+        'bg-indigo-100/75 border-indigo-200/90',
+        'bg-cyan-100/75 border-cyan-200/90',
+    ];
+@endphp
 <div class="grid gap-2 sm:gap-3 mb-5 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:[grid-template-columns:repeat(var(--cols),minmax(0,1fr))]" style="--cols: {{ min(10, max(2, count($statusCards))) }};">
     @foreach($statusCards as $card)
-        <a href="{{ $card['url'] ?? '#' }}" class="stat-card block rounded-2xl border border-line bg-white px-3 sm:px-4 py-3 sm:py-3.5 hover:border-brand/40 hover:shadow-sm transition min-w-0">
-            <div class="text-[10px] sm:text-[11px] uppercase tracking-[0.1em] sm:tracking-[0.14em] text-slate-400 font-bold truncate" title="{{ $card['label'] }}">{{ $card['label'] }}</div>
+        @php $kpiBg = $kpiBgs[$loop->index % count($kpiBgs)]; @endphp
+        <a href="{{ $card['url'] ?? '#' }}" class="stat-card block rounded-2xl border {{ $kpiBg }} px-3 sm:px-4 py-3 sm:py-3.5 hover:shadow-sm transition min-w-0">
+            <div class="text-[10px] sm:text-[11px] uppercase tracking-[0.1em] sm:tracking-[0.14em] text-slate-600 font-bold truncate" title="{{ $card['label'] }}">{{ $card['label'] }}</div>
             <div class="mt-1 text-xl sm:text-2xl font-extrabold text-{{ $card['tone'] }}-700">{{ $card['value'] }}</div>
         </a>
     @endforeach
@@ -19,37 +32,37 @@
 <div class="grid grid-cols-1 xl:grid-cols-12 gap-4 mb-4 items-start">
     {{-- Left Side: All Graphs (2x2 grid) --}}
     <div class="xl:col-span-7 grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div class="rounded-2xl border border-line bg-white p-4 min-w-0">
+        <div class="rounded-2xl border border-teal-200/80 bg-teal-50/75 p-4 min-w-0">
             <div class="flex items-center justify-between mb-3">
-                <h2 class="text-sm font-extrabold uppercase tracking-wide">Daily leads</h2>
-                <span class="text-[11px] text-slate-400">Last 7 days</span>
+                <h2 class="text-sm font-extrabold uppercase tracking-wide text-teal-950">Daily leads</h2>
+                <span class="text-[11px] text-teal-700/80">Last 7 days</span>
             </div>
             <div class="h-[230px] relative">
                 <canvas id="dayChart"></canvas>
             </div>
         </div>
-        <div class="rounded-2xl border border-line bg-white p-4 min-w-0">
+        <div class="rounded-2xl border border-sky-200/80 bg-sky-50/75 p-4 min-w-0">
             <div class="flex items-center justify-between mb-3">
-                <h2 class="text-sm font-extrabold uppercase tracking-wide">Monthly leads</h2>
-                <span class="text-[11px] text-slate-400">Last 12 months</span>
+                <h2 class="text-sm font-extrabold uppercase tracking-wide text-sky-950">Monthly leads</h2>
+                <span class="text-[11px] text-sky-700/80">Last 12 months</span>
             </div>
             <div class="h-[230px] relative">
                 <canvas id="monthChart"></canvas>
             </div>
         </div>
-        <div class="rounded-2xl border border-line bg-white p-4 min-w-0">
+        <div class="rounded-2xl border border-indigo-200/80 bg-indigo-50/75 p-4 min-w-0">
             <div class="flex items-center justify-between mb-3">
-                <h2 class="text-sm font-extrabold uppercase tracking-wide">Yearly leads</h2>
-                <span class="text-[11px] text-slate-400">5 year trend</span>
+                <h2 class="text-sm font-extrabold uppercase tracking-wide text-indigo-950">Yearly leads</h2>
+                <span class="text-[11px] text-indigo-700/80">5 year trend</span>
             </div>
             <div class="h-[230px] relative">
                 <canvas id="yearChart"></canvas>
             </div>
         </div>
-        <div class="rounded-2xl border border-line bg-white p-4 min-w-0">
+        <div class="rounded-2xl border border-amber-200/80 bg-amber-50/75 p-4 min-w-0">
             <div class="flex items-center justify-between mb-3">
-                <h2 class="text-sm font-extrabold uppercase tracking-wide">Falloff funnel</h2>
-                <span class="text-[11px] text-slate-400">Pipeline drop</span>
+                <h2 class="text-sm font-extrabold uppercase tracking-wide text-amber-950">Falloff funnel</h2>
+                <span class="text-[11px] text-amber-700/80">Pipeline drop</span>
             </div>
             <div class="h-[230px] relative">
                 <canvas id="falloffChart"></canvas>
@@ -58,37 +71,37 @@
     </div>
 
     {{-- Right Side: Booking Slot Details with WhatsApp Buttons --}}
-    <div class="xl:col-span-5 rounded-2xl border border-line bg-white overflow-hidden flex flex-col"
+    <div class="xl:col-span-5 rounded-2xl border border-violet-200/80 bg-violet-50/60 overflow-hidden flex flex-col"
          x-data="dashboardBookingSlots(@js($whatsappTargetPhone))"
          x-init="loadSlots()"
          @booking-slots-updated.window="loadSlots(date)">
-        <div class="px-4 py-3 border-b border-line bg-slate-50/80 flex flex-wrap items-center justify-between gap-2">
+        <div class="px-4 py-3 border-b border-violet-200/80 bg-violet-100/75 flex flex-wrap items-center justify-between gap-2">
             <div class="flex items-center gap-2">
-                <span class="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-200 flex items-center justify-center shrink-0">
+                <span class="w-8 h-8 rounded-xl bg-white/90 text-indigo-600 flex items-center justify-center shrink-0">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
                 </span>
                 <div>
-                    <h2 class="text-sm font-extrabold text-ink leading-tight">Booking Slot Details</h2>
+                    <h2 class="text-sm font-extrabold text-violet-950 leading-tight">Booking Slot Details</h2>
                     <div class="text-[11px] text-indigo-700 font-semibold" x-text="dateFormatted"></div>
                 </div>
             </div>
 
             <div class="flex items-center gap-1.5">
-                <div class="inline-flex items-center rounded-lg border border-line bg-white overflow-hidden">
+                <div class="inline-flex items-center rounded-lg bg-white overflow-hidden">
                     <button type="button" @click="shiftDate(-1)" title="Previous day" class="px-2 py-1 text-slate-600 hover:bg-mist text-xs font-bold">‹</button>
                     <input type="date" :value="date" @change="loadSlots($event.target.value)"
-                           class="border-x border-line px-2 py-1 text-[11.5px] font-semibold text-ink focus:outline-none">
+                           class="px-2 py-1 text-[11.5px] font-semibold text-ink focus:outline-none">
                     <button type="button" @click="shiftDate(1)" title="Next day" class="px-2 py-1 text-slate-600 hover:bg-mist text-xs font-bold">›</button>
                 </div>
                 <button type="button" @click="loadSlots('{{ now()->toDateString() }}')"
-                        class="px-2 py-1 rounded-lg border border-line bg-white hover:bg-mist text-[11px] font-semibold text-slate-700">
+                        class="px-2 py-1 rounded-lg bg-white hover:bg-mist text-[11px] font-semibold text-slate-700">
                     Today
                 </button>
             </div>
         </div>
 
         {{-- Counters & Send All Booked to WhatsApp --}}
-        <div class="px-4 py-2 border-b border-line bg-white flex flex-wrap items-center justify-between gap-2 text-[11px] font-semibold">
+        <div class="px-4 py-2 bg-indigo-50/70 flex flex-wrap items-center justify-between gap-2 text-[11px] font-semibold">
             <div class="flex items-center gap-1.5">
                 <span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800" x-text="'Available: ' + (counts.available || 0)"></span>
                 <span class="px-2 py-0.5 rounded-full bg-rose-100 text-rose-800" x-text="'Booked: ' + (counts.booked || 0)"></span>
@@ -216,14 +229,14 @@
     </div>
 </div>
 
-<div class="rounded-2xl border border-line bg-white overflow-hidden">
-    <div class="px-4 py-3 border-b border-line flex items-center justify-between">
-        <h2 class="text-sm font-extrabold">Recent customers</h2>
+<div class="rounded-2xl border border-rose-200/80 bg-rose-50/50 overflow-hidden">
+    <div class="px-4 py-3 border-b border-rose-200/80 bg-rose-100/70 flex items-center justify-between">
+        <h2 class="text-sm font-extrabold text-rose-950">Recent customers</h2>
         <a href="{{ route($listRoute) }}" class="text-[12px] font-bold text-brand hover:underline">{{ ($listRoute ?? 'customers.index') === 'operations.index' ? 'Open TEAM OPS' : 'Open CRM' }}</a>
     </div>
     <div class="overflow-x-auto">
         <table class="w-full text-[13px]">
-            <thead class="bg-mist/80 text-slate-500 text-[11px] uppercase tracking-wide">
+            <thead class="bg-rose-100/45 text-rose-900 text-[11px] uppercase tracking-wide">
                 <tr>
                     <th class="text-left font-bold px-4 py-2.5">Name</th>
                     <th class="text-left font-bold px-4 py-2.5">Phone</th>

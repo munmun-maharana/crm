@@ -30,11 +30,11 @@
         .crm-scroll::-webkit-scrollbar{width:8px;height:8px}
         .crm-scroll::-webkit-scrollbar-thumb{background:#c8c6c4;border-radius:8px}
         .crm-scroll::-webkit-scrollbar-thumb:hover{background:#a19f9d}
-        .nav-item{border-radius:4px}
-        .nav-item.active{background:#deecf9;color:#0f6cbd;font-weight:600}
-        .list-item{border-left:3px solid transparent; transition: background .18s ease, box-shadow .18s ease, border-color .18s ease}
-        .list-item:hover{background:#f5f5f5}
-        .list-item.active{background:#deecf9;border-left-color:#0f6cbd;box-shadow:inset 0 0 0 1px #201f1e}
+        .nav-item{border-radius:8px;transition:all .15s ease}
+        .nav-item.active{background:#0f6cbd;color:#ffffff;font-weight:700;border-color:#0f6cbd;box-shadow:0 2px 6px rgba(15,108,189,.25)}
+        .list-item{border-left:3px solid transparent; transition: background .18s ease, border-color .18s ease}
+        .list-item:hover{background:rgba(255,255,255,0.75)}
+        .list-item.active{background:#dbeafe;border-left-color:#0f6cbd}
         .stat-card{transition:transform .15s ease}
         .stat-card:hover{transform:translateY(-1px)}
         .desk-stage{position:relative}
@@ -56,13 +56,13 @@
         .crm-check.on{background:#0f6cbd;border-color:#0f6cbd}
         .crm-check svg{width:12px;height:12px;color:#fff;opacity:0}
         .crm-check.on svg{opacity:1}
-        .crm-toolbar-group{display:flex;align-items:center;flex:1;min-width:0;max-width:760px;height:38px;background:#f3f2f1;border:1px solid #edebe9;border-radius:10px;overflow:hidden}
-        .crm-toolbar-group:focus-within{background:#fff;border-color:#0f6cbd;box-shadow:0 0 0 3px rgba(15,108,189,.12)}
+        .crm-toolbar-group{display:flex;align-items:center;flex:1;min-width:0;max-width:760px;height:38px;background:#ffe4e6;border:1.5px solid #ef4444;border-radius:10px;overflow:hidden}
+        .crm-toolbar-group:focus-within{background:#fff1f2;border-color:#dc2626;box-shadow:0 0 0 3px rgba(239,68,68,.18)}
         .crm-toolbar-search{flex:1;min-width:140px;display:flex;align-items:center;gap:8px;padding:0 12px;height:100%}
-        .crm-toolbar-search input{flex:1;width:100%;background:transparent;border:0;outline:none;font-size:13px;color:#201f1e}
-        .crm-toolbar-search input::placeholder{color:#a19f9d}
-        .crm-toolbar-split{width:1px;height:18px;background:#e1dfdd;flex-shrink:0}
-        .crm-toolbar-select{border:0;background:transparent url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23605e5c' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") no-repeat right 10px center;font-size:12.5px;font-weight:600;color:#201f1e;padding:0 28px 0 12px;height:100%;outline:none;appearance:none;-webkit-appearance:none;cursor:pointer;max-width:150px}
+        .crm-toolbar-search input{flex:1;width:100%;background:transparent;border:0;outline:none;font-size:13px;color:#881337;font-weight:500}
+        .crm-toolbar-search input::placeholder{color:#e11d48;opacity:.7}
+        .crm-toolbar-split{width:1px;height:18px;background:#fca5a5;flex-shrink:0}
+        .crm-toolbar-select{border:0;background:transparent url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23be123c' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") no-repeat right 10px center;font-size:12.5px;font-weight:600;color:#881337;padding:0 28px 0 12px;height:100%;outline:none;appearance:none;-webkit-appearance:none;cursor:pointer;max-width:150px}
 
         /* ---------- Mobile / tablet responsiveness ---------- */
         .crm-scroll{-webkit-overflow-scrolling:touch}
@@ -93,13 +93,13 @@
          x-transition.opacity.duration.200ms @click="navOpen = false"></div>
 
     {{-- Left nav — Outlook style (off-canvas on mobile) --}}
-    <aside class="fixed inset-y-0 left-0 z-[56] w-[250px] lg:w-[200px] lg:static lg:z-auto lg:translate-x-0 shrink-0 border-r border-line bg-white flex flex-col h-full transition-transform duration-300 ease-out shadow-xl lg:shadow-none"
+    <aside class="fixed inset-y-0 left-0 z-[56] w-[250px] lg:w-[200px] lg:static lg:z-auto lg:translate-x-0 shrink-0 border-r border-line bg-indigo-50/60 flex flex-col h-full transition-transform duration-300 ease-out shadow-xl lg:shadow-none"
            :class="navOpen ? 'translate-x-0' : '-translate-x-full'">
-        <div class="px-4 py-4 border-b border-line flex items-center justify-between">
+        <div class="h-14 shrink-0 px-4 border-b border-line bg-sky-100/75 flex items-center justify-between">
             <div class="text-[18px] font-bold tracking-tight text-ink">Pulse<span class="text-brand">CRM</span></div>
-            <button type="button" class="lg:hidden w-8 h-8 rounded hover:bg-mist text-slate-500" @click="navOpen = false" aria-label="Close menu">✕</button>
+            <button type="button" class="lg:hidden w-8 h-8 rounded hover:bg-white/60 text-slate-500" @click="navOpen = false" aria-label="Close menu">✕</button>
         </div>
-        <nav class="p-2 flex-1 overflow-y-auto crm-scroll text-[13px]">
+        <nav class="p-2 flex-1 overflow-y-auto crm-scroll text-[13px] space-y-1">
             @php
                 $navUser = auth()->user();
                 $links = [
@@ -117,27 +117,27 @@
                     ]);
                 }
             @endphp
-            <div class="px-2 pt-1 pb-2 text-[11px] font-semibold text-slate-500">Favorites</div>
+            <div class="px-2 pt-1 pb-1.5 text-[11px] font-semibold text-indigo-500">Favorites</div>
             @foreach($links as [$route, $label])
                 <a href="{{ route($route) }}"
-                   class="nav-item flex items-center gap-2 px-3 py-1.5 mb-0.5 {{ request()->routeIs($route) || request()->routeIs(str_replace('.index','.*',$route)) || ($route === 'settings.index' && request()->routeIs('fields.*', 'note-templates.*', 'operation-settings.*', 'inventory-types.*')) ? 'active' : 'text-ink hover:bg-mist' }}">
+                   class="nav-item flex items-center gap-2 px-3 py-1.5 border {{ request()->routeIs($route) || request()->routeIs(str_replace('.index','.*',$route)) || ($route === 'settings.index' && request()->routeIs('fields.*', 'note-templates.*', 'operation-settings.*', 'inventory-types.*')) ? 'active' : 'bg-white/85 hover:bg-white text-slate-700 border-indigo-200/70' }}">
                     <span class="uppercase tracking-wide">{{ $label }}</span>
                 </a>
             @endforeach
         </nav>
-        <div class="p-3 border-t border-line text-[12px]">
+        <div class="p-3 border-t border-line bg-teal-100/60 text-[12px]">
             <div class="flex items-center justify-between gap-2">
-                <div class="font-semibold truncate min-w-0">{{ auth()->user()->name }}</div>
+                <div class="font-semibold truncate min-w-0 text-teal-950">{{ auth()->user()->name }}</div>
                 <div class="flex items-center gap-1 shrink-0">
                     <button type="button" @click="changePasswordOpen = true" title="Change Password"
-                       class="w-7 h-7 inline-flex items-center justify-center rounded-lg border border-line text-slate-500 hover:bg-brand-soft hover:text-brand hover:border-brand/30 transition">
+                       class="w-7 h-7 inline-flex items-center justify-center rounded-lg border border-teal-200 bg-white/80 text-slate-600 hover:bg-brand-soft hover:text-brand transition">
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/>
                         </svg>
                     </button>
                     @if(auth()->user()->isAdmin())
                         <a href="{{ route('settings.index') }}" title="Setting"
-                           class="w-7 h-7 shrink-0 inline-flex items-center justify-center rounded-lg border border-line text-slate-500 hover:bg-brand-soft hover:text-brand hover:border-brand/30 transition {{ request()->routeIs('settings.*', 'fields.*', 'note-templates.*', 'operation-settings.*') ? 'bg-brand-soft text-brand border-brand/30' : '' }}">
+                           class="w-7 h-7 shrink-0 inline-flex items-center justify-center rounded-lg border border-teal-200 bg-white/80 text-slate-600 hover:bg-brand-soft hover:text-brand transition {{ request()->routeIs('settings.*', 'fields.*', 'note-templates.*', 'operation-settings.*') ? 'bg-brand-soft text-brand border-brand/30' : '' }}">
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
@@ -147,12 +147,8 @@
                 </div>
             </div>
             <div class="flex items-center justify-between gap-2 mt-1">
-                <span class="text-slate-500 truncate">{{ auth()->user()->username }} · {{ auth()->user()->roleLabel() }}</span>
+                <span class="text-teal-800/80 truncate">{{ auth()->user()->username }} · {{ auth()->user()->roleLabel() }}</span>
                 <div class="flex items-center gap-1.5 shrink-0">
-                    <button type="button" @click="changePasswordOpen = true" class="text-slate-500 hover:text-brand font-medium text-[11px] transition">
-                        Password
-                    </button>
-                    <span class="text-slate-300">·</span>
                     <form method="POST" action="{{ route('logout') }}" onsubmit="return confirm('Logout karna hai?')">@csrf
                         <button class="text-brand font-semibold hover:underline">Logout</button>
                     </form>
@@ -163,25 +159,25 @@
 
     <div class="crm-main flex-1 min-w-0 h-full flex flex-col">
         {{-- Mobile top bar --}}
-        <div class="lg:hidden shrink-0 h-12 border-b border-line bg-white px-2 flex items-center gap-2">
+        <div class="lg:hidden shrink-0 h-12 border-b border-line bg-sky-100/75 px-2 flex items-center gap-2">
             <button type="button" @click="navOpen = true" aria-label="Open menu"
-                    class="w-9 h-9 inline-flex items-center justify-center rounded-lg text-slate-600 hover:bg-mist">
+                    class="w-9 h-9 inline-flex items-center justify-center rounded-lg text-slate-600 hover:bg-white/60">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
             </button>
             <div class="text-[16px] font-bold tracking-tight text-ink">Pulse<span class="text-brand">CRM</span></div>
-            <div class="ml-auto text-[12px] text-slate-500 truncate max-w-[45%]">{{ auth()->user()->name }}</div>
+            <div class="ml-auto text-[12px] text-slate-600 truncate max-w-[45%]">{{ auth()->user()->name }}</div>
         </div>
         @hasSection('split')
             @yield('split')
         @else
-            <header class="shrink-0 border-b border-line bg-white px-3 sm:px-5 py-3 flex flex-wrap items-center justify-between gap-2 sm:gap-3">
-                <div class="min-w-0">
-                    <h1 class="text-[16px] sm:text-[18px] font-semibold truncate">@yield('heading', 'Dashboard')</h1>
-                    <p class="text-[12px] text-slate-500">@yield('subheading')</p>
+            <header class="shrink-0 min-h-14 lg:h-14 border-b border-line bg-gradient-to-r from-sky-100/80 via-indigo-50/70 to-violet-100/70 px-3 sm:px-5 py-1.5 flex flex-wrap items-center justify-between gap-2 sm:gap-3">
+                <div class="min-w-0 leading-tight">
+                    <h1 class="text-[15px] sm:text-[17px] font-bold truncate text-indigo-950">@yield('heading', 'Dashboard')</h1>
+                    <p class="text-[11px] text-slate-600 truncate">@yield('subheading')</p>
                 </div>
                 <div class="flex flex-wrap items-center gap-2">@yield('actions')</div>
             </header>
-            <div class="flex-1 overflow-y-auto crm-scroll bg-mist/40 p-3 sm:p-5">
+            <div class="flex-1 overflow-y-auto crm-scroll bg-slate-50/60 p-3 sm:p-5">
                 @if(session('success'))
                     <div class="mb-3 rounded border border-emerald-200 bg-emerald-50 text-emerald-800 px-3 py-2 text-[13px]">{{ session('success') }}</div>
                 @endif
@@ -621,11 +617,79 @@
     </div>
 </div>
 
+{{-- Confirm Post Update Modal --}}
+<div x-show="postUpdateModalOpen" x-cloak
+     @keydown.escape.window="if (postUpdateModalOpen && !postUpdateSubmitting) postUpdateModalOpen = false"
+     class="fixed inset-0 z-[75] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+    <div @click.outside="if (!postUpdateSubmitting) postUpdateModalOpen = false"
+         class="w-full max-w-md rounded-2xl bg-white shadow-2xl border border-line overflow-hidden">
+        <div class="px-5 py-3.5 bg-gradient-to-r from-brand to-brand-dark text-white flex items-center justify-between">
+            <div class="flex items-center gap-2.5 min-w-0">
+                <span class="w-8 h-8 rounded-xl bg-white/15 inline-flex items-center justify-center shrink-0">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                </span>
+                <div class="min-w-0">
+                    <div class="text-[10.5px] font-bold uppercase tracking-wider text-blue-200">Confirm Update</div>
+                    <div class="text-[14px] font-bold leading-tight truncate" x-text="postUpdateCustomerName || 'Customer Update'"></div>
+                </div>
+            </div>
+            <button type="button" @click="if (!postUpdateSubmitting) postUpdateModalOpen = false"
+                    class="w-7 h-7 rounded-lg bg-white/10 hover:bg-white/20 inline-flex items-center justify-center text-white text-sm">✕</button>
+        </div>
+
+        <div class="p-4 max-h-[65vh] overflow-y-auto space-y-2.5">
+            <div class="text-[11.5px] text-slate-500 font-medium">Please review all changes before posting this update:</div>
+
+            <div class="rounded-xl border border-line bg-mist/30 divide-y divide-line overflow-hidden">
+                <template x-for="(item, idx) in postUpdateChanges" :key="idx">
+                    <div class="px-3.5 py-2.5 flex items-start justify-between gap-3 text-[12px]">
+                        <div class="min-w-0 flex-1">
+                            <div class="flex items-center gap-1.5">
+                                <span class="text-[10.5px] font-bold uppercase tracking-wider text-slate-400" x-text="item.label"></span>
+                                <span x-show="item.changed"
+                                      class="inline-flex items-center rounded-full bg-amber-100 text-amber-800 px-1.5 py-0.2 text-[9.5px] font-bold">Changed</span>
+                            </div>
+                            <div class="mt-0.5 flex flex-wrap items-center gap-1.5 break-words">
+                                <template x-if="item.from !== null && item.from !== undefined">
+                                    <span class="inline-flex items-center gap-1.5 flex-wrap">
+                                        <span class="line-through text-slate-400 text-[11.5px]" x-text="item.from || 'Empty'"></span>
+                                        <span class="text-slate-400 font-bold">→</span>
+                                        <span class="font-bold text-emerald-700 bg-emerald-50 border border-emerald-200/80 rounded px-1.5 py-0.5 text-[11.5px]" x-text="item.to || 'Empty'"></span>
+                                    </span>
+                                </template>
+                                <template x-if="item.from === null || item.from === undefined">
+                                    <span class="font-semibold text-ink whitespace-pre-line text-[12px]" x-text="item.to"></span>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </div>
+
+        <div class="px-5 py-3 bg-mist/40 border-t border-line flex items-center justify-end gap-2">
+            <button type="button"
+                    @click="postUpdateModalOpen = false"
+                    :disabled="postUpdateSubmitting"
+                    class="px-4 py-2 rounded-xl border border-line bg-white hover:bg-mist text-slate-700 text-[12.5px] font-semibold transition disabled:opacity-50">
+                Cancel
+            </button>
+            <button type="button"
+                    @click="confirmPostUpdate()"
+                    :disabled="postUpdateSubmitting"
+                    class="inline-flex items-center gap-1.5 px-5 py-2 rounded-xl bg-brand hover:bg-brand-dark text-white text-[12.5px] font-bold transition shadow-sm shadow-brand/20 disabled:opacity-60">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                <span x-text="postUpdateSubmitting ? 'Posting…' : 'Confirm & Post Update'"></span>
+            </button>
+        </div>
+    </div>
+</div>
+
 <script>
 function crmShell() {
     return {
         navOpen: false,
-        changePasswordOpen: {{ $errors->updatePassword->any() ? 'true' : 'false' }},
+        changePasswordOpen: "{{ $errors->updatePassword->any() ? '1' : '0' }}" === "1",
         selectedId: null,
         title: '',
         html: '',
@@ -661,6 +725,11 @@ function crmShell() {
         bookingModalCustomerName: '',
         bookingModalSubmitting: false,
         bookingModalError: '',
+        postUpdateModalOpen: false,
+        postUpdateSubmitting: false,
+        postUpdateFormEl: null,
+        postUpdateCustomerName: '',
+        postUpdateChanges: [],
         async toggleBookingSlots() {
             this.bookingSlotsOpen = !this.bookingSlotsOpen;
             if (this.bookingSlotsOpen) {
@@ -986,6 +1055,37 @@ function crmShell() {
             this.title = '';
             this.html = '';
         },
+        todayYmd() {
+            const d = new Date();
+            return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+        },
+        shiftFormDate(key, deltaDays) {
+            const raw = (this.form && this.form[key]) ? String(this.form[key]).trim() : '';
+            let base = new Date();
+            if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+                const parts = raw.split('-').map(Number);
+                base = new Date(parts[0], parts[1] - 1, parts[2]);
+            }
+            base.setDate(base.getDate() + Number(deltaDays || 0));
+            const nextStr = base.getFullYear() + '-' + String(base.getMonth() + 1).padStart(2, '0') + '-' + String(base.getDate()).padStart(2, '0');
+            this.form[key] = nextStr;
+        },
+        shiftFormTime(key, deltaMinutes) {
+            const raw = (this.form && this.form[key]) ? String(this.form[key]).trim() : '';
+            const now = new Date();
+            let hours = now.getHours();
+            let mins = now.getMinutes();
+            if (/^\d{1,2}:\d{2}/.test(raw)) {
+                const parts = raw.split(':').map(Number);
+                hours = parts[0];
+                mins = parts[1];
+            }
+            let totalMins = (hours * 60 + mins + Number(deltaMinutes || 0)) % 1440;
+            if (totalMins < 0) totalMins += 1440;
+            const nextH = Math.floor(totalMins / 60);
+            const nextM = totalMins % 60;
+            this.form[key] = String(nextH).padStart(2, '0') + ':' + String(nextM).padStart(2, '0');
+        },
         openCreateForm() {
             this.formMode = 'create';
             const newForm = { id: null };
@@ -998,6 +1098,10 @@ function crmShell() {
                     } else {
                         defaultVal = 'New';
                     }
+                } else if (f.type === 'select' && f.auto_select && Array.isArray(f.options) && f.options.length > 0) {
+                    defaultVal = f.options[0];
+                } else if (f.type === 'date') {
+                    defaultVal = this.todayYmd();
                 }
                 newForm[f.key] = defaultVal;
             });
@@ -1006,17 +1110,21 @@ function crmShell() {
             this.$nextTick(() => {
                 const drawer = document.getElementById('customerDrawerForm');
                 if (drawer) {
-                    const sel = drawer.querySelector('select[name="status"]');
-                    if (sel && this.form.status) {
-                        const valStr = String(this.form.status).trim().toLowerCase();
-                        const matchedOption = Array.from(sel.options).find(o => 
-                            o.value.trim().toLowerCase() === valStr
-                        );
-                        if (matchedOption) {
-                            sel.value = matchedOption.value;
-                            this.form.status = matchedOption.value;
+                    (window.CRM_FORM_FIELDS || []).forEach(f => {
+                        if (f.type === 'select' || f.key === 'status') {
+                            const sel = drawer.querySelector(`select[name="${f.key}"]`);
+                            if (sel && this.form[f.key]) {
+                                const valStr = String(this.form[f.key]).trim().toLowerCase();
+                                const matchedOption = Array.from(sel.options).find(o =>
+                                    o.value.trim().toLowerCase() === valStr
+                                );
+                                if (matchedOption) {
+                                    sel.value = matchedOption.value;
+                                    this.form[f.key] = matchedOption.value;
+                                }
+                            }
                         }
-                    }
+                    });
                 }
             });
         },
@@ -1026,6 +1134,13 @@ function crmShell() {
             (window.CRM_FORM_FIELDS || []).forEach(f => {
                 let val = c[f.key];
                 if ((val === undefined || val === null) && c.meta) val = c.meta[f.key];
+                if (val === undefined || val === null || String(val).trim() === '') {
+                    if (f.type === 'select' && f.auto_select && Array.isArray(f.options) && f.options.length > 0) {
+                        val = f.options[0];
+                    } else if (f.type === 'date') {
+                        val = this.todayYmd();
+                    }
+                }
                 if (val !== undefined && val !== null && (f.type === 'select' || f.key === 'status') && Array.isArray(f.options)) {
                     const match = f.options.find(opt => String(opt).trim().toLowerCase() === String(val).trim().toLowerCase());
                     if (match !== undefined) {
@@ -1264,6 +1379,145 @@ function crmShell() {
                 this.composeSending = false;
             }
         },
+        openPostUpdateConfirm(form) {
+            const followCheck = form.querySelector('[name="follow_up"]');
+            const followDate = form.querySelector('[name="follow_up_date"]');
+            const timeOn = form.querySelector('[name="follow_up_time_on"]');
+            const followTime = form.querySelector('[name="follow_up_time"]');
+            if (followCheck?.checked && !followDate?.value) {
+                alert('Follow-up date required when Follow up is checked.');
+                followDate?.focus();
+                return;
+            }
+            if (followCheck?.checked && timeOn?.checked && !followTime?.value) {
+                alert('Select a follow-up time, or uncheck Time.');
+                followTime?.focus();
+                return;
+            }
+
+            const changes = [];
+            const initStatus = (form.dataset.initialStatus || '').trim();
+            const statusEl = form.querySelector('[name="status_change"]');
+            const newStatus = (statusEl ? statusEl.value : '').trim();
+            if (newStatus && newStatus.toLowerCase() !== initStatus.toLowerCase()) {
+                changes.push({
+                    label: 'Status',
+                    from: initStatus ? initStatus : 'None',
+                    to: newStatus,
+                    changed: true
+                });
+            } else if (newStatus) {
+                changes.push({
+                    label: 'Status',
+                    from: null,
+                    to: newStatus,
+                    changed: false
+                });
+            }
+
+            const titleEl = form.querySelector('[name="title"]');
+            const titleVal = (titleEl ? titleEl.value : '').trim();
+            if (titleVal) {
+                changes.push({
+                    label: 'Internal Message / Title',
+                    from: null,
+                    to: titleVal,
+                    changed: true
+                });
+            }
+
+            const bodyEl = form.querySelector('[name="body"]');
+            const bodyVal = (bodyEl ? bodyEl.value : '').trim();
+            if (bodyVal) {
+                changes.push({
+                    label: 'Note / Feedback',
+                    from: null,
+                    to: bodyVal,
+                    changed: true
+                });
+            }
+
+            const imgInput = form.querySelector('input[type="file"][name="images[]"]');
+            if (imgInput && imgInput.files && imgInput.files.length > 0) {
+                const names = Array.from(imgInput.files).map(f => f.name).join(', ');
+                changes.push({
+                    label: 'Uploaded Images',
+                    from: null,
+                    to: `${imgInput.files.length} file(s): ${names}`,
+                    changed: true
+                });
+            }
+
+            const ufEls = form.querySelectorAll('[name^="update_fields["]');
+            ufEls.forEach(el => {
+                const label = el.dataset.fieldLabel || el.getAttribute('placeholder') || el.name;
+                const initVal = (el.dataset.initialValue || '').trim();
+                const curVal = (el.value || '').trim();
+                if (curVal !== initVal) {
+                    changes.push({
+                        label: label,
+                        from: initVal || 'Empty',
+                        to: curVal || 'Empty',
+                        changed: true
+                    });
+                } else if (curVal !== '') {
+                    changes.push({
+                        label: label,
+                        from: null,
+                        to: curVal,
+                        changed: false
+                    });
+                }
+            });
+
+            if (followCheck) {
+                const initFu = form.dataset.initialFu === '1';
+                const initFuDate = (form.dataset.initialFuDate || '').trim();
+                const initFuTime = (form.dataset.initialFuTime || '').trim();
+                const initFuSummary = initFu
+                    ? (initFuDate + (initFuTime ? ' ' + initFuTime : ''))
+                    : 'Off';
+
+                const curFu = !!followCheck.checked;
+                const curFuDate = (followDate ? followDate.value : '').trim();
+                const curFuTime = (timeOn && timeOn.checked && followTime ? followTime.value : '').trim();
+                const curFuSummary = curFu
+                    ? (curFuDate + (curFuTime ? ' ' + curFuTime : ''))
+                    : 'Off';
+
+                if (initFuSummary !== curFuSummary) {
+                    changes.push({
+                        label: 'Follow Up',
+                        from: initFuSummary,
+                        to: curFuSummary,
+                        changed: true
+                    });
+                } else if (curFu) {
+                    changes.push({
+                        label: 'Follow Up',
+                        from: null,
+                        to: curFuSummary,
+                        changed: false
+                    });
+                }
+            }
+
+            this.postUpdateFormEl = form;
+            this.postUpdateCustomerName = form.dataset.customerName || this.title || 'Customer';
+            this.postUpdateChanges = changes;
+            this.postUpdateModalOpen = true;
+        },
+        async confirmPostUpdate() {
+            if (!this.postUpdateFormEl || this.postUpdateSubmitting) return;
+            this.postUpdateSubmitting = true;
+            try {
+                await this.postActivity(this.postUpdateFormEl);
+                this.postUpdateModalOpen = false;
+                this.postUpdateFormEl = null;
+            } finally {
+                this.postUpdateSubmitting = false;
+            }
+        },
         async postActivity(form) {
             const followCheck = form.querySelector('[name="follow_up"]');
             const followDate = form.querySelector('[name="follow_up_date"]');
@@ -1337,6 +1591,8 @@ function toggleFollowUpFields(id, on) {
     const wrap = document.getElementById('followUpFields-' + id);
     const dateEl = document.getElementById('followUpDate-' + id);
     if (!wrap) return;
+    wrap.classList.toggle('hidden', !on);
+    wrap.classList.toggle('flex', !!on);
     wrap.style.display = on ? 'flex' : 'none';
     if (on && dateEl && !dateEl.value) dateEl.value = nextDayYmd();
 }
@@ -1356,10 +1612,91 @@ function handleStatusChangeFollowUp(id, statusVal) {
     }
 }
 function toggleFollowUpTime(id, on) {
+    const wrapEl = document.getElementById('followUpTimeWrap-' + id);
+    const timeEl = document.getElementById('followUpTime-' + id);
+    if (wrapEl) {
+        wrapEl.classList.toggle('hidden', !on);
+        wrapEl.classList.toggle('inline-flex', !!on);
+        wrapEl.style.display = on ? 'inline-flex' : 'none';
+    } else if (timeEl) {
+        timeEl.style.display = on ? 'inline-block' : 'none';
+    }
+    if (on && timeEl && !timeEl.value) timeEl.value = currentHm();
+}
+function shiftFollowUpDate(id, deltaDays) {
+    const dateEl = document.getElementById('followUpDate-' + id);
+    if (!dateEl) return;
+    const raw = (dateEl.value || '').trim();
+    let base = new Date();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+        const parts = raw.split('-').map(Number);
+        base = new Date(parts[0], parts[1] - 1, parts[2]);
+    }
+    base.setDate(base.getDate() + Number(deltaDays || 0));
+    dateEl.value = base.getFullYear() + '-' + pad2(base.getMonth() + 1) + '-' + pad2(base.getDate());
+}
+function shiftFollowUpTime(id, deltaMinutes) {
     const timeEl = document.getElementById('followUpTime-' + id);
     if (!timeEl) return;
-    timeEl.style.display = on ? 'inline-block' : 'none';
-    if (on && !timeEl.value) timeEl.value = currentHm();
+    const raw = (timeEl.value || '').trim();
+    const now = new Date();
+    let hours = now.getHours();
+    let mins = now.getMinutes();
+    if (/^\d{1,2}:\d{2}/.test(raw)) {
+        const parts = raw.split(':').map(Number);
+        hours = parts[0];
+        mins = parts[1];
+    }
+    let totalMins = (hours * 60 + mins + Number(deltaMinutes || 0)) % 1440;
+    if (totalMins < 0) totalMins += 1440;
+    timeEl.value = pad2(Math.floor(totalMins / 60)) + ':' + pad2(totalMins % 60);
+}
+function shiftInputDate(inp, deltaDays) {
+    if (!inp) return;
+    const raw = (inp.value || '').trim();
+    let base = new Date();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+        const parts = raw.split('-').map(Number);
+        base = new Date(parts[0], parts[1] - 1, parts[2]);
+    }
+    base.setDate(base.getDate() + Number(deltaDays || 0));
+    inp.value = base.getFullYear() + '-' + pad2(base.getMonth() + 1) + '-' + pad2(base.getDate());
+}
+function shiftInputTime(inp, deltaMinutes) {
+    if (!inp) return;
+    const raw = (inp.value || '').trim();
+    const now = new Date();
+    let hours = now.getHours();
+    let mins = now.getMinutes();
+    if (/^\d{1,2}:\d{2}/.test(raw)) {
+        const parts = raw.split(':').map(Number);
+        hours = parts[0];
+        mins = parts[1];
+    }
+    let totalMins = (hours * 60 + mins + Number(deltaMinutes || 0)) % 1440;
+    if (totalMins < 0) totalMins += 1440;
+    inp.value = pad2(Math.floor(totalMins / 60)) + ':' + pad2(totalMins % 60);
+}
+function updateImageFileLabel(inputEl) {
+    if (!inputEl) return;
+    const info = inputEl.closest('div')?.querySelector('[data-img-info]');
+    if (info) {
+        info.textContent = inputEl.files?.length
+            ? Array.from(inputEl.files).map(f => f.name).join(', ')
+            : 'No image selected';
+    }
+}
+function toggleMoreCustomerMessages(btnEl) {
+    if (!btnEl) return;
+    const cid = btnEl.dataset.cid;
+    const moreCount = btnEl.dataset.moreCount || '';
+    const items = document.querySelectorAll('[data-more-msg="' + cid + '"]');
+    const lbl = btnEl.querySelector('[data-view-more-label]');
+    let isHidden = false;
+    items.forEach(el => { isHidden = el.classList.toggle('hidden'); });
+    if (lbl) {
+        lbl.textContent = isHidden ? 'View More (' + moreCount + ' more)' : 'Show Less';
+    }
 }
 function applyNoteTemplate(form, title, body) {
     if (!form) return;

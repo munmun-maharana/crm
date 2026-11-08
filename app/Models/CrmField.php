@@ -21,6 +21,7 @@ class CrmField extends Model
         'in_table',
         'in_excel',
         'in_update',
+        'auto_select',
         'is_system',
         'sort_order',
     ];
@@ -35,6 +36,7 @@ class CrmField extends Model
             'in_table' => 'boolean',
             'in_excel' => 'boolean',
             'in_update' => 'boolean',
+            'auto_select' => 'boolean',
             'is_system' => 'boolean',
         ];
     }

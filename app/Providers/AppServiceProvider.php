@@ -42,6 +42,12 @@ class AppServiceProvider extends ServiceProvider
                 });
             }
 
+            if (Schema::hasTable('crm_fields') && ! Schema::hasColumn('crm_fields', 'auto_select')) {
+                Schema::table('crm_fields', function (Blueprint $table) {
+                    $table->boolean('auto_select')->default(false)->after('in_update');
+                });
+            }
+
             if (! Schema::hasTable('booking_slots')) {
                 Schema::create('booking_slots', function (Blueprint $table) {
                     $table->id();
