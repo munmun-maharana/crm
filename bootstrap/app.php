@@ -15,6 +15,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'admin' => \App\Http\Middleware\EnsureAdmin::class,
             'api.token' => \App\Http\Middleware\AuthenticateApiToken::class,
+            'api.mobile_json' => \App\Http\Middleware\MobileJsonResponse::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

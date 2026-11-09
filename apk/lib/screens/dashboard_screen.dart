@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
-
-import '../services/api.dart';
-import 'login_screen.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../models/customer.dart';
+import '../services/api_service.dart';
+import '../theme/app_theme.dart';
+import 'customer_detail_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
-  const DashboardScreen({super.key, this.embedded = false});
+  final Function(String? filter, String? status)? onNavigateToCrm;
 
-  final bool embedded;
+  const DashboardScreen({super.key, this.onNavigateToCrm});
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -15,577 +17,400 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   bool _loading = true;
   String? _error;
-  Map<String, dynamic>? _data;
+  List<Map<String, dynamic>> _statusCards = [];
+  Map<String, dynamic> _charts = {};
+  List<Customer> _recentLeads = [];
+  String? _whatsappPhone;
+  String _chartPeriod = 'week'; // 'week', 'month', 'year', 'falloff'
 
   @override
   void initState() {
     super.initState();
-    _load();
+    _loadDashboard();
   }
 
-  Future<void> _load() async {
+  Future<void> _loadDashboard() async {
     setState(() {
       _loading = true;
       _error = null;
     });
+
     try {
-      final data = await ApiClient.instance.dashboard();
-      if (!mounted) return;
-      setState(() {
-        _data = data;
-        _loading = false;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      final msg = e.toString().replaceFirst('Exception: ', '');
-      if (msg.contains('Session expired')) {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const LoginScreen()),
-        );
-        return;
+      final res = await ApiService.instance.dashboard();
+      if (mounted) {
+        setState(() {
+          _statusCards = (res['status_cards'] as List?)
+                  ?.whereType<Map>()
+                  .map((m) => Map<String, dynamic>.from(m))
+                  .toList() ??
+              [];
+          _charts = (res['charts'] is Map)
+              ? Map<String, dynamic>.from(res['charts'] as Map)
+              : {};
+          final rawRecent = (res['recent'] as List?) ?? [];
+          _recentLeads = rawRecent
+              .whereType<Map>()
+              .map((m) => Customer.fromJson(Map<String, dynamic>.from(m)))
+              .toList();
+          _whatsappPhone = res['whatsapp_target_phone']?.toString();
+          _loading = false;
+        });
       }
-      setState(() {
-        _error = msg;
-        _loading = false;
-      });
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = e.toString().replaceAll('Exception: ', '');
+          _loading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _openWhatsApp() async {
+    final phone = _whatsappPhone;
+    if (phone == null || phone.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('WhatsApp phone number not configured in Settings.')),
+      );
+      return;
+    }
+    final uri = Uri.parse('https://wa.me/$phone');
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    const brand = Color(0xFF0F6CBD);
-    final showCrm = ApiClient.instance.canAccessCrm && _data?['show_crm'] == true;
-    final showStock = ApiClient.instance.canAccessInventory;
-    final crm = _data?['crm'] as Map<String, dynamic>?;
-    final summary = _data?['stock_summary'] as Map<String, dynamic>? ?? {};
-    final byType = (_data?['stock_by_type'] as List?) ?? [];
-
-    Widget body;
     if (_loading) {
-      body = const Center(child: CircularProgressIndicator());
-    } else if (_error != null) {
-      body = Center(
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_error != null) {
+      return Center(
         child: Padding(
           padding: const EdgeInsets.all(24),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(_error!, textAlign: TextAlign.center),
+              const Icon(Icons.error_outline, size: 48, color: Colors.red),
               const SizedBox(height: 12),
-              FilledButton(onPressed: _load, child: const Text('Retry')),
+              Text(_error!, textAlign: TextAlign.center, style: const TextStyle(color: Colors.red)),
+              const SizedBox(height: 16),
+              ElevatedButton.icon(
+                onPressed: _loadDashboard,
+                icon: const Icon(Icons.refresh),
+                label: const Text('Try Again'),
+              ),
             ],
           ),
         ),
       );
-    } else {
-      body = RefreshIndicator(
-        onRefresh: _load,
-        child: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            if (showCrm && crm != null) ...[
-              const _SectionTitle('CRM'),
-              const SizedBox(height: 8),
-              Row(
+    }
+
+    return RefreshIndicator(
+      onRefresh: _loadDashboard,
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          // Quick WhatsApp bar
+          if (_whatsappPhone != null && _whatsappPhone!.isNotEmpty) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFDCFCE7),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFF86EFAC)),
+              ),
+              child: Row(
                 children: [
-                  Expanded(
-                    child: _StatCard(
-                      label: 'Total leads',
-                      value: '${crm['total'] ?? 0}',
-                      color: brand,
+                  const Icon(Icons.chat, color: Color(0xFF15803D), size: 20),
+                  const SizedBox(width: 10),
+                  const Expanded(
+                    child: Text(
+                      'Official WhatsApp Support & Alerts',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF166534)),
                     ),
                   ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: _StatCard(
-                      label: 'Today',
-                      value: '${crm['today'] ?? 0}',
-                      color: const Color(0xFF0F766E),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF16A34A),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: _StatCard(
-                      label: 'Today F/ups',
-                      value: '${crm['follow_up'] ?? 0}',
-                      color: const Color(0xFFB45309),
-                    ),
+                    onPressed: _openWhatsApp,
+                    child: const Text('Open WhatsApp', style: TextStyle(fontSize: 12)),
                   ),
                 ],
               ),
-              if (showStock) const SizedBox(height: 20),
-            ],
-            if (showStock) ...[
-              const _SectionTitle('My stock'),
-              const SizedBox(height: 8),
-              _StockDonut(
-                total: (summary['total'] as num?)?.toInt() ?? 0,
-                inStock: (summary['in_stock'] as num?)?.toInt() ?? 0,
-                assigned: (summary['assigned'] as num?)?.toInt() ?? 0,
-                damaged: (summary['damaged'] as num?)?.toInt() ?? 0,
-                repair: (summary['repair'] as num?)?.toInt() ?? 0,
-              ),
-              if (byType.isNotEmpty) ...[
-                const SizedBox(height: 20),
-                const _SectionTitle('By type'),
-                const SizedBox(height: 8),
-                _ByTypeChart(
-                  rows: byType
-                      .map((raw) => Map<String, dynamic>.from(raw as Map))
-                      .toList(),
-                ),
-              ],
-            ],
-            if (!showCrm && !showStock)
-              const Padding(
-                padding: EdgeInsets.only(top: 40),
-                child: Center(
-                  child: Text(
-                    'No dashboard modules enabled for your access.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: Color(0xFF94A3B8)),
-                  ),
-                ),
-              ),
+            ),
+            const SizedBox(height: 14),
           ],
-        ),
-      );
-    }
 
-    if (widget.embedded) return body;
+          // Status Cards Grid
+          const Text(
+            'PIPELINE OVERVIEW',
+            style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 0.8, color: AppTheme.textMuted),
+          ),
+          const SizedBox(height: 8),
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF3F2F1),
-      body: body,
-    );
-  }
-}
-
-class _SectionTitle extends StatelessWidget {
-  const _SectionTitle(this.text);
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      text.toUpperCase(),
-      style: const TextStyle(
-        fontSize: 11,
-        letterSpacing: 1.1,
-        fontWeight: FontWeight.w800,
-        color: Color(0xFF64748B),
-      ),
-    );
-  }
-}
-
-class _StatCard extends StatelessWidget {
-  const _StatCard({
-    required this.label,
-    required this.value,
-    required this.color,
-  });
-
-  final String label;
-  final String value;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFEDEBE9)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label.toUpperCase(),
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w800,
-              color: color.withValues(alpha: 0.8),
-              letterSpacing: 0.6,
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: _statusCards.length,
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              crossAxisSpacing: 10,
+              mainAxisSpacing: 10,
+              childAspectRatio: 1.8,
             ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.w800,
-              color: Color(0xFF201F1E),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
+            itemBuilder: (context, index) {
+              final card = _statusCards[index];
+              final label = card['label']?.toString() ?? '';
+              final value = card['value']?.toString() ?? '0';
+              final filter = card['filter']?.toString();
+              final status = card['status']?.toString();
 
-class _StockDonut extends StatelessWidget {
-  const _StockDonut({
-    required this.total,
-    required this.inStock,
-    required this.assigned,
-    required this.damaged,
-    required this.repair,
-  });
+              Color bg = AppTheme.statusBg(status ?? label);
+              Color border = AppTheme.statusBorder(status ?? label);
+              Color textCol = AppTheme.statusText(status ?? label);
 
-  final int total;
-  final int inStock;
-  final int assigned;
-  final int damaged;
-  final int repair;
+              if (filter == 'follow_up_today') {
+                bg = const Color(0xFFFFEDD5);
+                border = const Color(0xFFFED7AA);
+                textCol = const Color(0xFFC2410C);
+              }
 
-  static const _colors = {
-    'In stock': Color(0xFF047857),
-    'Assigned': Color(0xFF0F6CBD),
-    'Damaged': Color(0xFFB45309),
-    'Repair': Color(0xFF7C3AED),
-  };
-
-  @override
-  Widget build(BuildContext context) {
-    final slices = <MapEntry<String, int>>[
-      MapEntry('In stock', inStock),
-      MapEntry('Assigned', assigned),
-      MapEntry('Damaged', damaged),
-      MapEntry('Repair', repair),
-    ];
-    final sum = slices.fold<int>(0, (a, e) => a + e.value);
-    final paintSlices = slices
-        .where((e) => e.value > 0)
-        .map(
-          (e) => _DonutSlice(
-            value: e.value.toDouble(),
-            color: _colors[e.key]!,
-          ),
-        )
-        .toList();
-
-    return Container(
-      padding: const EdgeInsets.fromLTRB(14, 16, 14, 14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFEDEBE9)),
-      ),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 120,
-            height: 120,
-            child: CustomPaint(
-              painter: _DonutPainter(
-                slices: paintSlices.isEmpty
-                    ? [
-                        const _DonutSlice(
-                          value: 1,
-                          color: Color(0xFFE2E8F0),
+              return InkWell(
+                onTap: () {
+                  widget.onNavigateToCrm?.call(filter, status);
+                },
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: bg,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: border),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        label,
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.bold,
+                          color: textCol.withValues(alpha: 0.9),
                         ),
-                      ]
-                    : paintSlices,
-              ),
-              child: Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      '$total',
-                      style: const TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w800,
-                        color: Color(0xFF201F1E),
-                        height: 1,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                    ),
-                    const SizedBox(height: 2),
-                    const Text(
-                      'TOTAL',
-                      style: TextStyle(
-                        fontSize: 9,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF94A3B8),
-                        letterSpacing: 0.5,
+                      const SizedBox(height: 4),
+                      Text(
+                        value,
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w800,
+                          color: textCol,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-            ),
+              );
+            },
           ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                for (final e in slices)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 8,
-                          height: 8,
-                          decoration: BoxDecoration(
-                            color: _colors[e.key],
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            e.key,
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFF475569),
-                            ),
-                          ),
-                        ),
-                        Text(
-                          '${e.value}',
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w800,
-                            color: Color(0xFF201F1E),
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          sum > 0
-                              ? '${((e.value / sum) * 100).round()}%'
-                              : '0%',
-                          style: const TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFF94A3B8),
-                          ),
-                        ),
-                      ],
-                    ),
+          const SizedBox(height: 20),
+
+          // Analytics / Trends Chart Card
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Lead Performance',
+                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                      ),
+                      DropdownButton<String>(
+                        value: _chartPeriod,
+                        underline: const SizedBox(),
+                        items: const [
+                          DropdownMenuItem(value: 'week', child: Text('7 Days', style: TextStyle(fontSize: 12))),
+                          DropdownMenuItem(value: 'month', child: Text('12 Months', style: TextStyle(fontSize: 12))),
+                          DropdownMenuItem(value: 'year', child: Text('5 Years', style: TextStyle(fontSize: 12))),
+                          DropdownMenuItem(value: 'falloff', child: Text('Distribution', style: TextStyle(fontSize: 12))),
+                        ],
+                        onChanged: (v) {
+                          if (v != null) setState(() => _chartPeriod = v);
+                        },
+                      ),
+                    ],
                   ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _DonutSlice {
-  const _DonutSlice({required this.value, required this.color});
-  final double value;
-  final Color color;
-}
-
-class _DonutPainter extends CustomPainter {
-  _DonutPainter({required this.slices});
-
-  final List<_DonutSlice> slices;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
-    final radius = size.shortestSide / 2;
-    final rect = Rect.fromCircle(center: center, radius: radius);
-    final total = slices.fold<double>(0, (a, s) => a + s.value);
-    if (total <= 0) return;
-
-    var start = -1.57079632679; // -pi/2
-    final paint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = radius * 0.32
-      ..strokeCap = StrokeCap.butt;
-
-    for (final slice in slices) {
-      final sweep = (slice.value / total) * 6.28318530718;
-      paint.color = slice.color;
-      canvas.drawArc(rect.deflate(paint.strokeWidth / 2), start, sweep, false, paint);
-      start += sweep;
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _DonutPainter oldDelegate) =>
-      oldDelegate.slices != slices;
-}
-
-class _ByTypeChart extends StatelessWidget {
-  const _ByTypeChart({required this.rows});
-
-  final List<Map<String, dynamic>> rows;
-
-  @override
-  Widget build(BuildContext context) {
-    final maxVal = rows
-        .map((r) => ((r['total'] as num?) ?? 0).toDouble())
-        .fold<double>(0, (a, b) => a > b ? a : b);
-    final scale = maxVal <= 0 ? 1.0 : maxVal;
-
-    return Container(
-      padding: const EdgeInsets.fromLTRB(14, 14, 14, 10),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFEDEBE9)),
-      ),
-      child: Column(
-        children: [
-          Row(
-            children: const [
-              _LegendDot(color: Color(0xFF0F6CBD), label: 'Total'),
-              SizedBox(width: 14),
-              _LegendDot(color: Color(0xFF047857), label: 'In stock'),
-            ],
-          ),
-          const SizedBox(height: 16),
-          SizedBox(
-            height: 160,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                for (final row in rows) ...[
-                  Expanded(
-                    child: _TypeBars(
-                      name: '${row['name'] ?? ''}',
-                      total: ((row['total'] as num?) ?? 0).toDouble(),
-                      inStock: ((row['in_stock'] as num?) ?? 0).toDouble(),
-                      scale: scale,
-                    ),
-                  ),
+                  const SizedBox(height: 12),
+                  _buildChartPreview(),
                 ],
-              ],
+              ),
             ),
           ),
-        ],
-      ),
-    );
-  }
-}
+          const SizedBox(height: 20),
 
-class _LegendDot extends StatelessWidget {
-  const _LegendDot({required this.color, required this.label});
-  final Color color;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 8,
-          height: 8,
-          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-        ),
-        const SizedBox(width: 6),
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w600,
-            color: Color(0xFF64748B),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _TypeBars extends StatelessWidget {
-  const _TypeBars({
-    required this.name,
-    required this.total,
-    required this.inStock,
-    required this.scale,
-  });
-
-  final String name;
-  final double total;
-  final double inStock;
-  final double scale;
-
-  @override
-  Widget build(BuildContext context) {
-    const barMax = 110.0;
-    final totalH = (total / scale) * barMax;
-    final inH = (inStock / scale) * barMax;
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.end,
-        children: [
+          // Recent Leads List
           Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Expanded(
-                child: Column(
-                  children: [
-                    Text(
-                      '${total.toInt()}',
-                      style: const TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF0F6CBD),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Container(
-                      height: totalH.clamp(4, barMax),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF0F6CBD),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                    ),
-                  ],
-                ),
+              const Text(
+                'RECENT LEADS',
+                style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 0.8, color: AppTheme.textMuted),
               ),
-              const SizedBox(width: 4),
-              Expanded(
-                child: Column(
-                  children: [
-                    Text(
-                      '${inStock.toInt()}',
-                      style: const TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF047857),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Container(
-                      height: inH.clamp(4, barMax),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF047857),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                    ),
-                  ],
-                ),
+              TextButton(
+                onPressed: () => widget.onNavigateToCrm?.call(null, null),
+                child: const Text('View All →', style: TextStyle(fontSize: 12)),
               ),
             ],
           ),
           const SizedBox(height: 8),
-          Text(
-            name,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w700,
-              color: Color(0xFF475569),
-              height: 1.15,
+
+          if (_recentLeads.isEmpty)
+            const Card(
+              child: Padding(
+                padding: EdgeInsets.all(24),
+                child: Center(
+                  child: Text('No leads found.', style: TextStyle(color: AppTheme.textMuted)),
+                ),
+              ),
+            )
+          else
+            ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: _recentLeads.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 8),
+              itemBuilder: (context, index) {
+                final lead = _recentLeads[index];
+                return Card(
+                  child: ListTile(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                    leading: CircleAvatar(
+                      backgroundColor: AppTheme.primarySoft,
+                      child: Text(
+                        lead.name.isNotEmpty ? lead.name[0].toUpperCase() : '?',
+                        style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.primary),
+                      ),
+                    ),
+                    title: Text(
+                      lead.name,
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                    ),
+                    subtitle: Text(
+                      '${lead.phone ?? "No phone"} • ${lead.city ?? "No city"}',
+                      style: const TextStyle(fontSize: 12, color: AppTheme.textMuted),
+                    ),
+                    trailing: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: AppTheme.statusBg(lead.status),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: AppTheme.statusBorder(lead.status)),
+                          ),
+                          child: Text(
+                            (lead.status ?? 'New').toUpperCase(),
+                            style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.statusText(lead.status)),
+                          ),
+                        ),
+                        if (lead.followUpAt != null) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            lead.followUpLabel ?? '',
+                            style: const TextStyle(fontSize: 10, color: AppTheme.amberText, fontWeight: FontWeight.bold),
+                          ),
+                        ],
+                      ],
+                    ),
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => CustomerDetailScreen(customerId: lead.id),
+                        ),
+                      );
+                    },
+                  ),
+                );
+              },
             ),
-          ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildChartPreview() {
+    final Map<String, dynamic> chartData = _charts[_chartPeriod] is Map
+        ? Map<String, dynamic>.from(_charts[_chartPeriod] as Map)
+        : {};
+
+    final labels = (chartData['labels'] as List?)?.map((e) => e.toString()).toList() ?? [];
+    final data = (chartData['data'] as List?)?.map((e) => (e as num).toInt()).toList() ?? [];
+
+    if (labels.isEmpty || data.isEmpty) {
+      return const SizedBox(
+        height: 120,
+        child: Center(child: Text('No chart data available', style: TextStyle(color: AppTheme.textMuted))),
+      );
+    }
+
+    final maxVal = data.fold<int>(1, (prev, elem) => elem > prev ? elem : prev);
+
+    return SizedBox(
+      height: 160,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: List.generate(labels.length, (i) {
+          final val = data[i];
+          final heightFactor = (val / maxVal).clamp(0.05, 1.0);
+          return Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  Text(val.toString(), style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 4),
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 300),
+                    height: 100 * heightFactor,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.bottomCenter,
+                        end: Alignment.topCenter,
+                        colors: [
+                          AppTheme.primary,
+                          AppTheme.primary.withValues(alpha: 0.7),
+                        ],
+                      ),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    labels[i],
+                    style: const TextStyle(fontSize: 10, color: AppTheme.textMuted),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+          );
+        }),
       ),
     );
   }

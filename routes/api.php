@@ -5,6 +5,9 @@ use App\Http\Controllers\Api\MobileCrmController;
 use App\Http\Controllers\Api\MobileDashboardController;
 use Illuminate\Support\Facades\Route;
 
+// Dedicated API v1 endpoints for the Flutter mobile application
+Route::prefix('v1')->group(base_path('routes/api_v1.php'));
+
 Route::prefix('mobile')->group(function () {
     Route::post('/login', [MobileAuthController::class, 'login']);
 
