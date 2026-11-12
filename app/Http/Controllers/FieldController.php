@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\CrmField;
 use App\Models\Customer;
+use App\Models\Pincode;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -62,8 +63,8 @@ class FieldController extends Controller
             'active' => true,
             'in_form' => $request->boolean('in_form', true),
             'in_table' => $request->boolean('in_table'),
-            'in_excel' => $pipeline === 'crm' ? $request->boolean('in_excel', true) : false,
-            'in_update' => in_array($pipeline, ['crm', 'operations'], true) ? $request->boolean('in_update') : false,
+            'in_excel' => in_array($pipeline, ['crm', 'call_crm', 'pincodes'], true) ? $request->boolean('in_excel', true) : false,
+            'in_update' => in_array($pipeline, ['crm', 'call_crm', 'operations'], true) ? $request->boolean('in_update') : false,
             'auto_select' => $request->boolean('auto_select'),
             'is_system' => false,
             'sort_order' => $maxSort + 1,
@@ -72,8 +73,14 @@ class FieldController extends Controller
         if ($pipeline === 'operations') {
             return redirect()->route('settings.index', ['tab' => 'op-fields'])->with('success', 'Operation field added. Map it to a CRM field to copy data on Assign.');
         }
+        if ($pipeline === 'call_crm') {
+            return redirect()->route('settings.index', ['tab' => 'call-crm-fields'])->with('success', 'Call CRM field added.');
+        }
         if ($pipeline === 'users') {
             return redirect()->route('settings.index', ['tab' => 'user-fields'])->with('success', 'User field added.');
+        }
+        if ($pipeline === 'pincodes') {
+            return redirect()->route('settings.index', ['tab' => 'pincode-fields'])->with('success', 'Pincode field added.');
         }
 
         return redirect()->route('settings.index', ['tab' => 'fields'])->with('success', 'Field added.');
@@ -106,7 +113,7 @@ class FieldController extends Controller
         $inUpdate = $request->boolean('in_update');
         $autoSelect = $request->boolean('auto_select');
 
-        if ($field->key === 'name') {
+        if (in_array($field->key, ['name', 'pincode'], true)) {
             $required = true;
             $active = true;
             $inForm = true;
@@ -139,7 +146,7 @@ class FieldController extends Controller
             'in_form' => $inForm,
             'in_table' => $field->pipeline === 'operations' ? $field->in_table : $inTable,
             'in_excel' => $field->pipeline === 'operations' ? false : $inExcel,
-            'in_update' => in_array($field->pipeline, ['crm', 'operations'], true) ? $inUpdate : false,
+            'in_update' => in_array($field->pipeline, ['crm', 'call_crm', 'operations'], true) ? $inUpdate : false,
             'auto_select' => $autoSelect,
             'sort_order' => $data['sort_order'] ?? $field->sort_order,
             'maps_from' => $mapsFrom,
@@ -148,8 +155,14 @@ class FieldController extends Controller
         if ($field->pipeline === 'operations') {
             return redirect()->route('settings.index', ['tab' => 'op-fields'])->with('success', 'Operation field updated.');
         }
+        if ($field->pipeline === 'call_crm') {
+            return redirect()->route('settings.index', ['tab' => 'call-crm-fields'])->with('success', 'Call CRM field updated.');
+        }
         if ($field->pipeline === 'users') {
             return redirect()->route('settings.index', ['tab' => 'user-fields'])->with('success', 'User field updated.');
+        }
+        if ($field->pipeline === 'pincodes') {
+            return redirect()->route('settings.index', ['tab' => 'pincode-fields'])->with('success', 'Pincode field updated.');
         }
 
         return redirect()->route('settings.index', ['tab' => 'fields'])->with('success', 'Field updated.');
@@ -159,6 +172,10 @@ class FieldController extends Controller
     {
         if ($field->key === 'name') {
             return back()->withErrors(['field' => 'The Name field is required by the system and cannot be deleted.']);
+        }
+
+        if ($field->pipeline === 'pincodes' && $field->key === 'pincode') {
+            return back()->withErrors(['field' => 'The Pincode field is required by the system and cannot be deleted.']);
         }
 
         if ($field->pipeline === 'users' && in_array($field->key, CrmField::USER_CORE_KEYS, true)) {
@@ -212,6 +229,28 @@ class FieldController extends Controller
             return redirect()->route('settings.index', ['tab' => 'op-fields'])->with('success', 'Operation field deleted.');
         }
 
+        if ($pipeline === 'call_crm') {
+            Customer::query()->inPipeline('call_crm')->orderBy('id')->chunkById(100, function ($rows) use ($key) {
+                foreach ($rows as $customer) {
+                    $meta = $customer->meta ?? [];
+                    if (is_array($meta) && array_key_exists($key, $meta)) {
+                        unset($meta[$key]);
+                        $customer->meta = $meta ?: null;
+                    }
+                    if (in_array($key, CrmField::CORE_KEYS, true) && $key !== 'name') {
+                        if ($key === 'status') {
+                            $customer->status = 'new';
+                        } else {
+                            $customer->{$key} = null;
+                        }
+                    }
+                    $customer->save();
+                }
+            });
+
+            return redirect()->route('settings.index', ['tab' => 'call-crm-fields'])->with('success', 'Call CRM field deleted.');
+        }
+
         if ($pipeline === 'users') {
             User::query()->orderBy('id')->chunkById(100, function ($rows) use ($key) {
                 foreach ($rows as $user) {
@@ -226,6 +265,28 @@ class FieldController extends Controller
             });
 
             return redirect()->route('settings.index', ['tab' => 'user-fields'])->with('success', 'User field deleted.');
+        }
+
+        if ($pipeline === 'pincodes') {
+            Pincode::query()->orderBy('id')->chunkById(100, function ($rows) use ($key) {
+                foreach ($rows as $pincodeRow) {
+                    $meta = $pincodeRow->meta ?? [];
+                    if (is_array($meta) && array_key_exists($key, $meta)) {
+                        unset($meta[$key]);
+                        $pincodeRow->meta = $meta ?: null;
+                    }
+                    if (in_array($key, CrmField::PINCODE_CORE_KEYS, true) && $key !== 'pincode') {
+                        if ($key === 'status') {
+                            $pincodeRow->status = 'Serviceable';
+                        } else {
+                            $pincodeRow->{$key} = null;
+                        }
+                    }
+                    $pincodeRow->save();
+                }
+            });
+
+            return redirect()->route('settings.index', ['tab' => 'pincode-fields'])->with('success', 'Pincode field deleted.');
         }
 
         return redirect()->route('settings.index', ['tab' => 'fields'])->with('success', 'Field deleted. Existing values cleared.');

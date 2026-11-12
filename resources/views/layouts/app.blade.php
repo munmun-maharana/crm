@@ -108,8 +108,14 @@
                 if ($navUser->canAccessCrm()) {
                     $links[] = ['customers.index', 'CRM'];
                 }
+                if ($navUser->canAccessCallCrm()) {
+                    $links[] = ['call-crm.index', 'CALL CRM'];
+                }
                 if ($navUser->canAccessOperations()) {
                     $links[] = ['operations.index', 'TEAM OPS'];
+                }
+                if ($navUser->canAccessPincodes()) {
+                    $links[] = ['pincodes.index', 'Pincode Manager'];
                 }
                 if ($navUser->isAdmin()) {
                     $links = array_merge($links, [
@@ -695,9 +701,9 @@ function crmShell() {
         html: '',
         loading: false,
         deskKey: 0,
-        formOpen: false,
+        formOpen: {{ $errors->any() && ! $errors->updatePassword->any() ? 'true' : 'false' }},
         formMode: 'create',
-        form: { id: null },
+        form: @json(old() ? array_merge(['id' => null], old()) : ['id' => null]),
         composeOpen: false,
         composeSending: false,
         compose: { channel: 'whatsapp', customerId: null, customer: null, name: '', phone: '', email: '', message: '', subject: '', link: '' },
@@ -1085,6 +1091,48 @@ function crmShell() {
             const nextH = Math.floor(totalMins / 60);
             const nextM = totalMins % 60;
             this.form[key] = String(nextH).padStart(2, '0') + ':' + String(nextM).padStart(2, '0');
+        },
+        async onPincodeInput(pin) {
+            const clean = String(pin || '').replace(/\D/g, '').trim();
+            if (!clean) return;
+            const dir = window.PINCODE_DIRECTORY || [];
+            const match = dir.find(p => String(p.pincode).trim() === clean);
+            if (match && match.area) {
+                this.setAreaValue(match.area, match.city);
+                return;
+            }
+            if (clean.length === 6) {
+                try {
+                    const res = await fetch(`https://api.postalpincode.in/pincode/${encodeURIComponent(clean)}`);
+                    const data = await res.json();
+                    const first = Array.isArray(data) ? data[0] : null;
+                    const offices = first && Array.isArray(first.PostOffice) ? first.PostOffice : [];
+                    if (offices.length > 0 && offices[0].Name) {
+                        this.setAreaValue(offices[0].Name, offices[0].District);
+                    }
+                } catch (e) {}
+            }
+        },
+        setAreaValue(areaName, cityName) {
+            if (!areaName) return;
+            this.form['area'] = areaName;
+            this.form = { ...this.form, area: areaName };
+            const areaInputs = document.querySelectorAll('input[name="area"], input[name="ariya"], #formFieldArea');
+            areaInputs.forEach(el => {
+                el.value = areaName;
+                el.dispatchEvent(new Event('input', { bubbles: true }));
+                el.dispatchEvent(new Event('change', { bubbles: true }));
+            });
+            if (cityName && (!this.form['city'] || this.form['city'] === '')) {
+                this.form['city'] = cityName;
+                this.form = { ...this.form, city: cityName };
+                const cityInputs = document.querySelectorAll('input[name="city"]');
+                cityInputs.forEach(el => {
+                    el.value = cityName;
+                    el.dispatchEvent(new Event('input', { bubbles: true }));
+                    el.dispatchEvent(new Event('change', { bubbles: true }));
+                });
+            }
         },
         openCreateForm() {
             this.formMode = 'create';

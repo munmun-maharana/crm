@@ -17,7 +17,7 @@ class SettingsController extends Controller
 {
     public function index(Request $request): View
     {
-        $allowed = ['fields', 'notes', 'whatsapp', 'booking-slots', 'op-assign', 'op-fields', 'user-fields', 'security'];
+        $allowed = ['fields', 'call-crm-fields', 'notes', 'whatsapp', 'booking-slots', 'op-assign', 'op-fields', 'user-fields', 'pincode-fields', 'security'];
         $tab = $request->string('tab')->toString();
         if (! in_array($tab, $allowed, true)) {
             $tab = 'fields';
@@ -46,6 +46,7 @@ class SettingsController extends Controller
             ->get();
 
         $fields = CrmField::inPipeline('crm')->ordered()->get();
+        $callCrmFields = CrmField::inPipeline('call_crm')->ordered()->get();
         $templates = NoteTemplate::ordered()->get();
         $setting = OperationSetting::current();
         $bookingSlotSetting = BookingSlotSetting::current();
@@ -53,12 +54,14 @@ class SettingsController extends Controller
         $statuses = $this->statusOptions();
         $opFields = CrmField::inPipeline('operations')->ordered()->get();
         $userFields = CrmField::inPipeline('users')->ordered()->get();
+        $pincodeFields = CrmField::inPipeline('pincodes')->ordered()->get();
         $inventoryTypes = InventoryType::ordered()->get();
         $crmFields = $fields->map(fn ($f) => (object) ['id' => $f->id, 'key' => $f->key, 'label' => $f->label]);
 
         return view('settings.index', compact(
             'tab',
             'fields',
+            'callCrmFields',
             'templates',
             'setting',
             'bookingSlotSetting',
@@ -66,6 +69,7 @@ class SettingsController extends Controller
             'statuses',
             'opFields',
             'userFields',
+            'pincodeFields',
             'inventoryTypes',
             'crmFields',
             'slotDate',

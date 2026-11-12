@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', ($pipeline ?? 'crm') === 'operations' ? 'TEAM OPS' : 'CRM')
+@section('title', ($pipeline ?? 'crm') === 'operations' ? 'TEAM OPS' : (($pipeline ?? 'crm') === 'call_crm' ? 'CALL CRM' : 'CRM'))
 
 @section('split')
 @php
@@ -37,7 +37,7 @@
                 <label class="crm-toolbar-search">
                     <svg class="w-4 h-4 text-rose-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M11 18a7 7 0 100-14 7 7 0 000 14z"/></svg>
                     <input type="text" name="q" id="crmSearch" value="{{ $q }}"
-                           placeholder="Search name, phone, email…"
+                           placeholder="{{ ($pipeline ?? 'crm') === 'call_crm' ? 'Search name, phone, area, pin…' : 'Search name, phone, email…' }}"
                            autocomplete="off">
                 </label>
                 <span class="crm-toolbar-split"></span>
@@ -47,7 +47,16 @@
                         <option value="{{ $s }}" @selected(strtolower((string)$status)===strtolower((string)$s))>{{ ucfirst($s) }}</option>
                     @endforeach
                 </select>
-                @if(auth()->user()->canSeeAllRecords())
+                @if(($pipeline ?? 'crm') === 'call_crm')
+                    <span class="crm-toolbar-split"></span>
+                    <select name="area" id="crmArea" class="crm-toolbar-select" title="Filter by Area">
+                        <option value="">All Areas</option>
+                        @foreach($areaOptions ?? [] as $aOpt)
+                            <option value="{{ $aOpt }}" @selected(strtolower((string)($area ?? '')) === strtolower((string)$aOpt))>{{ $aOpt }}</option>
+                        @endforeach
+                    </select>
+                @endif
+                @if(auth()->user()->canSeeAllRecords() && ($pipeline ?? 'crm') !== 'call_crm')
                     <span class="crm-toolbar-split"></span>
                     <select name="assigned_to" id="crmAssigned" class="crm-toolbar-select" title="Mapped user">
                         <option value="">All users</option>
@@ -72,6 +81,7 @@
                     'q' => $q ?: null,
                     'status' => $status ?: null,
                     'assigned_to' => $assignedTo ?: null,
+                    'area' => ($area ?? '') ?: null,
                     'filter' => $isTodayFuActive ? null : 'follow_up_today',
                 ])) }}"
                title="{{ $isTodayFuActive ? 'Showing Today Follow-up (Click to show all)' : 'Filter Today Follow-up' }}"
@@ -80,13 +90,15 @@
                 <span>Today Follow-up</span>
             </a>
 
-            <button type="button" title="Booking Slots"
-                    @click="toggleBookingSlots()"
-                    :class="bookingSlotsOpen ? 'bg-indigo-700 text-white ring-2 ring-indigo-300' : 'bg-indigo-600 text-white hover:bg-indigo-700'"
-                    class="h-9 inline-flex items-center gap-1.5 rounded-lg px-3 text-[12px] font-semibold transition">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-                <span>Booking Slots</span>
-            </button>
+            @if(($pipeline ?? 'crm') !== 'call_crm')
+                <button type="button" title="Booking Slots"
+                        @click="toggleBookingSlots()"
+                        :class="bookingSlotsOpen ? 'bg-indigo-700 text-white ring-2 ring-indigo-300' : 'bg-indigo-600 text-white hover:bg-indigo-700'"
+                        class="h-9 inline-flex items-center gap-1.5 rounded-lg px-3 text-[12px] font-semibold transition">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                    <span>Booking Slots</span>
+                </button>
+            @endif
 
             <button type="button" title="Add customer" @click="openCreateForm()"
                     class="h-9 inline-flex items-center gap-1.5 rounded-lg bg-brand text-white hover:bg-brand-dark px-3 text-[12px] font-semibold">
@@ -110,6 +122,18 @@
             @if(!empty($cItem->name))
                 <option value="{{ $cItem->name }}">{{ $cItem->phone }}</option>
             @endif
+        @endforeach
+    </datalist>
+
+    <datalist id="pincodeDirectoryList">
+        @foreach($pincodeDirectory ?? [] as $pItem)
+            <option value="{{ $pItem->pincode }}">{{ $pItem->area ? $pItem->area . ($pItem->city ? ', ' . $pItem->city : '') : '' }}</option>
+        @endforeach
+    </datalist>
+
+    <datalist id="areaDirectoryList">
+        @foreach($areaOptions ?? [] as $aOpt)
+            <option value="{{ $aOpt }}">{{ $aOpt }}</option>
         @endforeach
     </datalist>
 
@@ -335,7 +359,7 @@
                 <table class="w-full text-[13px]">
                     <thead class="bg-indigo-100/75 text-indigo-950 text-[11px] uppercase tracking-wide border-b border-indigo-200/80">
                         <tr>
-                            @if(auth()->user()->canSeeAllRecords())
+                            @if(auth()->user()->canSeeAllRecords() && ($pipeline ?? 'crm') !== 'call_crm')
                                 <th class="text-left font-bold px-3 py-2.5 w-10">
                                     <button type="button" class="crm-check"
                                             :class="pageSelected(@js($pageIds)) ? 'on' : ''"
@@ -359,7 +383,7 @@
                         @forelse($customers as $c)
                             <tr class="border-t border-line hover:bg-mist/70 table-row-press" @click="selectCustomer({{ $c->id }})"
                                 :class="isSelected({{ (int) $c->id }}) ? 'bg-brand-soft/40' : ''">
-                                @if(auth()->user()->canSeeAllRecords())
+                                @if(auth()->user()->canSeeAllRecords() && ($pipeline ?? 'crm') !== 'call_crm')
                                     <td class="px-3 py-2.5" @click.stop>
                                         <button type="button" class="crm-check"
                                                 :class="isSelected({{ (int) $c->id }}) ? 'on' : ''"
@@ -461,7 +485,7 @@
                                 </td>
                             </tr>
                         @empty
-                            <tr><td colspan="{{ $tableFields->count() + (auth()->user()->canSeeAllRecords() ? 1 : 0) + ((($pipeline ?? 'crm') === 'operations') ? 1 : 0) + 2 }}" class="px-4 py-10 text-center text-slate-400">{{ auth()->user()->canSeeAllRecords() ? 'No customers found' : 'No customers mapped to you' }}</td></tr>
+                            <tr><td colspan="{{ $tableFields->count() + ((auth()->user()->canSeeAllRecords() && ($pipeline ?? 'crm') !== 'call_crm') ? 1 : 0) + ((($pipeline ?? 'crm') === 'operations') ? 1 : 0) + 2 }}" class="px-4 py-10 text-center text-slate-400">{{ auth()->user()->canSeeAllRecords() ? 'No customers found' : 'No customers mapped to you' }}</td></tr>
                         @endforelse
                     </tbody>
                 </table>
@@ -501,7 +525,9 @@
                                         @click="selectCustomer({{ $c->id }})">
                                     <div class="flex items-center justify-between gap-1.5">
                                         <div class="font-semibold text-[12.5px] text-ink truncate">{{ $c->name }}</div>
-                                        <div class="text-[10px] text-slate-400 shrink-0 truncate max-w-[85px]" title="{{ $c->assignee?->name ?: 'Unassigned' }}">{{ $c->assignee?->name ?: 'Unassigned' }}</div>
+                                        @if(($pipeline ?? 'crm') !== 'call_crm')
+                                            <div class="text-[10px] text-slate-400 shrink-0 truncate max-w-[85px]" title="{{ $c->assignee?->name ?: 'Unassigned' }}">{{ $c->assignee?->name ?: 'Unassigned' }}</div>
+                                        @endif
                                     </div>
                                     @if(($pipeline ?? 'crm') === 'operations' && $c->source_customer_id)
                                         <div class="text-[10px] text-brand font-semibold mt-0.5">CRM #{{ $c->source_customer_id }}</div>
@@ -537,7 +563,7 @@
             </template>
         </div>
 
-        @if(auth()->user()->canSeeAllRecords() && $customers->isNotEmpty())
+        @if(auth()->user()->canSeeAllRecords() && ($pipeline ?? 'crm') !== 'call_crm' && $customers->isNotEmpty())
             <form method="POST" action="{{ route('customers.bulk-map') }}"
                   x-show="selectedIds.length > 0 && !selectedId"
                   x-cloak
@@ -667,6 +693,32 @@
                                 class="w-full rounded-lg border border-line px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-brand/20"
                                 @required($field->required)
                             >
+                        @elseif($field->key === 'pincode' || $field->key === 'pin')
+                            <input
+                                id="formFieldPincode"
+                                name="{{ $field->key }}"
+                                x-model="form['{{ $field->key }}']"
+                                type="text"
+                                inputmode="numeric"
+                                list="pincodeDirectoryList"
+                                @input="onPincodeInput($event.target.value)"
+                                @change="onPincodeInput($event.target.value)"
+                                @blur="onPincodeInput($event.target.value)"
+                                placeholder="e.g. 751001"
+                                class="w-full rounded-lg border border-line px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-brand/20"
+                                @required($field->required)
+                            >
+                        @elseif($field->key === 'area' || $field->key === 'ariya')
+                            <input
+                                id="formFieldArea"
+                                name="{{ $field->key }}"
+                                x-model="form['{{ $field->key }}']"
+                                type="text"
+                                list="areaDirectoryList"
+                                placeholder="Area"
+                                class="w-full rounded-lg border border-line px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-brand/20"
+                                @required($field->required)
+                            >
                         @elseif($field->type === 'number')
                             <input
                                 name="{{ $field->key }}"
@@ -787,7 +839,7 @@
                                 <h3 class="text-[13.5px] font-bold text-ink">Bulk Upload Customers</h3>
                                 <p class="text-[11px] text-slate-500 mt-0.5">Import customers from Excel / CSV using active fields.</p>
                             </div>
-                            <a href="{{ route('upload.demo') }}"
+                            <a href="{{ route('upload.demo', ['pipeline' => $pipeline ?? 'crm']) }}"
                                class="shrink-0 inline-flex items-center gap-1 rounded-lg bg-brand-soft text-brand hover:bg-brand hover:text-white text-[11px] font-semibold px-2.5 py-1.5 transition">
                                 ↓ Demo Excel
                             </a>
@@ -797,7 +849,7 @@
                             <div class="flex items-center justify-between mb-1.5">
                                 <span class="text-[10.5px] font-bold uppercase tracking-wide text-slate-400">Active Excel Columns</span>
                                 @if(auth()->user()->isAdmin())
-                                    <a href="{{ route('settings.index', ['tab' => 'fields']) }}" class="text-[11px] font-semibold text-brand hover:underline">Manage fields</a>
+                                    <a href="{{ route('settings.index', ['tab' => ($pipeline ?? 'crm') === 'call_crm' ? 'call-crm-fields' : 'fields']) }}" class="text-[11px] font-semibold text-brand hover:underline">Manage fields</a>
                                 @endif
                             </div>
                             <div class="flex flex-wrap gap-1">
@@ -813,6 +865,7 @@
 
                         <form method="POST" action="{{ route('upload.store') }}" enctype="multipart/form-data" class="space-y-3">
                             @csrf
+                            <input type="hidden" name="pipeline" value="{{ $pipeline ?? 'crm' }}">
                             <label class="flex flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-line bg-mist/40 px-4 py-6 cursor-pointer hover:border-brand/40 transition text-center">
                                 <span class="text-[13px] font-semibold text-ink">Drop Excel file or click</span>
                                 <span class="text-[11px] text-slate-400">.xlsx · .xls · .csv (max 10MB)</span>
@@ -832,6 +885,7 @@
                         </div>
 
                         <form method="GET" action="{{ route('upload.export') }}" class="space-y-3">
+                            <input type="hidden" name="pipeline" value="{{ $pipeline ?? 'crm' }}">
                             <div class="grid grid-cols-2 gap-2.5">
                                 <div>
                                     <label class="block text-[10.5px] font-bold uppercase tracking-wide text-slate-500 mb-1">From Date</label>
@@ -871,10 +925,12 @@
 
 @push('scripts')
 <script>
+window.PINCODE_DIRECTORY = @json($pincodeDirectory ?? []);
 (function () {
     const form = document.getElementById('crmFilterForm');
     const input = document.getElementById('crmSearch');
     const status = document.getElementById('crmStatus');
+    const area = document.getElementById('crmArea');
     const assigned = document.getElementById('crmAssigned');
     const hint = document.getElementById('crmSearchHint');
     if (!form || !input) return;
@@ -904,6 +960,12 @@
 
     if (status) {
         status.addEventListener('change', () => {
+            clearTimeout(timer);
+            runSearch();
+        });
+    }
+    if (area) {
+        area.addEventListener('change', () => {
             clearTimeout(timer);
             runSearch();
         });

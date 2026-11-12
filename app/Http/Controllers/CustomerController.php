@@ -9,12 +9,14 @@ use App\Models\InventoryItem;
 use App\Models\InventoryType;
 use App\Models\NoteTemplate;
 use App\Models\OperationSetting;
+use App\Models\Pincode;
 use App\Models\WhatsappSetting;
 use App\Models\User;
 use App\Services\CrmFieldService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Http;
 use Illuminate\View\View;
 
 class CustomerController extends Controller
@@ -26,6 +28,13 @@ class CustomerController extends Controller
         abort_unless($request->user()->canAccessCrm(), 403);
 
         return $this->listing($request, 'crm');
+    }
+
+    public function callCrm(Request $request): View
+    {
+        abort_unless($request->user()->canAccessCallCrm(), 403);
+
+        return $this->listing($request, 'call_crm');
     }
 
     public function operations(Request $request): View
@@ -41,7 +50,12 @@ class CustomerController extends Controller
         $status = $request->string('status')->toString();
         $filter = $request->string('filter')->toString();
         $assignedTo = $request->integer('assigned_to') ?: null;
-        $listRoute = $pipeline === 'operations' ? 'operations.index' : 'customers.index';
+        $area = trim($request->string('area')->toString());
+        $listRoute = match ($pipeline) {
+            'operations' => 'operations.index',
+            'call_crm' => 'call-crm.index',
+            default => 'customers.index',
+        };
 
         if ($filter === 'interested' && $status === '') {
             $status = 'interested';
@@ -54,9 +68,18 @@ class CustomerController extends Controller
                 $inner->where('name', 'like', "%{$q}%")
                     ->orWhere('email', 'like', "%{$q}%")
                     ->orWhere('phone', 'like', "%{$q}%")
-                    ->orWhere('company', 'like', "%{$q}%");
+                    ->orWhere('company', 'like', "%{$q}%")
+                    ->orWhere('city', 'like', "%{$q}%")
+                    ->orWhere('meta->area', 'like', "%{$q}%")
+                    ->orWhere('meta->pincode', 'like', "%{$q}%");
             }))
             ->when($request->user()->canSeeAllRecords() && $assignedTo, fn ($query) => $query->where('assigned_to', $assignedTo))
+            ->when($area !== '', function ($query) use ($area) {
+                $query->where(function ($sub) use ($area) {
+                    $sub->where('meta->area', $area)
+                        ->orWhere('meta->area', 'like', "%{$area}%");
+                });
+            })
             ->when($filter === 'follow_up_today', function ($query) {
                 $query->where('follow_up', true)
                     ->whereDate('follow_up_at', today())
@@ -84,8 +107,31 @@ class CustomerController extends Controller
             ? $statusField->options
             : ['new', 'interested', 'contacted', 'converted', 'lost', 'request'];
 
+        $pincodeDirectory = Pincode::whereNotNull('pincode')
+            ->where('pincode', '!=', '')
+            ->orderBy('pincode')
+            ->get(['pincode', 'area', 'city'])
+            ->values();
+
+        $areaOptions = [];
+        if ($pipeline === 'call_crm') {
+            $pincodeAreas = Pincode::whereNotNull('area')->where('area', '!=', '')->pluck('area');
+            $customerAreas = Customer::where('pipeline', 'call_crm')
+                ->whereNotNull('meta')
+                ->get(['id', 'meta'])
+                ->map(fn ($c) => data_get($c->meta, 'area'))
+                ->filter();
+            $areaOptions = $pincodeAreas->merge($customerAreas)
+                ->map(fn ($a) => trim((string) $a))
+                ->filter()
+                ->unique()
+                ->sort()
+                ->values()
+                ->all();
+        }
+
         return view('customers.index', compact(
-            'customers', 'agents', 'q', 'status', 'filter', 'assignedTo', 'formFields', 'tableFields', 'excelFields', 'pipeline', 'listRoute', 'statusOptions'
+            'customers', 'agents', 'q', 'status', 'filter', 'assignedTo', 'area', 'areaOptions', 'pincodeDirectory', 'formFields', 'tableFields', 'excelFields', 'pipeline', 'listRoute', 'statusOptions'
         ));
     }
 
@@ -104,14 +150,82 @@ class CustomerController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
-        $pipeline = $request->input('pipeline') === 'operations' ? 'operations' : 'crm';
+        $rawPipeline = (string) $request->input('pipeline', 'crm');
+        $pipeline = match ($rawPipeline) {
+            'operations' => 'operations',
+            'call_crm' => 'call_crm',
+            default => 'crm',
+        };
         abort_unless(
-            $pipeline === 'operations' ? $request->user()->canAccessOperations() : $request->user()->canAccessCrm(),
+            match ($pipeline) {
+                'operations' => $request->user()->canAccessOperations(),
+                'call_crm' => $request->user()->canAccessCallCrm(),
+                default => $request->user()->canAccessCrm(),
+            },
             403
         );
         $fields = $this->formFieldsFor($request, $pipeline);
         $request->validate($this->fields->validationRules($fields));
         [$core, $meta] = $this->fields->splitPayload($request, $fields);
+
+        if ($pipeline === 'call_crm') {
+            $phone = trim((string) ($core['phone'] ?? data_get($meta, 'phone') ?? data_get($meta, 'phone_no') ?? data_get($meta, 'mobile') ?? ''));
+            if ($phone !== '' && Customer::phoneExistsInPipeline($phone, 'call_crm')) {
+                if ($request->wantsJson()) {
+                    return response()->json([
+                        'ok' => false,
+                        'message' => "Customer with phone number {$phone} already exists in CALL CRM.",
+                    ], 422);
+                }
+
+                return back()
+                    ->withInput()
+                    ->withErrors(['phone' => "Customer with phone number {$phone} already exists in CALL CRM. Record was not added."]);
+            }
+
+            // Auto-fill area according to PIN (from Pincode Manager or Postal API)
+            $pinVal = trim((string) ($meta['pincode'] ?? $core['pincode'] ?? $request->input('pincode') ?? $request->input('pin') ?? ''));
+            $cleanPin = preg_replace('/[^0-9]/', '', explode('.', $pinVal)[0]);
+            if ($cleanPin === '' && ! empty($core['address'] ?? $meta['address'] ?? $request->input('address'))) {
+                $addr = (string) ($core['address'] ?? $meta['address'] ?? $request->input('address'));
+                if (preg_match('/\b(7\d{5}|[1-9]\d{5})\b/', $addr, $m)) {
+                    $cleanPin = $m[1];
+                }
+            }
+
+            if ($cleanPin !== '') {
+                $meta['pincode'] = $cleanPin;
+                $matchedArea = Pincode::where('pincode', $cleanPin)->whereNotNull('area')->where('area', '!=', '')->value('area');
+
+                if (! $matchedArea && strlen($cleanPin) === 6) {
+                    try {
+                        $res = Http::timeout(2)->get("https://api.postalpincode.in/pincode/{$cleanPin}");
+                        if ($res->successful()) {
+                            $data = $res->json();
+                            $offices = $data[0]['PostOffice'] ?? [];
+                            if (! empty($offices[0]['Name'])) {
+                                $matchedArea = $offices[0]['Name'];
+                                Pincode::firstOrCreate(
+                                    ['pincode' => $cleanPin],
+                                    [
+                                        'area' => $matchedArea,
+                                        'city' => $offices[0]['District'] ?? null,
+                                        'status' => 'Serviceable',
+                                        'created_by' => $request->user()->id,
+                                    ]
+                                );
+                            }
+                        }
+                    } catch (\Throwable $e) {}
+                }
+
+                $curArea = trim((string) ($meta['area'] ?? $core['area'] ?? ''));
+                if ($matchedArea && ($curArea === '' || empty($meta['area']))) {
+                    $meta['area'] = $matchedArea;
+                }
+            }
+        }
+
         $core = $this->applyAssignment($request, $core);
         $core['pipeline'] = $pipeline;
         $core['status'] = $core['status'] ?? 'new';
@@ -123,7 +237,11 @@ class CustomerController extends Controller
             'user_id' => $request->user()->id,
             'type' => 'system',
             'title' => 'Customer created',
-            'body' => $core['pipeline'] === 'operations' ? 'Record added to Operations.' : 'Record added to CRM.',
+            'body' => match ($core['pipeline']) {
+                'operations' => 'Record added to Operations.',
+                'call_crm' => 'Record added to CALL CRM.',
+                default => 'Record added to CRM.',
+            },
         ]);
 
         return back()->with('success', 'Customer created.');
@@ -162,6 +280,58 @@ class CustomerController extends Controller
         $fields = $this->formFieldsFor($request, $customer->pipeline ?? 'crm');
         $request->validate($this->fields->validationRules($fields));
         [$core, $meta] = $this->fields->splitPayload($request, $fields);
+
+        if ($customer->isCallCrm() || ($core['pipeline'] ?? null) === 'call_crm') {
+            $phone = trim((string) ($core['phone'] ?? data_get($meta, 'phone') ?? data_get($meta, 'phone_no') ?? data_get($meta, 'mobile') ?? ''));
+            if ($phone !== '' && Customer::phoneExistsInPipeline($phone, 'call_crm', $customer->id)) {
+                return back()
+                    ->withInput()
+                    ->withErrors(['phone' => "Customer with phone number {$phone} already exists in CALL CRM."]);
+            }
+
+            // Auto-fill area according to PIN (from Pincode Manager or Postal API)
+            $pinVal = trim((string) ($meta['pincode'] ?? $core['pincode'] ?? $request->input('pincode') ?? $request->input('pin') ?? ''));
+            $cleanPin = preg_replace('/[^0-9]/', '', explode('.', $pinVal)[0]);
+            if ($cleanPin === '' && ! empty($core['address'] ?? $meta['address'] ?? $request->input('address'))) {
+                $addr = (string) ($core['address'] ?? $meta['address'] ?? $request->input('address'));
+                if (preg_match('/\b(7\d{5}|[1-9]\d{5})\b/', $addr, $m)) {
+                    $cleanPin = $m[1];
+                }
+            }
+
+            if ($cleanPin !== '') {
+                $meta['pincode'] = $cleanPin;
+                $matchedArea = Pincode::where('pincode', $cleanPin)->whereNotNull('area')->where('area', '!=', '')->value('area');
+
+                if (! $matchedArea && strlen($cleanPin) === 6) {
+                    try {
+                        $res = Http::timeout(2)->get("https://api.postalpincode.in/pincode/{$cleanPin}");
+                        if ($res->successful()) {
+                            $data = $res->json();
+                            $offices = $data[0]['PostOffice'] ?? [];
+                            if (! empty($offices[0]['Name'])) {
+                                $matchedArea = $offices[0]['Name'];
+                                Pincode::firstOrCreate(
+                                    ['pincode' => $cleanPin],
+                                    [
+                                        'area' => $matchedArea,
+                                        'city' => $offices[0]['District'] ?? null,
+                                        'status' => 'Serviceable',
+                                        'created_by' => $request->user()->id,
+                                    ]
+                                );
+                            }
+                        }
+                    } catch (\Throwable $e) {}
+                }
+
+                $curArea = trim((string) ($meta['area'] ?? $core['area'] ?? ''));
+                if ($matchedArea && ($curArea === '' || empty($meta['area']))) {
+                    $meta['area'] = $matchedArea;
+                }
+            }
+        }
+
         $core = $this->applyAssignment($request, $core, $customer);
 
         $oldStatus = $customer->status;
@@ -1030,7 +1200,7 @@ class CustomerController extends Controller
     private function formFieldsFor(Request $request, string $pipeline = 'crm')
     {
         $formFields = $this->fields->formFields($pipeline);
-        if (! $request->user()->canAssignUsers()) {
+        if ($pipeline === 'call_crm' || ! $request->user()->canAssignUsers()) {
             $formFields = $formFields->reject(fn ($field) => $field->key === 'assigned_to')->values();
         }
 
@@ -1049,6 +1219,11 @@ class CustomerController extends Controller
 
     private function applyAssignment(Request $request, array $core, ?Customer $customer = null): array
     {
+        if ($customer?->isCallCrm() || ($core['pipeline'] ?? null) === 'call_crm') {
+            $core['assigned_to'] = null;
+            return $core;
+        }
+
         if ($request->user()->canAssignUsers()) {
             return $core;
         }

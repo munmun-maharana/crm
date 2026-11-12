@@ -9,6 +9,7 @@ use App\Http\Controllers\FieldController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\InventoryTypeController;
 use App\Http\Controllers\NoteTemplateController;
+use App\Http\Controllers\PincodeController;
 use App\Http\Controllers\UploadController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\OperationSettingController;
@@ -29,6 +30,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
     Route::get('/customers', [CustomerController::class, 'index'])->name('customers.index');
+    Route::get('/call-crm', [CustomerController::class, 'callCrm'])->name('call-crm.index');
     Route::get('/operations', [CustomerController::class, 'operations'])->name('operations.index');
     Route::post('/customers', [CustomerController::class, 'store'])->name('customers.store');
     Route::post('/customers/bulk-map', [CustomerController::class, 'bulkMap'])->name('customers.bulk-map');
@@ -49,6 +51,15 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/booking-slots', [BookingSlotController::class, 'index'])->name('booking-slots.index');
     Route::post('/booking-slots/{bookingSlot}/book', [BookingSlotController::class, 'book'])->name('booking-slots.book');
+
+    Route::get('/pincodes', [PincodeController::class, 'index'])->name('pincodes.index');
+    Route::post('/pincodes', [PincodeController::class, 'store'])->name('pincodes.store');
+    Route::post('/pincodes/bulk', [PincodeController::class, 'bulkAction'])->name('pincodes.bulk');
+    Route::get('/pincodes/export', [PincodeController::class, 'export'])->name('pincodes.export');
+    Route::get('/pincodes/demo', [PincodeController::class, 'demo'])->name('pincodes.demo');
+    Route::post('/pincodes/import', [PincodeController::class, 'import'])->name('pincodes.import');
+    Route::put('/pincodes/{pincode}', [PincodeController::class, 'update'])->name('pincodes.update');
+    Route::delete('/pincodes/{pincode}', [PincodeController::class, 'destroy'])->name('pincodes.destroy');
 
     Route::get('/upload', [UploadController::class, 'index'])->name('upload.index');
     Route::get('/upload/demo', [UploadController::class, 'demo'])->name('upload.demo');

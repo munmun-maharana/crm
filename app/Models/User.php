@@ -124,9 +124,19 @@ class User extends Authenticatable
         return $this->isAdmin() || $this->isCoordinator() || $this->isFrontOffice() || $this->appAccessFlag('access_crm', false);
     }
 
+    public function canAccessCallCrm(): bool
+    {
+        return $this->isAdmin() || $this->isCoordinator() || $this->isFrontOffice() || $this->appAccessFlag('access_call_crm', true);
+    }
+
     public function canAccessOperations(): bool
     {
         return $this->isAdmin() || $this->isCoordinator() || $this->isOperation() || $this->appAccessFlag('access_operations', false);
+    }
+
+    public function canAccessPincodes(): bool
+    {
+        return $this->isAdmin() || $this->isCoordinator() || $this->isFrontOffice() || $this->isOperation() || $this->appAccessFlag('access_pincodes', true);
     }
 
     public function canAccessInventory(): bool
@@ -140,9 +150,19 @@ class User extends Authenticatable
         return $this->appAccessFlag('access_crm', $this->canAccessCrm());
     }
 
+    public function appAccessCallCrm(): bool
+    {
+        return $this->appAccessFlag('access_call_crm', $this->canAccessCallCrm());
+    }
+
     public function appAccessOperations(): bool
     {
         return $this->appAccessFlag('access_operations', $this->canAccessOperations());
+    }
+
+    public function appAccessPincodes(): bool
+    {
+        return $this->appAccessFlag('access_pincodes', $this->canAccessPincodes());
     }
 
     public function appAccessInventory(): bool
@@ -154,7 +174,9 @@ class User extends Authenticatable
     {
         return [
             'crm' => $this->appAccessCrm(),
+            'call_crm' => $this->appAccessCallCrm(),
             'operations' => $this->appAccessOperations(),
+            'pincodes' => $this->appAccessPincodes(),
             'inventory' => $this->appAccessInventory(),
         ];
     }

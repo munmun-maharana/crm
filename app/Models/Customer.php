@@ -170,6 +170,60 @@ class Customer extends Model
         return $this->pipeline === 'operations';
     }
 
+    public function isCallCrm(): bool
+    {
+        return $this->pipeline === 'call_crm';
+    }
+
+    public static function normalizePhoneTo10Digits(?string $phone): ?string
+    {
+        if ($phone === null) {
+            return null;
+        }
+
+        $digits = preg_replace('/\D+/', '', (string) $phone);
+        if ($digits === '') {
+            return null;
+        }
+
+        return strlen($digits) >= 10 ? substr($digits, -10) : $digits;
+    }
+
+    public static function phoneExistsInPipeline(string $phone, string $pipeline = 'call_crm', ?int $excludeCustomerId = null): bool
+    {
+        $raw = trim($phone);
+        if ($raw === '') {
+            return false;
+        }
+
+        $digits = preg_replace('/\D+/', '', $raw);
+        if ($digits === '') {
+            return false;
+        }
+
+        $last10 = strlen($digits) >= 10 ? substr($digits, -10) : $digits;
+
+        $query = self::query()->where('pipeline', $pipeline);
+        if ($excludeCustomerId) {
+            $query->where('id', '!=', $excludeCustomerId);
+        }
+
+        return $query->where(function ($q) use ($raw, $digits, $last10) {
+            $q->where('phone', $raw)
+              ->orWhere('phone', $digits);
+
+            if (strlen($last10) >= 7) {
+                $q->orWhere('phone', 'like', "%{$last10}")
+                  ->orWhereRaw("REGEXP_REPLACE(phone, '[^0-9]', '') LIKE ?", ["%{$last10}"])
+                  ->orWhere('meta->phone', 'like', "%{$last10}%")
+                  ->orWhere('meta->phone_no', 'like', "%{$last10}%")
+                  ->orWhere('meta->mobile', 'like', "%{$last10}%")
+                  ->orWhere('meta->contact', 'like', "%{$last10}%")
+                  ->orWhere('meta->contact_no', 'like', "%{$last10}%");
+            }
+        })->exists();
+    }
+
     public function scopeInPipeline($query, string $pipeline)
     {
         return $query->where('pipeline', $pipeline);
@@ -182,7 +236,10 @@ class Customer extends Model
         }
 
         if ($user->isOperation()) {
-            return $query->where('pipeline', 'operations');
+            return $query->whereIn('pipeline', array_filter([
+                'operations',
+                $user->canAccessCallCrm() ? 'call_crm' : null,
+            ]));
         }
 
         return $query->where(function ($q) use ($user) {
@@ -201,7 +258,11 @@ class Customer extends Model
             return $this->assigned_to === null || (int) $this->assigned_to === (int) $user->id || $user->isOperation();
         }
 
-        if (! $this->isOperations() && $user->canAccessCrm()) {
+        if ($this->isCallCrm() && $user->canAccessCallCrm()) {
+            return $this->assigned_to === null || (int) $this->assigned_to === (int) $user->id;
+        }
+
+        if (! $this->isOperations() && ! $this->isCallCrm() && $user->canAccessCrm()) {
             return $this->assigned_to === null || (int) $this->assigned_to === (int) $user->id;
         }
 

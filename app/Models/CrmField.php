@@ -49,6 +49,10 @@ class CrmField extends Model
         'name', 'username', 'email', 'password', 'role',
     ];
 
+    public const PINCODE_CORE_KEYS = [
+        'pincode', 'area', 'city', 'state', 'zone', 'status', 'assigned_to', 'notes',
+    ];
+
     public const TYPES = [
         'text' => 'Text',
         'email' => 'Email',
@@ -80,6 +84,8 @@ class CrmField extends Model
         return match ($pipeline) {
             'operations' => 'operations',
             'users' => 'users',
+            'pincodes' => 'pincodes',
+            'call_crm' => 'call_crm',
             default => 'crm',
         };
     }
@@ -93,6 +99,10 @@ class CrmField extends Model
     {
         if ($this->pipeline === 'users') {
             return in_array($this->key, self::USER_CORE_KEYS, true);
+        }
+
+        if ($this->pipeline === 'pincodes') {
+            return in_array($this->key, self::PINCODE_CORE_KEYS, true);
         }
 
         return in_array($this->key, self::CORE_KEYS, true);

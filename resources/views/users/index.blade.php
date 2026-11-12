@@ -18,7 +18,9 @@
             'id' => $u->id,
             'name' => $u->name,
             'access_crm' => $u->appAccessCrm(),
+            'access_call_crm' => $u->appAccessCallCrm(),
             'access_operations' => $u->appAccessOperations(),
+            'access_pincodes' => $u->appAccessPincodes(),
             'access_inventory' => $u->appAccessInventory(),
         ];
         foreach ($formFields as $field) {
@@ -41,7 +43,9 @@
                 ...user,
                 password: '',
                 access_crm: !!user.access_crm,
+                access_call_crm: user.access_call_crm !== undefined ? !!user.access_call_crm : true,
                 access_operations: !!user.access_operations,
+                access_pincodes: user.access_pincodes !== undefined ? !!user.access_pincodes : true,
                 access_inventory: !!user.access_inventory,
             };
             this.editOpen = true;
@@ -126,9 +130,19 @@
                         CRM
                     </label>
                     <label class="flex items-center gap-2 text-[13px] font-semibold text-ink">
+                        <input type="checkbox" name="access_call_crm" value="1" class="rounded border-line text-brand"
+                               @checked(old('access_call_crm', true))>
+                        CALL CRM
+                    </label>
+                    <label class="flex items-center gap-2 text-[13px] font-semibold text-ink">
                         <input type="checkbox" name="access_operations" value="1" class="rounded border-line text-brand"
                                @checked(old('access_operations'))>
                         Operation
+                    </label>
+                    <label class="flex items-center gap-2 text-[13px] font-semibold text-ink">
+                        <input type="checkbox" name="access_pincodes" value="1" class="rounded border-line text-brand"
+                               @checked(old('access_pincodes', true))>
+                        Pincode Manager
                     </label>
                 </div>
 
@@ -178,8 +192,14 @@
                                         @if($u->appAccessCrm())
                                             <span class="inline-flex text-[10px] font-bold px-1.5 py-0.5 rounded bg-sky-50 text-sky-800">CRM</span>
                                         @endif
+                                        @if($u->appAccessCallCrm())
+                                            <span class="inline-flex text-[10px] font-bold px-1.5 py-0.5 rounded bg-teal-50 text-teal-800">CALL CRM</span>
+                                        @endif
                                         @if($u->appAccessOperations())
                                             <span class="inline-flex text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-50 text-amber-800">Operation</span>
+                                        @endif
+                                        @if($u->appAccessPincodes())
+                                            <span class="inline-flex text-[10px] font-bold px-1.5 py-0.5 rounded bg-violet-50 text-violet-800">Pincode</span>
                                         @endif
                                     </div>
                                 </td>
@@ -302,9 +322,19 @@
                             CRM
                         </label>
                         <label class="flex items-center gap-2 text-[13px] font-semibold text-ink">
+                            <input type="checkbox" name="access_call_crm" value="1" class="rounded border-line text-brand"
+                                   x-model="form.access_call_crm">
+                            CALL CRM
+                        </label>
+                        <label class="flex items-center gap-2 text-[13px] font-semibold text-ink">
                             <input type="checkbox" name="access_operations" value="1" class="rounded border-line text-brand"
                                    x-model="form.access_operations">
                             Operation
+                        </label>
+                        <label class="flex items-center gap-2 text-[13px] font-semibold text-ink">
+                            <input type="checkbox" name="access_pincodes" value="1" class="rounded border-line text-brand"
+                                   x-model="form.access_pincodes">
+                            Pincode Manager
                         </label>
                     </div>
                 </div>

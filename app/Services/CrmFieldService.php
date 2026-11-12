@@ -59,7 +59,11 @@ class CrmFieldService
                 continue;
             }
 
-            $rule[] = 'max:2000';
+            if ($field->type === 'number') {
+                $rule[] = 'max_digits:15';
+            } else {
+                $rule[] = 'max:2000';
+            }
 
             $rules[$field->key] = $rule;
         }

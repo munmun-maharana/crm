@@ -107,7 +107,7 @@
                             @endif
                         </div>
                         <div class="text-[10.5px] text-slate-400 truncate">
-                            {{ $customer->city ?: '—' }} · Agent: <span class="text-slate-600 font-medium">{{ $customer->assignee?->name ?: 'Unassigned' }}</span>
+                            {{ $customer->city ?: '—' }}@unless($customer->isCallCrm()) · Agent: <span class="text-slate-600 font-medium">{{ $customer->assignee?->name ?: 'Unassigned' }}</span>@endunless
                         </div>
                     </div>
                 </div>
@@ -130,7 +130,7 @@
                             class="flex-1 h-7 inline-flex items-center justify-center rounded-md bg-indigo-100/90 text-indigo-700 hover:bg-indigo-200 transition">
                         <svg class="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M21 12c0 4.418-4.03 8-9 8a9.86 9.86 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
                     </button>
-                    @unless($customer->isOperations())
+                    @unless($customer->isOperations() || $customer->isCallCrm())
                         @if($customer->operationCopy)
                             <span title="Assigned to Operation Team"
                                   class="h-7 inline-flex items-center justify-center px-2 rounded-md bg-emerald-100/90 text-emerald-800 text-[10px] font-bold whitespace-nowrap">
