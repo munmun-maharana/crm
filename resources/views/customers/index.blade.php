@@ -355,6 +355,38 @@
             @php $pageIds = $customers->pluck('id')->map(fn ($id) => (int) $id)->values(); @endphp
             <script id="crm-page-ids-json" type="application/json">@json($pageIds)</script>
             <script>window.CRM_PAGE_IDS = JSON.parse(document.getElementById('crm-page-ids-json')?.textContent || '[]');</script>
+
+            @if(!empty($statusCards))
+                @php
+                    $kpiBgs = [
+                        'bg-sky-100/75 border-sky-200/90 text-sky-950',
+                        'bg-emerald-100/75 border-emerald-200/90 text-emerald-950',
+                        'bg-amber-100/75 border-amber-200/90 text-amber-950',
+                        'bg-violet-100/75 border-violet-200/90 text-violet-950',
+                        'bg-rose-100/75 border-rose-200/90 text-rose-950',
+                        'bg-teal-100/75 border-teal-200/90 text-teal-950',
+                        'bg-indigo-100/75 border-indigo-200/90 text-indigo-950',
+                        'bg-cyan-100/75 border-cyan-200/90 text-cyan-950',
+                    ];
+                @endphp
+                <div class="grid gap-2 sm:gap-2.5 mb-3 sm:mb-3.5 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:[grid-template-columns:repeat(var(--cols),minmax(0,1fr))]" style="--cols: {{ min(10, max(2, count($statusCards))) }};">
+                    @foreach($statusCards as $card)
+                        @php $kpiBg = $kpiBgs[$loop->index % count($kpiBgs)]; @endphp
+                        <a href="{{ $card['url'] ?? '#' }}"
+                           class="stat-card block rounded-xl border {{ !empty($card['active']) ? 'ring-2 ring-brand bg-white shadow-sm border-brand' : $kpiBg }} px-3 py-2 sm:py-2.5 hover:shadow-sm transition min-w-0"
+                           title="{{ $card['label'] }}">
+                            <div class="flex items-center justify-between gap-1">
+                                <span class="text-[10px] sm:text-[11px] uppercase tracking-wider font-bold text-slate-600 truncate">{{ $card['label'] }}</span>
+                                @if(!empty($card['active']))
+                                    <span class="w-1.5 h-1.5 rounded-full bg-brand shrink-0" title="Active filter"></span>
+                                @endif
+                            </div>
+                            <div class="mt-0.5 text-lg sm:text-xl font-extrabold text-{{ $card['tone'] }}-700 leading-tight">{{ $card['value'] }}</div>
+                        </a>
+                    @endforeach
+                </div>
+            @endif
+
             <div class="rounded-xl border border-indigo-200/80 bg-indigo-50/35 overflow-x-auto shadow-xs select-none">
                 <table class="w-full text-[13px]">
                     <thead class="bg-indigo-100/75 text-indigo-950 text-[11px] uppercase tracking-wide border-b border-indigo-200/80">

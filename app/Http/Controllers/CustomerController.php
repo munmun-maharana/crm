@@ -13,10 +13,13 @@ use App\Models\Pincode;
 use App\Models\WhatsappSetting;
 use App\Models\User;
 use App\Services\CrmFieldService;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\View\View;
 
 class CustomerController extends Controller
@@ -107,15 +110,112 @@ class CustomerController extends Controller
             ? $statusField->options
             : ['new', 'interested', 'contacted', 'converted', 'lost', 'request'];
 
-        $pincodeDirectory = Pincode::whereNotNull('pincode')
-            ->where('pincode', '!=', '')
-            ->orderBy('pincode')
-            ->get(['pincode', 'area', 'city'])
-            ->values();
+        // Status cards (status-wise counts like dashboard)
+        $countQuery = $this->mappedCustomers($request)->inPipeline($pipeline);
+        if ($area !== '') {
+            $countQuery->where(function ($sub) use ($area) {
+                $sub->where('meta->area', $area)
+                    ->orWhere('meta->area', 'like', "%{$area}%");
+            });
+        }
+        if ($assignedTo && $request->user()->canSeeAllRecords() && $pipeline !== 'call_crm') {
+            $countQuery->where('assigned_to', $assignedTo);
+        }
+
+        $allLeadsCount = (clone $countQuery)->count();
+        $todayFollowUpCount = (clone $countQuery)->where('follow_up', true)->whereDate('follow_up_at', Carbon::today())->count();
+
+        $normalize = fn ($s) => strtolower(trim(str_replace(['_', '-'], ' ', (string) $s)));
+
+        $rawStatusCounts = (clone $countQuery)
+            ->whereNotNull('status')
+            ->select('status', DB::raw('count(*) as total'))
+            ->groupBy('status')
+            ->pluck('total', 'status')
+            ->toArray();
+
+        $normalizedCounts = [];
+        foreach ($rawStatusCounts as $st => $cnt) {
+            $norm = $normalize($st);
+            if ($norm !== '') {
+                $normalizedCounts[$norm] = ($normalizedCounts[$norm] ?? 0) + (int) $cnt;
+            }
+        }
+
+        $statuses = $statusOptions;
+        $configuredNormalized = array_map($normalize, $statuses);
+        foreach ($rawStatusCounts as $dbStatus => $cnt) {
+            $dbNorm = $normalize($dbStatus);
+            if ($dbNorm !== '' && ! in_array($dbNorm, $configuredNormalized, true)) {
+                $statuses[] = ucwords(str_replace(['_', '-'], ' ', (string) $dbStatus));
+                $configuredNormalized[] = $dbNorm;
+            }
+        }
+
+        $tones = ['sky', 'teal', 'amber', 'emerald', 'rose', 'indigo', 'violet', 'orange', 'cyan', 'slate'];
+
+        $statusCards = [
+            [
+                'label' => 'Total',
+                'value' => $allLeadsCount,
+                'tone' => 'indigo',
+                'active' => $status === '' && $filter !== 'follow_up_today',
+                'url' => route($listRoute, array_filter([
+                    'q' => $q ?: null,
+                    'area' => $area ?: null,
+                    'assigned_to' => $assignedTo ?: null,
+                ])),
+            ],
+            [
+                'label' => 'Today Follow-up',
+                'value' => $todayFollowUpCount,
+                'tone' => 'orange',
+                'active' => $filter === 'follow_up_today',
+                'url' => route($listRoute, array_filter([
+                    'q' => $q ?: null,
+                    'area' => $area ?: null,
+                    'assigned_to' => $assignedTo ?: null,
+                    'filter' => $filter === 'follow_up_today' ? null : 'follow_up_today',
+                ])),
+            ],
+        ];
+
+        foreach (array_values($statuses) as $i => $st) {
+            $norm = $normalize($st);
+            $isActive = $status !== '' && $filter !== 'follow_up_today' && $normalize($status) === $norm;
+            $statusCards[] = [
+                'label' => ucwords(str_replace(['_', '-'], ' ', (string) $st)),
+                'value' => (int) ($normalizedCounts[$norm] ?? 0),
+                'tone' => $tones[$i % count($tones)],
+                'active' => $isActive,
+                'url' => route($listRoute, array_filter([
+                    'q' => $q ?: null,
+                    'area' => $area ?: null,
+                    'assigned_to' => $assignedTo ?: null,
+                    'status' => $isActive ? null : $st,
+                ])),
+            ];
+        }
+
+        $pincodeDirectory = collect();
+        if (Schema::hasTable('pincodes')) {
+            try {
+                $pincodeDirectory = Pincode::whereNotNull('pincode')
+                    ->where('pincode', '!=', '')
+                    ->orderBy('pincode')
+                    ->get(['pincode', 'area', 'city'])
+                    ->values();
+            } catch (\Throwable $e) {}
+        }
 
         $areaOptions = [];
         if ($pipeline === 'call_crm') {
-            $pincodeAreas = Pincode::whereNotNull('area')->where('area', '!=', '')->pluck('area');
+            $pincodeAreas = collect();
+            if (Schema::hasTable('pincodes')) {
+                try {
+                    $pincodeAreas = Pincode::whereNotNull('area')->where('area', '!=', '')->pluck('area');
+                } catch (\Throwable $e) {}
+            }
             $customerAreas = Customer::where('pipeline', 'call_crm')
                 ->whereNotNull('meta')
                 ->get(['id', 'meta'])
@@ -131,7 +231,7 @@ class CustomerController extends Controller
         }
 
         return view('customers.index', compact(
-            'customers', 'agents', 'q', 'status', 'filter', 'assignedTo', 'area', 'areaOptions', 'pincodeDirectory', 'formFields', 'tableFields', 'excelFields', 'pipeline', 'listRoute', 'statusOptions'
+            'customers', 'agents', 'q', 'status', 'filter', 'assignedTo', 'area', 'areaOptions', 'pincodeDirectory', 'formFields', 'tableFields', 'excelFields', 'pipeline', 'listRoute', 'statusOptions', 'statusCards'
         ));
     }
 
