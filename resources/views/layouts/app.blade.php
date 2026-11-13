@@ -675,28 +675,21 @@
             </div>
         </div>
 
-        <div class="px-5 py-3 bg-mist/40 border-t border-line flex items-center justify-between gap-2">
-            <span class="text-[11px] text-slate-500 flex items-center gap-1">
-                <span>Press</span>
-                <kbd class="px-1.5 py-0.5 rounded bg-white border border-slate-300 text-slate-700 font-bold text-[10.5px] shadow-2xs">Enter ↵</kbd>
-                <span>to accept</span>
-            </span>
-            <div class="flex items-center gap-2">
-                <button type="button"
-                        @click="postUpdateModalOpen = false"
-                        :disabled="postUpdateSubmitting"
-                        class="px-4 py-2 rounded-xl border border-line bg-white hover:bg-mist text-slate-700 text-[12.5px] font-semibold transition disabled:opacity-50">
-                    Cancel
-                </button>
-                <button type="button"
-                        x-ref="confirmPostUpdateBtn"
-                        @click="confirmPostUpdate()"
-                        :disabled="postUpdateSubmitting"
-                        class="inline-flex items-center gap-1.5 px-5 py-2 rounded-xl bg-brand hover:bg-brand-dark text-white text-[12.5px] font-bold transition shadow-sm shadow-brand/20 disabled:opacity-60 focus:ring-2 focus:ring-brand focus:outline-none">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
-                    <span x-text="postUpdateSubmitting ? 'Posting…' : 'Confirm & Post Update'"></span>
-                </button>
-            </div>
+        <div class="px-5 py-3 bg-mist/40 border-t border-line flex items-center justify-end gap-2">
+            <button type="button"
+                    @click="postUpdateModalOpen = false"
+                    :disabled="postUpdateSubmitting"
+                    class="px-4 py-2 rounded-xl border border-line bg-white hover:bg-mist text-slate-700 text-[12.5px] font-semibold transition disabled:opacity-50">
+                Cancel
+            </button>
+            <button type="button"
+                    x-ref="confirmPostUpdateBtn"
+                    @click="confirmPostUpdate()"
+                    :disabled="postUpdateSubmitting"
+                    class="inline-flex items-center gap-1.5 px-5 py-2 rounded-xl bg-brand hover:bg-brand-dark text-white text-[12.5px] font-bold transition shadow-sm shadow-brand/20 disabled:opacity-60 focus:ring-2 focus:ring-brand focus:outline-none">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                <span x-text="postUpdateSubmitting ? 'Posting…' : 'Confirm & Post Update'"></span>
+            </button>
         </div>
     </div>
 </div>

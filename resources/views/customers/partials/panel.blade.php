@@ -283,7 +283,7 @@
                             </button>
                         </div>
 
-                        <textarea name="body" id="activityBody-{{ $customer->id }}" rows="2" placeholder="Write wash feedback / what happened… (Enter to post, Shift+Enter for new line)"
+                        <textarea name="body" id="activityBody-{{ $customer->id }}" rows="2" placeholder="Write wash feedback / what happened…"
                                   @keydown.enter.exact="if(!$event.shiftKey) { $event.preventDefault(); $el.closest('form').requestSubmit(); }"
                                   class="w-full rounded-lg border border-violet-200/80 bg-white px-3 py-2 text-[12px] leading-snug outline-none resize-y min-h-[60px]
                                          focus:bg-white focus:border-brand focus:ring-2 focus:ring-brand/20 transition"></textarea>
@@ -450,7 +450,7 @@
                                        class="h-8 flex-1 min-w-0 rounded-lg border border-violet-200 bg-white px-3 text-[12px] outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 transition">
                             </div>
 
-                            <textarea name="body" id="activityBody-{{ $customer->id }}" rows="2" placeholder="What happened / note… (Enter to post, Shift+Enter for new line)"
+                            <textarea name="body" id="activityBody-{{ $customer->id }}" rows="2" placeholder="What happened / note…"
                                       @keydown.enter.exact="if(!$event.shiftKey) { $event.preventDefault(); $el.closest('form').requestSubmit(); }"
                                       class="w-full rounded-lg border border-violet-200 bg-white px-3 py-2 text-[12px] leading-snug outline-none resize-y min-h-[60px]
                                              focus:bg-white focus:border-brand focus:ring-2 focus:ring-brand/20 transition"></textarea>
