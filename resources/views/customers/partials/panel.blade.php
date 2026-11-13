@@ -338,6 +338,89 @@
                                                    oninput="this.value = this.value.replace(/[^0-9+\-\s()]/g, '')"
                                                    placeholder="{{ $uf->label }}"
                                                    class="w-full rounded-lg border border-line bg-white px-2.5 py-1.5 text-[12px] outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 transition">
+                                        @elseif($uf->key === 'pincode' || $uf->key === 'pin')
+                                            <div class="relative" x-data="pincodeAutocomplete({
+                                                initialPin: '{{ addslashes($ufVal ?? '') }}',
+                                                cid: {{ $customer->id }}
+                                            })" @click.outside="open = false">
+                                                <input name="update_fields[{{ $uf->key }}]"
+                                                       type="text"
+                                                       inputmode="numeric"
+                                                       x-model="pin"
+                                                       @input="onInput($event.target.value)"
+                                                       @focus="open = true"
+                                                       @keydown.arrow-down.prevent="selectNext()"
+                                                       @keydown.arrow-up.prevent="selectPrev()"
+                                                       @keydown.enter.prevent="selectActive()"
+                                                       placeholder="PIN (e.g. 751015)"
+                                                       autocomplete="off"
+                                                       data-field-label="{{ $uf->label }}"
+                                                       data-initial-value="{{ (string) $rawInitVal }}"
+                                                       data-pincode-input="{{ $customer->id }}"
+                                                       class="w-full rounded-lg border border-line bg-white px-2.5 py-1.5 text-[12px] font-medium text-ink outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 transition">
+
+                                                {{-- Suggestions Dropdown (PIN + Area) --}}
+                                                <div x-show="open && filteredList.length > 0" x-cloak
+                                                     class="absolute left-0 top-full mt-1 w-full min-w-[240px] max-w-[340px] max-h-52 overflow-y-auto crm-scroll rounded-xl border border-line bg-white shadow-xl z-50 divide-y divide-slate-100">
+                                                    <template x-for="(item, idx) in filteredList" :key="idx">
+                                                        <button type="button"
+                                                                @click="choose(item)"
+                                                                :class="activeIndex === idx ? 'bg-brand-soft text-brand' : 'hover:bg-slate-50 text-slate-700'"
+                                                                class="w-full text-left px-3 py-2 flex items-center justify-between gap-2 text-[12px] transition">
+                                                            <div class="min-w-0">
+                                                                <span class="font-extrabold text-ink" x-text="item.pincode"></span>
+                                                                <span class="text-slate-400 mx-1">·</span>
+                                                                <span class="font-semibold text-slate-800" x-text="item.area || '—'"></span>
+                                                                <template x-if="item.city">
+                                                                    <span class="text-[10.5px] text-slate-400 ml-1" x-text="'(' + item.city + ')'"></span>
+                                                                </template>
+                                                            </div>
+                                                            <span class="text-[10px] font-bold text-brand shrink-0">Select ↵</span>
+                                                        </button>
+                                                    </template>
+                                                </div>
+                                            </div>
+                                        @elseif($uf->key === 'area' || $uf->key === 'ariya')
+                                            <div class="relative" x-data="areaAutocomplete({
+                                                initialArea: '{{ addslashes($ufVal ?? '') }}',
+                                                cid: {{ $customer->id }}
+                                            })" @click.outside="open = false">
+                                                <input name="update_fields[{{ $uf->key }}]"
+                                                       type="text"
+                                                       x-model="area"
+                                                       @input="onInput($event.target.value)"
+                                                       @focus="open = true"
+                                                       @keydown.arrow-down.prevent="selectNext()"
+                                                       @keydown.arrow-up.prevent="selectPrev()"
+                                                       @keydown.enter.prevent="selectActive()"
+                                                       placeholder="Area name…"
+                                                       autocomplete="off"
+                                                       data-field-label="{{ $uf->label }}"
+                                                       data-initial-value="{{ (string) $rawInitVal }}"
+                                                       data-area-input="{{ $customer->id }}"
+                                                       class="w-full rounded-lg border border-line bg-white px-2.5 py-1.5 text-[12px] font-medium text-ink outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 transition">
+
+                                                {{-- Suggestions Dropdown (Area + PIN) --}}
+                                                <div x-show="open && filteredList.length > 0" x-cloak
+                                                     class="absolute left-0 top-full mt-1 w-full min-w-[240px] max-w-[340px] max-h-52 overflow-y-auto crm-scroll rounded-xl border border-line bg-white shadow-xl z-50 divide-y divide-slate-100">
+                                                    <template x-for="(item, idx) in filteredList" :key="idx">
+                                                        <button type="button"
+                                                                @click="choose(item)"
+                                                                :class="activeIndex === idx ? 'bg-brand-soft text-brand' : 'hover:bg-slate-50 text-slate-700'"
+                                                                class="w-full text-left px-3 py-2 flex items-center justify-between gap-2 text-[12px] transition">
+                                                            <div class="min-w-0">
+                                                                <span class="font-extrabold text-ink" x-text="item.area || '—'"></span>
+                                                                <span class="text-slate-400 mx-1">·</span>
+                                                                <span class="font-semibold text-slate-600" x-text="item.pincode"></span>
+                                                                <template x-if="item.city">
+                                                                    <span class="text-[10.5px] text-slate-400 ml-1" x-text="'(' + item.city + ')'"></span>
+                                                                </template>
+                                                            </div>
+                                                            <span class="text-[10px] font-bold text-brand shrink-0">Select ↵</span>
+                                                        </button>
+                                                    </template>
+                                                </div>
+                                            </div>
                                         @elseif($uf->type === 'number')
                                             <input name="update_fields[{{ $uf->key }}]" value="{{ $ufVal }}"
                                                    data-field-label="{{ $uf->label }}"
@@ -513,6 +596,89 @@
                                                    oninput="this.value = this.value.replace(/[^0-9+\-\s()]/g, '')"
                                                    placeholder="{{ $uf->label }}"
                                                    class="w-full rounded-lg border border-line bg-white px-2.5 py-1.5 text-[12px] outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 transition">
+                                        @elseif($uf->key === 'pincode' || $uf->key === 'pin')
+                                            <div class="relative" x-data="pincodeAutocomplete({
+                                                initialPin: '{{ addslashes($ufVal ?? '') }}',
+                                                cid: {{ $customer->id }}
+                                            })" @click.outside="open = false">
+                                                <input name="update_fields[{{ $uf->key }}]"
+                                                       type="text"
+                                                       inputmode="numeric"
+                                                       x-model="pin"
+                                                       @input="onInput($event.target.value)"
+                                                       @focus="open = true"
+                                                       @keydown.arrow-down.prevent="selectNext()"
+                                                       @keydown.arrow-up.prevent="selectPrev()"
+                                                       @keydown.enter.prevent="selectActive()"
+                                                       placeholder="PIN (e.g. 751015)"
+                                                       autocomplete="off"
+                                                       data-field-label="{{ $uf->label }}"
+                                                       data-initial-value="{{ (string) $rawInitVal }}"
+                                                       data-pincode-input="{{ $customer->id }}"
+                                                       class="w-full rounded-lg border border-line bg-white px-2.5 py-1.5 text-[12px] font-medium text-ink outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 transition">
+
+                                                {{-- Suggestions Dropdown (PIN + Area) --}}
+                                                <div x-show="open && filteredList.length > 0" x-cloak
+                                                     class="absolute left-0 top-full mt-1 w-full min-w-[240px] max-w-[340px] max-h-52 overflow-y-auto crm-scroll rounded-xl border border-line bg-white shadow-xl z-50 divide-y divide-slate-100">
+                                                    <template x-for="(item, idx) in filteredList" :key="idx">
+                                                        <button type="button"
+                                                                @click="choose(item)"
+                                                                :class="activeIndex === idx ? 'bg-brand-soft text-brand' : 'hover:bg-slate-50 text-slate-700'"
+                                                                class="w-full text-left px-3 py-2 flex items-center justify-between gap-2 text-[12px] transition">
+                                                            <div class="min-w-0">
+                                                                <span class="font-extrabold text-ink" x-text="item.pincode"></span>
+                                                                <span class="text-slate-400 mx-1">·</span>
+                                                                <span class="font-semibold text-slate-800" x-text="item.area || '—'"></span>
+                                                                <template x-if="item.city">
+                                                                    <span class="text-[10.5px] text-slate-400 ml-1" x-text="'(' + item.city + ')'"></span>
+                                                                </template>
+                                                            </div>
+                                                            <span class="text-[10px] font-bold text-brand shrink-0">Select ↵</span>
+                                                        </button>
+                                                    </template>
+                                                </div>
+                                            </div>
+                                        @elseif($uf->key === 'area' || $uf->key === 'ariya')
+                                            <div class="relative" x-data="areaAutocomplete({
+                                                initialArea: '{{ addslashes($ufVal ?? '') }}',
+                                                cid: {{ $customer->id }}
+                                            })" @click.outside="open = false">
+                                                <input name="update_fields[{{ $uf->key }}]"
+                                                       type="text"
+                                                       x-model="area"
+                                                       @input="onInput($event.target.value)"
+                                                       @focus="open = true"
+                                                       @keydown.arrow-down.prevent="selectNext()"
+                                                       @keydown.arrow-up.prevent="selectPrev()"
+                                                       @keydown.enter.prevent="selectActive()"
+                                                       placeholder="Area name…"
+                                                       autocomplete="off"
+                                                       data-field-label="{{ $uf->label }}"
+                                                       data-initial-value="{{ (string) $rawInitVal }}"
+                                                       data-area-input="{{ $customer->id }}"
+                                                       class="w-full rounded-lg border border-line bg-white px-2.5 py-1.5 text-[12px] font-medium text-ink outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 transition">
+
+                                                {{-- Suggestions Dropdown (Area + PIN) --}}
+                                                <div x-show="open && filteredList.length > 0" x-cloak
+                                                     class="absolute left-0 top-full mt-1 w-full min-w-[240px] max-w-[340px] max-h-52 overflow-y-auto crm-scroll rounded-xl border border-line bg-white shadow-xl z-50 divide-y divide-slate-100">
+                                                    <template x-for="(item, idx) in filteredList" :key="idx">
+                                                        <button type="button"
+                                                                @click="choose(item)"
+                                                                :class="activeIndex === idx ? 'bg-brand-soft text-brand' : 'hover:bg-slate-50 text-slate-700'"
+                                                                class="w-full text-left px-3 py-2 flex items-center justify-between gap-2 text-[12px] transition">
+                                                            <div class="min-w-0">
+                                                                <span class="font-extrabold text-ink" x-text="item.area || '—'"></span>
+                                                                <span class="text-slate-400 mx-1">·</span>
+                                                                <span class="font-semibold text-slate-600" x-text="item.pincode"></span>
+                                                                <template x-if="item.city">
+                                                                    <span class="text-[10.5px] text-slate-400 ml-1" x-text="'(' + item.city + ')'"></span>
+                                                                </template>
+                                                            </div>
+                                                            <span class="text-[10px] font-bold text-brand shrink-0">Select ↵</span>
+                                                        </button>
+                                                    </template>
+                                                </div>
+                                            </div>
                                         @elseif($uf->type === 'number')
                                             <input name="update_fields[{{ $uf->key }}]" value="{{ $ufVal }}"
                                                    data-field-label="{{ $uf->label }}"
@@ -579,7 +745,8 @@
                                     Follow up
                                 </label>
                                 <div id="followUpFields-{{ $customer->id }}"
-                                     class="{{ $customer->follow_up ? 'flex' : 'hidden' }} items-center gap-1 flex-wrap">
+                                     class="{{ $customer->follow_up ? 'flex' : 'hidden' }} items-center gap-1 flex-wrap"
+                                     style="{{ $customer->follow_up ? 'display: flex;' : 'display: none;' }}">
                                     <div class="inline-flex items-center rounded border border-line bg-white overflow-hidden">
                                         <button type="button"
                                                 data-cid="{{ $customer->id }}"
@@ -587,7 +754,7 @@
                                                 title="Previous day"
                                                 class="px-2 py-0.5 bg-mist/60 hover:bg-brand-soft hover:text-brand text-slate-700 font-bold text-[12px] border-r border-line transition">‹</button>
                                         <input type="date" name="follow_up_date" id="followUpDate-{{ $customer->id }}"
-                                               value="{{ $customer->follow_up_at?->format('Y-m-d') }}"
+                                               value="{{ $customer->follow_up && $customer->follow_up_at ? $customer->follow_up_at->format('Y-m-d') : ($customer->follow_up_at?->format('Y-m-d') ?: now()->addDay()->format('Y-m-d')) }}"
                                                title="Follow-up date"
                                                class="bg-white px-2 py-0.5 text-[11px] outline-none focus:bg-brand-soft/20">
                                         <button type="button"
@@ -601,19 +768,20 @@
                                         <input type="checkbox" name="follow_up_time_on" value="1" id="followUpTimeOn-{{ $customer->id }}"
                                                data-cid="{{ $customer->id }}"
                                                class="rounded border-line text-brand focus:ring-brand/30"
-                                               @checked($customer->follow_up_has_time)
+                                               @checked($customer->follow_up && $customer->follow_up_has_time)
                                                onchange="toggleFollowUpTime(this.dataset.cid, this.checked)">
                                         Time
                                     </label>
                                     <div id="followUpTimeWrap-{{ $customer->id }}"
-                                         class="{{ $customer->follow_up_has_time ? 'inline-flex' : 'hidden' }} items-center rounded border border-line bg-white overflow-hidden">
+                                         class="{{ ($customer->follow_up && $customer->follow_up_has_time) ? 'inline-flex' : 'hidden' }} items-center rounded border border-line bg-white overflow-hidden"
+                                         style="{{ ($customer->follow_up && $customer->follow_up_has_time) ? 'display: inline-flex;' : 'display: none;' }}">
                                         <button type="button"
                                                 data-cid="{{ $customer->id }}"
                                                 onclick="shiftFollowUpTime(this.dataset.cid, -30)"
                                                 title="Previous 30 min"
                                                 class="px-2 py-0.5 bg-mist/60 hover:bg-brand-soft hover:text-brand text-slate-700 font-bold text-[12px] border-r border-line transition">‹</button>
                                         <input type="time" name="follow_up_time" id="followUpTime-{{ $customer->id }}"
-                                               value="{{ $customer->follow_up_has_time ? $customer->follow_up_at?->format('H:i') : '' }}"
+                                               value="{{ ($customer->follow_up && $customer->follow_up_has_time) ? $customer->follow_up_at?->format('H:i') : '' }}"
                                                title="Follow-up time"
                                                class="bg-white px-2 py-0.5 text-[11px] outline-none focus:bg-brand-soft/20">
                                         <button type="button"

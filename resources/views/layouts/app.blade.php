@@ -1054,6 +1054,9 @@ function crmShell() {
                     return;
                 }
                 this.title = data.customer.name;
+                if (data.pincode_directory && Array.isArray(data.pincode_directory)) {
+                    window.PINCODE_DIRECTORY = data.pincode_directory;
+                }
                 this.html = data.html;
             } finally {
                 this.loading = false;
@@ -1709,6 +1712,174 @@ window.copyToClipboard = function(text, btn) {
     }
 };
 
+window.pincodeAutocomplete = function(config) {
+    return {
+        pin: config.initialPin || '',
+        open: false,
+        activeIndex: -1,
+        cid: config.cid,
+        get directory() {
+            return window.PINCODE_DIRECTORY || [];
+        },
+        get filteredList() {
+            const q = String(this.pin || '').trim().toLowerCase();
+            if (!q) {
+                return this.directory.slice(0, 8);
+            }
+            return this.directory.filter(item => {
+                const p = String(item.pincode || '').toLowerCase();
+                const a = String(item.area || '').toLowerCase();
+                const c = String(item.city || '').toLowerCase();
+                return p.includes(q) || a.includes(q) || c.includes(q);
+            }).slice(0, 10);
+        },
+        onInput(val) {
+            this.pin = val;
+            this.open = true;
+            this.activeIndex = -1;
+            const clean = String(val || '').replace(/\D/g, '').trim();
+            if (clean.length >= 4) {
+                const match = this.directory.find(p => String(p.pincode).trim() === clean);
+                if (match && match.area) {
+                    this.applyAreaAndCity(match.area, match.city);
+                    return;
+                }
+            }
+            if (clean.length === 6) {
+                fetch(`https://api.postalpincode.in/pincode/${encodeURIComponent(clean)}`)
+                    .then(r => r.json())
+                    .then(data => {
+                        const first = Array.isArray(data) ? data[0] : null;
+                        const offices = first && Array.isArray(first.PostOffice) ? first.PostOffice : [];
+                        if (offices.length > 0 && offices[0].Name) {
+                            this.applyAreaAndCity(offices[0].Name, offices[0].District);
+                        }
+                    })
+                    .catch(() => {});
+            }
+        },
+        choose(item) {
+            this.pin = String(item.pincode || '').trim();
+            this.open = false;
+            this.applyAreaAndCity(item.area, item.city);
+        },
+        applyAreaAndCity(areaName, cityName) {
+            if (!areaName) return;
+            const el = document.querySelector(`[data-pincode-input="${this.cid}"]`);
+            const form = el ? el.closest('form') : document;
+            if (form) {
+                const areaInput = form.querySelector('[name="update_fields[area]"], [name="update_fields[ariya]"], [name="area"], [name="ariya"]');
+                if (areaInput) {
+                    areaInput.value = areaName;
+                    areaInput.dispatchEvent(new Event('input', { bubbles: true }));
+                    areaInput.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+                if (cityName) {
+                    const cityInput = form.querySelector('[name="update_fields[city]"], [name="city"]');
+                    if (cityInput && (!cityInput.value || cityInput.value.trim() === '')) {
+                        cityInput.value = cityName;
+                        cityInput.dispatchEvent(new Event('input', { bubbles: true }));
+                        cityInput.dispatchEvent(new Event('change', { bubbles: true }));
+                    }
+                }
+            }
+        },
+        selectNext() {
+            if (!this.open) { this.open = true; return; }
+            if (this.filteredList.length === 0) return;
+            this.activeIndex = (this.activeIndex + 1) % this.filteredList.length;
+        },
+        selectPrev() {
+            if (!this.open) { this.open = true; return; }
+            if (this.filteredList.length === 0) return;
+            this.activeIndex = (this.activeIndex - 1 + this.filteredList.length) % this.filteredList.length;
+        },
+        selectActive() {
+            if (this.open && this.activeIndex >= 0 && this.filteredList[this.activeIndex]) {
+                this.choose(this.filteredList[this.activeIndex]);
+            }
+        }
+    };
+};
+
+window.areaAutocomplete = function(config) {
+    return {
+        area: config.initialArea || '',
+        open: false,
+        activeIndex: -1,
+        cid: config.cid,
+        get directory() {
+            return window.PINCODE_DIRECTORY || [];
+        },
+        get filteredList() {
+            const q = String(this.area || '').trim().toLowerCase();
+            if (!q) {
+                return this.directory.slice(0, 8);
+            }
+            return this.directory.filter(item => {
+                const a = String(item.area || '').toLowerCase();
+                const p = String(item.pincode || '').toLowerCase();
+                const c = String(item.city || '').toLowerCase();
+                return a.includes(q) || p.includes(q) || c.includes(q);
+            }).slice(0, 10);
+        },
+        onInput(val) {
+            this.area = val;
+            this.open = true;
+            this.activeIndex = -1;
+            const q = String(val || '').trim().toLowerCase();
+            if (q.length >= 3) {
+                const match = this.directory.find(p => String(p.area || '').trim().toLowerCase() === q);
+                if (match && match.pincode) {
+                    this.applyPincode(match.pincode, match.city);
+                }
+            }
+        },
+        choose(item) {
+            this.area = String(item.area || '').trim();
+            this.open = false;
+            this.applyPincode(item.pincode, item.city);
+        },
+        applyPincode(pinCode, cityName) {
+            const el = document.querySelector(`[data-area-input="${this.cid}"]`);
+            const form = el ? el.closest('form') : document;
+            if (form) {
+                if (pinCode) {
+                    const pinInput = form.querySelector('[name="update_fields[pincode]"], [name="update_fields[pin]"], [name="pincode"], [name="pin"]');
+                    if (pinInput) {
+                        pinInput.value = pinCode;
+                        pinInput.dispatchEvent(new Event('input', { bubbles: true }));
+                        pinInput.dispatchEvent(new Event('change', { bubbles: true }));
+                    }
+                }
+                if (cityName) {
+                    const cityInput = form.querySelector('[name="update_fields[city]"], [name="city"]');
+                    if (cityInput && (!cityInput.value || cityInput.value.trim() === '')) {
+                        cityInput.value = cityName;
+                        cityInput.dispatchEvent(new Event('input', { bubbles: true }));
+                        cityInput.dispatchEvent(new Event('change', { bubbles: true }));
+                    }
+                }
+            }
+        },
+        selectNext() {
+            if (!this.open) { this.open = true; return; }
+            if (this.filteredList.length === 0) return;
+            this.activeIndex = (this.activeIndex + 1) % this.filteredList.length;
+        },
+        selectPrev() {
+            if (!this.open) { this.open = true; return; }
+            if (this.filteredList.length === 0) return;
+            this.activeIndex = (this.activeIndex - 1 + this.filteredList.length) % this.filteredList.length;
+        },
+        selectActive() {
+            if (this.open && this.activeIndex >= 0 && this.filteredList[this.activeIndex]) {
+                this.choose(this.filteredList[this.activeIndex]);
+            }
+        }
+    };
+};
+
 function pad2(n) { return String(n).padStart(2, '0'); }
 function nextDayYmd() {
     const d = new Date();
@@ -1730,16 +1901,31 @@ function toggleFollowUpFields(id, on) {
 }
 function handleStatusChangeFollowUp(id, statusVal) {
     const s = String(statusVal || '').trim().toLowerCase();
-    if (['confirmed', 'confirm', 'converted', 'cancelled', 'lost'].includes(s)) {
-        const chk = document.getElementById('followUpCheck-' + id);
-        const timeChk = document.getElementById('followUpTimeOn-' + id);
-        if (chk) {
-            chk.checked = false;
-            toggleFollowUpFields(id, false);
-        }
+    const chk = document.getElementById('followUpCheck-' + id);
+    const timeChk = document.getElementById('followUpTimeOn-' + id);
+    const dateEl = document.getElementById('followUpDate-' + id);
+
+    if (!chk) return;
+
+    if (['confirmed', 'confirm', 'converted', 'cancelled', 'canceled', 'lost'].includes(s)) {
+        chk.checked = false;
+        toggleFollowUpFields(id, false);
         if (timeChk) {
             timeChk.checked = false;
             toggleFollowUpTime(id, false);
+        }
+        return;
+    }
+
+    if (s !== '') {
+        chk.checked = true;
+        toggleFollowUpFields(id, true);
+        const todayStr = (function() {
+            const d = new Date();
+            return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
+        })();
+        if (dateEl && (!dateEl.value || dateEl.value < todayStr)) {
+            dateEl.value = nextDayYmd();
         }
     }
 }

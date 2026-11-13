@@ -197,16 +197,7 @@ class CustomerController extends Controller
             ];
         }
 
-        $pincodeDirectory = collect();
-        if (Schema::hasTable('pincodes')) {
-            try {
-                $pincodeDirectory = Pincode::whereNotNull('pincode')
-                    ->where('pincode', '!=', '')
-                    ->orderBy('pincode')
-                    ->get(['pincode', 'area', 'city'])
-                    ->values();
-            } catch (\Throwable $e) {}
-        }
+        $pincodeDirectory = $this->getPincodeDirectory();
 
         $areaOptions = [];
         if ($pipeline === 'call_crm') {
@@ -363,13 +354,17 @@ class CustomerController extends Controller
             ? $statusField->options
             : ['new', 'interested', 'contacted', 'converted', 'lost', 'request'];
 
+        $pincodeDirectory = $this->getPincodeDirectory();
+
         return response()->json([
             'customer' => $customer,
+            'pincode_directory' => $pincodeDirectory,
             'html' => view('customers.partials.panel', compact(
                 'customer',
                 'formFields',
                 'statusOptions',
-                'noteTemplates'
+                'noteTemplates',
+                'pincodeDirectory'
             ))->render(),
         ]);
     }
@@ -824,6 +819,7 @@ class CustomerController extends Controller
                     'formFields' => $formFields,
                     'statusOptions' => $statusOptions,
                     'noteTemplates' => NoteTemplate::active()->ordered()->get(['id', 'title', 'body']),
+                    'pincodeDirectory' => $this->getPincodeDirectory(),
                 ])->render(),
             ]);
         }
@@ -1333,5 +1329,20 @@ class CustomerController extends Controller
         $core['assigned_to'] = $customer?->assigned_to ?: $request->user()->id;
 
         return $core;
+    }
+
+    private function getPincodeDirectory()
+    {
+        if (Schema::hasTable('pincodes')) {
+            try {
+                return Pincode::whereNotNull('pincode')
+                    ->where('pincode', '!=', '')
+                    ->orderBy('pincode')
+                    ->get(['pincode', 'area', 'city'])
+                    ->values();
+            } catch (\Throwable $e) {}
+        }
+
+        return collect();
     }
 }
