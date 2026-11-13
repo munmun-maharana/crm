@@ -31,6 +31,7 @@ class User extends Authenticatable
         'email',
         'password',
         'role',
+        'is_active',
         'meta',
         'api_token',
     ];
@@ -47,6 +48,7 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'meta' => 'array',
+            'is_active' => 'boolean',
         ];
     }
 
@@ -97,6 +99,23 @@ class User extends Authenticatable
     public function isAdmin(): bool
     {
         return strtolower(trim((string) $this->role)) === self::ROLE_ADMIN;
+    }
+
+    public function isActive(): bool
+    {
+        if ($this->isAdmin()) {
+            return true;
+        }
+
+        if (array_key_exists('is_active', $this->attributes) && $this->attributes['is_active'] !== null) {
+            return (bool) $this->attributes['is_active'];
+        }
+
+        if (is_array($this->meta) && array_key_exists('is_active', $this->meta)) {
+            return (bool) $this->meta['is_active'];
+        }
+
+        return true;
     }
 
     public function isCoordinator(): bool

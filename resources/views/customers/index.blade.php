@@ -415,7 +415,7 @@
                     </thead>
                     <tbody>
                         @forelse($customers as $c)
-                            <tr class="border-t border-line hover:bg-mist/70 table-row-press" @click="selectCustomer({{ $c->id }})"
+                            <tr class="border-t border-line hover:bg-mist/70 table-row-press" data-table-row="{{ $c->id }}" @click="selectCustomer({{ $c->id }})"
                                 :class="isSelected({{ (int) $c->id }}) ? 'bg-brand-soft/40' : ''">
                                 @if(auth()->user()->canSeeAllRecords() && ($pipeline ?? 'crm') !== 'call_crm')
                                     <td class="px-3 py-2.5" @click.stop>
@@ -445,7 +445,17 @@
                                         @elseif($field->key === 'assigned_to')
                                             <span class="text-slate-600">{{ $c->assignee?->name ?: 'Unassigned' }}</span>
                                         @elseif($field->key === 'phone')
-                                            <span class="text-slate-600">{{ $c->phone ?: '—' }}</span>
+                                            <span class="text-slate-600 inline-flex items-center gap-1.5">
+                                                <span>{{ $c->phone ?: '—' }}</span>
+                                                @if($c->phone)
+                                                    <button type="button"
+                                                            onclick="event.stopPropagation(); copyToClipboard('{{ addslashes($c->phone) }}', this)"
+                                                            class="p-0.5 rounded text-slate-400 hover:text-brand hover:bg-brand-soft/70 transition"
+                                                            title="Copy phone number">
+                                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                                                    </button>
+                                                @endif
+                                            </span>
                                         @elseif($field->key === 'email')
                                             <span class="text-slate-600">{{ $c->email ?: '—' }}</span>
                                         @elseif($field->key === 'company')
@@ -561,6 +571,7 @@
                             @foreach($customers as $c)
                                 <button type="button"
                                         class="list-item w-full text-left px-2.5 py-1.5 leading-tight"
+                                        data-slide-item="{{ $c->id }}"
                                         :class="selectedId == {{ $c->id }} ? 'active' : ''"
                                         @click="selectCustomer({{ $c->id }})">
                                     <div class="flex items-center justify-between gap-1.5">

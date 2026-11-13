@@ -100,10 +100,20 @@
                                 </span>
                             @endif
                         </div>
-                        <div class="text-[11px] text-slate-600 font-medium truncate mt-0.5">
-                            {{ $customer->phone ?: 'No phone' }}
+                        <div class="flex items-center gap-2 text-[11.5px] text-slate-700 font-semibold truncate mt-0.5">
+                            <span class="tracking-wide">{{ $customer->phone ?: 'No phone' }}</span>
+                            @if($customer->phone)
+                                <button type="button"
+                                        onclick="copyToClipboard('{{ addslashes($customer->phone) }}', this)"
+                                        class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-white hover:bg-brand hover:text-white text-slate-600 border border-slate-300 shadow-2xs transition"
+                                        title="Copy phone number">
+                                    <svg class="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                                    <span>Copy</span>
+                                </button>
+                            @endif
                             @if($customer->email)
-                                · {{ $customer->email }}
+                                <span class="text-slate-400 font-normal">·</span>
+                                <span class="text-[11px] text-slate-500 font-normal truncate">{{ $customer->email }}</span>
                             @endif
                         </div>
                         <div class="text-[10.5px] text-slate-400 truncate">
@@ -273,7 +283,8 @@
                             </button>
                         </div>
 
-                        <textarea name="body" id="activityBody-{{ $customer->id }}" rows="2" placeholder="Write wash feedback / what happened…"
+                        <textarea name="body" id="activityBody-{{ $customer->id }}" rows="2" placeholder="Write wash feedback / what happened… (Enter to post, Shift+Enter for new line)"
+                                  @keydown.enter.exact="if(!$event.shiftKey) { $event.preventDefault(); $el.closest('form').requestSubmit(); }"
                                   class="w-full rounded-lg border border-violet-200/80 bg-white px-3 py-2 text-[12px] leading-snug outline-none resize-y min-h-[60px]
                                          focus:bg-white focus:border-brand focus:ring-2 focus:ring-brand/20 transition"></textarea>
 
@@ -439,7 +450,8 @@
                                        class="h-8 flex-1 min-w-0 rounded-lg border border-violet-200 bg-white px-3 text-[12px] outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 transition">
                             </div>
 
-                            <textarea name="body" id="activityBody-{{ $customer->id }}" rows="2" placeholder="What happened / note…"
+                            <textarea name="body" id="activityBody-{{ $customer->id }}" rows="2" placeholder="What happened / note… (Enter to post, Shift+Enter for new line)"
+                                      @keydown.enter.exact="if(!$event.shiftKey) { $event.preventDefault(); $el.closest('form').requestSubmit(); }"
                                       class="w-full rounded-lg border border-violet-200 bg-white px-3 py-2 text-[12px] leading-snug outline-none resize-y min-h-[60px]
                                              focus:bg-white focus:border-brand focus:ring-2 focus:ring-brand/20 transition"></textarea>
 

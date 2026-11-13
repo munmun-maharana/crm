@@ -17,6 +17,8 @@
         $row = [
             'id' => $u->id,
             'name' => $u->name,
+            'is_active' => $u->isActive() ? '1' : '0',
+            'is_admin' => $u->isAdmin(),
             'access_crm' => $u->appAccessCrm(),
             'access_call_crm' => $u->appAccessCallCrm(),
             'access_operations' => $u->appAccessOperations(),
@@ -44,6 +46,7 @@
             this.form = {
                 ...user,
                 password: '',
+                is_active: user.is_active !== undefined ? String(user.is_active) : '1',
                 access_crm: !!user.access_crm,
                 access_call_crm: user.access_call_crm !== undefined ? !!user.access_call_crm : true,
                 access_operations: !!user.access_operations,
@@ -125,6 +128,24 @@
                     <p class="text-[12px] text-slate-400">No form fields. Add them in Setting → User Fields.</p>
                 @endforelse
 
+                <div class="rounded-xl border border-sky-300/80 bg-white/90 p-3 space-y-1.5 shadow-2xs">
+                    <div class="text-[11px] font-bold uppercase tracking-wide text-slate-600">Account status</div>
+                    <div class="flex items-center gap-4 text-[13px] font-semibold text-ink pt-0.5">
+                        <label class="inline-flex items-center gap-1.5 cursor-pointer">
+                            <input type="radio" name="is_active" value="1" class="text-emerald-600 focus:ring-emerald-500" @checked(old('is_active', '1') == '1')>
+                            <span class="inline-flex items-center gap-1 text-emerald-700">
+                                <span class="w-2 h-2 rounded-full bg-emerald-500"></span> Active
+                            </span>
+                        </label>
+                        <label class="inline-flex items-center gap-1.5 cursor-pointer">
+                            <input type="radio" name="is_active" value="0" class="text-rose-600 focus:ring-rose-500" @checked(old('is_active') === '0')>
+                            <span class="inline-flex items-center gap-1 text-rose-700">
+                                <span class="w-2 h-2 rounded-full bg-rose-500"></span> Deactive
+                            </span>
+                        </label>
+                    </div>
+                </div>
+
                 <div class="rounded-xl bg-indigo-100/60 p-3 space-y-2">
                     <div class="text-[11px] font-bold uppercase tracking-wide text-indigo-900">App access level</div>
                     <p class="text-[11px] text-indigo-700/80">Dashboard always on · tick tabs for mobile app</p>
@@ -175,6 +196,7 @@
                             @foreach($tableFields as $field)
                                 <th class="text-left font-bold px-4 py-2.5">{{ $field->label }}</th>
                             @endforeach
+                            <th class="text-left font-bold px-4 py-2.5">Status</th>
                             <th class="text-left font-bold px-4 py-2.5">App access</th>
                             <th class="text-right font-bold px-4 py-2.5">Action</th>
                         </tr>
@@ -201,6 +223,28 @@
                                         @endif
                                     </td>
                                 @endforeach
+                                <td class="px-4 py-2.5 whitespace-nowrap">
+                                    @if($u->isAdmin())
+                                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-600"></span> Active (Admin)
+                                        </span>
+                                    @elseif($u->id === auth()->id())
+                                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300" title="Current logged-in account">
+                                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-600"></span> Active (You)
+                                        </span>
+                                    @else
+                                        <form method="POST" action="{{ route('users.toggle-status', $u) }}" class="inline-block"
+                                              onsubmit="return confirm('{{ $u->isActive() ? "Deactivate {$u->name}? If they are logged in, they will be logged out immediately." : "Activate {$u->name}?" }}')">
+                                            @csrf @method('PATCH')
+                                            <button type="submit"
+                                                    class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold transition shadow-2xs {{ $u->isActive() ? 'bg-emerald-100 text-emerald-800 hover:bg-rose-100 hover:text-rose-800 border border-emerald-300 hover:border-rose-300' : 'bg-rose-100 text-rose-800 hover:bg-emerald-100 hover:text-emerald-800 border border-rose-300 hover:border-emerald-300' }}"
+                                                    title="Click to {{ $u->isActive() ? 'Deactivate' : 'Activate' }}">
+                                                <span class="w-1.5 h-1.5 rounded-full {{ $u->isActive() ? 'bg-emerald-600' : 'bg-rose-600' }}"></span>
+                                                <span>{{ $u->isActive() ? 'Active' : 'Deactive' }}</span>
+                                            </button>
+                                        </form>
+                                    @endif
+                                </td>
                                 <td class="px-4 py-2.5">
                                     <div class="flex flex-wrap gap-1">
                                         <span class="inline-flex text-[10px] font-bold px-1.5 py-0.5 rounded bg-mist text-slate-600">Dashboard</span>
@@ -327,6 +371,27 @@
                             @endif
                         </div>
                     @endforeach
+
+                    <div class="rounded-xl border border-line bg-mist/50 p-3 space-y-1.5" x-show="form.role !== 'admin' && form.id !== {{ auth()->id() }}">
+                        <div class="text-[11px] font-bold uppercase tracking-wide text-slate-600">Account status</div>
+                        <div class="flex items-center gap-4 text-[13px] font-semibold text-ink pt-0.5">
+                            <label class="inline-flex items-center gap-1.5 cursor-pointer">
+                                <input type="radio" name="is_active" value="1" class="text-emerald-600 focus:ring-emerald-500"
+                                       :checked="form.is_active == '1'" @change="form.is_active = '1'">
+                                <span class="inline-flex items-center gap-1 text-emerald-700">
+                                    <span class="w-2 h-2 rounded-full bg-emerald-500"></span> Active
+                                </span>
+                            </label>
+                            <label class="inline-flex items-center gap-1.5 cursor-pointer">
+                                <input type="radio" name="is_active" value="0" class="text-rose-600 focus:ring-rose-500"
+                                       :checked="form.is_active == '0'" @change="form.is_active = '0'">
+                                <span class="inline-flex items-center gap-1 text-rose-700">
+                                    <span class="w-2 h-2 rounded-full bg-rose-500"></span> Deactive
+                                </span>
+                            </label>
+                        </div>
+                        <p class="text-[11px] text-slate-400">If deactivated, user will be auto logged out on their next action or refresh.</p>
+                    </div>
 
                     <div class="rounded-xl border border-line bg-mist/40 p-3 space-y-2">
                         <div class="text-[11px] font-bold uppercase tracking-wide text-slate-500">App access level</div>

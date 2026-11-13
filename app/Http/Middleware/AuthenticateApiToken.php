@@ -29,6 +29,10 @@ class AuthenticateApiToken
             return response()->json(['message' => 'Unauthenticated.'], 401);
         }
 
+        if (! $user->isAdmin() && ! $user->isActive()) {
+            return response()->json(['message' => 'Your account has been deactivated. Please contact an administrator.'], 403);
+        }
+
         auth()->setUser($user);
         $request->setUserResolver(fn () => $user);
 

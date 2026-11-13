@@ -70,6 +70,26 @@ class UserController extends Controller
         return back()->with('success', 'User deleted.');
     }
 
+    public function toggleStatus(Request $request, User $user): RedirectResponse
+    {
+        if ($request->user()->id === $user->id) {
+            return back()->withErrors(['user' => 'You cannot deactivate your own account.']);
+        }
+
+        if ($user->isAdmin()) {
+            return back()->withErrors(['user' => 'Admin accounts cannot be deactivated.']);
+        }
+
+        $newStatus = ! $user->isActive();
+        $user->is_active = $newStatus;
+        $meta = is_array($user->meta) ? $user->meta : [];
+        $meta['is_active'] = $newStatus;
+        $user->meta = $meta;
+        $user->save();
+
+        return back()->with('success', 'User status changed to ' . ($newStatus ? 'Active' : 'Deactive') . '.');
+    }
+
     private function validatedPayload(Request $request, $fields, ?User $user): array
     {
         $rules = [];
@@ -166,6 +186,25 @@ class UserController extends Controller
         $meta['access_inventory'] = $request->boolean('access_inventory');
         $meta['can_edit'] = $request->boolean('can_edit');
         $meta['can_delete'] = $request->boolean('can_delete');
+
+        // Account status (Active vs Deactive)
+        $isActive = true;
+        if ($request->has('is_active')) {
+            $rawActive = $request->input('is_active');
+            $isActive = ! in_array($rawActive, ['0', 0, false, 'false', 'deactive', 'inactive'], true);
+        } elseif ($user) {
+            $isActive = $user->isActive();
+        }
+
+        if ($user && $user->id === $request->user()->id) {
+            $isActive = true; // Cannot deactivate self
+        }
+        if (($core['role'] ?? $user?->role) === User::ROLE_ADMIN) {
+            $isActive = true; // Admin is always active
+        }
+
+        $core['is_active'] = $isActive;
+        $meta['is_active'] = $isActive;
 
         if (empty($core['name']) && $user) {
             $core['name'] = $user->name;

@@ -29,6 +29,18 @@ class AuthController extends Controller
         $remember = $request->boolean('remember', true);
 
         if (Auth::attempt(['username' => $credentials['username'], 'password' => $credentials['password']], $remember)) {
+            $user = Auth::user();
+
+            if (! $user->isAdmin() && ! $user->isActive()) {
+                Auth::logout();
+                $request->session()->invalidate();
+                $request->session()->regenerateToken();
+
+                return back()->withErrors([
+                    'username' => 'Your account has been deactivated. Please contact an administrator.',
+                ])->onlyInput('username');
+            }
+
             $request->session()->regenerate();
 
             return redirect()->intended(Auth::user()->defaultRoute());

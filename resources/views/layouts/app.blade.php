@@ -627,6 +627,7 @@
 {{-- Confirm Post Update Modal --}}
 <div x-show="postUpdateModalOpen" x-cloak
      @keydown.escape.window="if (postUpdateModalOpen && !postUpdateSubmitting) postUpdateModalOpen = false"
+     @keydown.enter.window.prevent="if (postUpdateModalOpen && !postUpdateSubmitting) confirmPostUpdate()"
      class="fixed inset-0 z-[75] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
     <div @click.outside="if (!postUpdateSubmitting) postUpdateModalOpen = false"
          class="w-full max-w-md rounded-2xl bg-white shadow-2xl border border-line overflow-hidden">
@@ -674,20 +675,28 @@
             </div>
         </div>
 
-        <div class="px-5 py-3 bg-mist/40 border-t border-line flex items-center justify-end gap-2">
-            <button type="button"
-                    @click="postUpdateModalOpen = false"
-                    :disabled="postUpdateSubmitting"
-                    class="px-4 py-2 rounded-xl border border-line bg-white hover:bg-mist text-slate-700 text-[12.5px] font-semibold transition disabled:opacity-50">
-                Cancel
-            </button>
-            <button type="button"
-                    @click="confirmPostUpdate()"
-                    :disabled="postUpdateSubmitting"
-                    class="inline-flex items-center gap-1.5 px-5 py-2 rounded-xl bg-brand hover:bg-brand-dark text-white text-[12.5px] font-bold transition shadow-sm shadow-brand/20 disabled:opacity-60">
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
-                <span x-text="postUpdateSubmitting ? 'Posting…' : 'Confirm & Post Update'"></span>
-            </button>
+        <div class="px-5 py-3 bg-mist/40 border-t border-line flex items-center justify-between gap-2">
+            <span class="text-[11px] text-slate-500 flex items-center gap-1">
+                <span>Press</span>
+                <kbd class="px-1.5 py-0.5 rounded bg-white border border-slate-300 text-slate-700 font-bold text-[10.5px] shadow-2xs">Enter ↵</kbd>
+                <span>to accept</span>
+            </span>
+            <div class="flex items-center gap-2">
+                <button type="button"
+                        @click="postUpdateModalOpen = false"
+                        :disabled="postUpdateSubmitting"
+                        class="px-4 py-2 rounded-xl border border-line bg-white hover:bg-mist text-slate-700 text-[12.5px] font-semibold transition disabled:opacity-50">
+                    Cancel
+                </button>
+                <button type="button"
+                        x-ref="confirmPostUpdateBtn"
+                        @click="confirmPostUpdate()"
+                        :disabled="postUpdateSubmitting"
+                        class="inline-flex items-center gap-1.5 px-5 py-2 rounded-xl bg-brand hover:bg-brand-dark text-white text-[12.5px] font-bold transition shadow-sm shadow-brand/20 disabled:opacity-60 focus:ring-2 focus:ring-brand focus:outline-none">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                    <span x-text="postUpdateSubmitting ? 'Posting…' : 'Confirm & Post Update'"></span>
+                </button>
+            </div>
         </div>
     </div>
 </div>
@@ -1555,6 +1564,9 @@ function crmShell() {
             this.postUpdateCustomerName = form.dataset.customerName || this.title || 'Customer';
             this.postUpdateChanges = changes;
             this.postUpdateModalOpen = true;
+            this.$nextTick(() => {
+                this.$refs.confirmPostUpdateBtn?.focus();
+            });
         },
         async confirmPostUpdate() {
             if (!this.postUpdateFormEl || this.postUpdateSubmitting) return;
@@ -1621,10 +1633,88 @@ function crmShell() {
                         }
                     }
                 }
+
+                // Auto-remove lead from current filter and auto-view next one if status changed
+                const urlParams = new URLSearchParams(window.location.search);
+                const filterStatus = (urlParams.get('status') || '').trim();
+                const filterType = (urlParams.get('filter') || '').trim().toLowerCase();
+                const toolbarStatus = (document.getElementById('crmStatus')?.value || '').trim();
+                const activeFilterStatus = filterStatus || toolbarStatus;
+
+                const normalizeSt = (s) => (s || '').toLowerCase().replace(/[-_\s]+/g, ' ').trim();
+                const newStatusNorm = normalizeSt(data.status);
+                const filterStatusNorm = normalizeSt(activeFilterStatus);
+
+                const statusMismatch = filterStatusNorm !== '' && newStatusNorm !== filterStatusNorm;
+                const isTodayFu = !!(data.follow_up && data.follow_up_at && (new Date(data.follow_up_at).toDateString() === new Date().toDateString()));
+                const fuMismatch = filterType === 'follow_up_today' && !isTodayFu;
+
+                if (statusMismatch || fuMismatch) {
+                    const currentSlide = document.querySelector(`[data-slide-item="${data.customer_id}"]`);
+                    const allSlides = Array.from(document.querySelectorAll('[data-slide-item]:not([data-removed="true"])'));
+                    let nextCustomerId = null;
+                    if (currentSlide && allSlides.length > 0) {
+                        const curIdx = allSlides.indexOf(currentSlide);
+                        if (curIdx !== -1) {
+                            if (allSlides[curIdx + 1]) {
+                                nextCustomerId = allSlides[curIdx + 1].getAttribute('data-slide-item');
+                            } else if (allSlides[curIdx - 1]) {
+                                nextCustomerId = allSlides[curIdx - 1].getAttribute('data-slide-item');
+                            }
+                        }
+                    }
+
+                    if (currentSlide) {
+                        currentSlide.setAttribute('data-removed', 'true');
+                        currentSlide.style.transition = 'all 0.25s ease';
+                        currentSlide.style.opacity = '0';
+                        currentSlide.style.transform = 'translateX(-20px)';
+                        setTimeout(() => currentSlide.remove(), 260);
+                    }
+
+                    const tableRow = document.querySelector(`tr[data-table-row="${data.customer_id}"]`) || document.querySelector(`[data-status-cell="${data.customer_id}"]`)?.closest('tr');
+                    if (tableRow) {
+                        tableRow.remove();
+                    }
+
+                    if (nextCustomerId && Number(nextCustomerId) !== Number(data.customer_id)) {
+                        await this.selectCustomer(Number(nextCustomerId));
+                    } else if (!allSlides.some(el => el.getAttribute('data-slide-item') !== String(data.customer_id))) {
+                        this.html = '<div class="p-12 text-center text-slate-500 font-medium"><div class="text-3xl mb-2">🎉</div>No more leads matching this filter.</div>';
+                    }
+                }
             }
         }
     }
 }
+
+window.copyToClipboard = function(text, btn) {
+    if (!text) return;
+    const clean = String(text).trim();
+    if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(clean).then(() => showCopied(btn)).catch(() => fallbackCopy(clean, btn));
+    } else {
+        fallbackCopy(clean, btn);
+    }
+    function fallbackCopy(val, el) {
+        const ta = document.createElement('textarea');
+        ta.value = val;
+        ta.style.position = 'fixed';
+        ta.style.left = '-9999px';
+        ta.style.top = '-9999px';
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        try { document.execCommand('copy'); showCopied(el); } catch (e) {}
+        ta.remove();
+    }
+    function showCopied(el) {
+        if (!el) return;
+        const orig = el.innerHTML;
+        el.innerHTML = '<span class="inline-flex items-center gap-1 text-emerald-600 font-bold"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>Copied!</span>';
+        setTimeout(() => { el.innerHTML = orig; }, 1600);
+    }
+};
 
 function pad2(n) { return String(n).padStart(2, '0'); }
 function nextDayYmd() {

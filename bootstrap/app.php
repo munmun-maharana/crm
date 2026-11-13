@@ -12,8 +12,12 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->web(append: [
+            \App\Http\Middleware\EnsureUserIsActive::class,
+        ]);
         $middleware->alias([
             'admin' => \App\Http\Middleware\EnsureAdmin::class,
+            'active' => \App\Http\Middleware\EnsureUserIsActive::class,
             'api.token' => \App\Http\Middleware\AuthenticateApiToken::class,
             'api.mobile_json' => \App\Http\Middleware\MobileJsonResponse::class,
         ]);
