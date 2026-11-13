@@ -158,12 +158,14 @@ class UserController extends Controller
             }
         }
 
-        // Mobile app tab access (Dashboard always on)
+        // App access levels & action permissions
         $meta['access_crm'] = $request->boolean('access_crm');
-        $meta['access_call_crm'] = $request->boolean('access_call_crm', true);
+        $meta['access_call_crm'] = $request->boolean('access_call_crm');
         $meta['access_operations'] = $request->boolean('access_operations');
-        $meta['access_pincodes'] = $request->boolean('access_pincodes', true);
+        $meta['access_pincodes'] = $request->boolean('access_pincodes');
         $meta['access_inventory'] = $request->boolean('access_inventory');
+        $meta['can_edit'] = $request->boolean('can_edit');
+        $meta['can_delete'] = $request->boolean('can_delete');
 
         if (empty($core['name']) && $user) {
             $core['name'] = $user->name;

@@ -119,24 +119,49 @@ class User extends Authenticatable
         return $this->isAdmin() || $this->isCoordinator();
     }
 
+    public function canAccessDashboard(): bool
+    {
+        if ($this->isAdmin()) {
+            return true;
+        }
+
+        return $this->canAccessCrm() || $this->canAccessOperations() || $this->appAccessFlag('access_dashboard', false);
+    }
+
     public function canAccessCrm(): bool
     {
-        return $this->isAdmin() || $this->isCoordinator() || $this->isFrontOffice() || $this->appAccessFlag('access_crm', false);
+        if ($this->isAdmin()) {
+            return true;
+        }
+
+        return $this->appAccessFlag('access_crm', $this->isCoordinator() || $this->isFrontOffice());
     }
 
     public function canAccessCallCrm(): bool
     {
-        return $this->isAdmin() || $this->isCoordinator() || $this->isFrontOffice() || $this->appAccessFlag('access_call_crm', true);
+        if ($this->isAdmin()) {
+            return true;
+        }
+
+        return $this->appAccessFlag('access_call_crm', $this->isCoordinator() || $this->isFrontOffice());
     }
 
     public function canAccessOperations(): bool
     {
-        return $this->isAdmin() || $this->isCoordinator() || $this->isOperation() || $this->appAccessFlag('access_operations', false);
+        if ($this->isAdmin()) {
+            return true;
+        }
+
+        return $this->appAccessFlag('access_operations', $this->isCoordinator() || $this->isOperation());
     }
 
     public function canAccessPincodes(): bool
     {
-        return $this->isAdmin() || $this->isCoordinator() || $this->isFrontOffice() || $this->isOperation() || $this->appAccessFlag('access_pincodes', true);
+        if ($this->isAdmin()) {
+            return true;
+        }
+
+        return $this->appAccessFlag('access_pincodes', $this->isCoordinator() || $this->isFrontOffice() || $this->isOperation());
     }
 
     public function canAccessInventory(): bool
@@ -144,25 +169,64 @@ class User extends Authenticatable
         return false;
     }
 
+    public function canEditCustomers(): bool
+    {
+        if ($this->isAdmin()) {
+            return true;
+        }
+
+        return $this->appAccessFlag('can_edit', false);
+    }
+
+    public function canDeleteCustomers(): bool
+    {
+        if ($this->isAdmin()) {
+            return true;
+        }
+
+        return $this->appAccessFlag('can_delete', false);
+    }
+
+    public function defaultRoute(): string
+    {
+        if ($this->isAdmin() || $this->canAccessDashboard()) {
+            return route('dashboard');
+        }
+        if ($this->canAccessCallCrm()) {
+            return route('call-crm.index');
+        }
+        if ($this->canAccessCrm()) {
+            return route('customers.index');
+        }
+        if ($this->canAccessOperations()) {
+            return route('operations.index');
+        }
+        if ($this->canAccessPincodes()) {
+            return route('pincodes.index');
+        }
+
+        return route('login');
+    }
+
     /** Mobile app tab access — Dashboard is always allowed. */
     public function appAccessCrm(): bool
     {
-        return $this->appAccessFlag('access_crm', $this->canAccessCrm());
+        return $this->appAccessFlag('access_crm', $this->isAdmin() || $this->isCoordinator() || $this->isFrontOffice());
     }
 
     public function appAccessCallCrm(): bool
     {
-        return $this->appAccessFlag('access_call_crm', $this->canAccessCallCrm());
+        return $this->appAccessFlag('access_call_crm', $this->isAdmin() || $this->isCoordinator() || $this->isFrontOffice());
     }
 
     public function appAccessOperations(): bool
     {
-        return $this->appAccessFlag('access_operations', $this->canAccessOperations());
+        return $this->appAccessFlag('access_operations', $this->isAdmin() || $this->isCoordinator() || $this->isOperation());
     }
 
     public function appAccessPincodes(): bool
     {
-        return $this->appAccessFlag('access_pincodes', $this->canAccessPincodes());
+        return $this->appAccessFlag('access_pincodes', $this->isAdmin() || $this->isCoordinator() || $this->isFrontOffice() || $this->isOperation());
     }
 
     public function appAccessInventory(): bool
@@ -181,7 +245,7 @@ class User extends Authenticatable
         ];
     }
 
-    private function appAccessFlag(string $key, bool $roleDefault): bool
+    public function appAccessFlag(string $key, bool $roleDefault): bool
     {
         $meta = is_array($this->meta) ? $this->meta : [];
         if (array_key_exists($key, $meta)) {

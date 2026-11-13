@@ -102,9 +102,10 @@
         <nav class="p-2 flex-1 overflow-y-auto crm-scroll text-[13px] space-y-1">
             @php
                 $navUser = auth()->user();
-                $links = [
-                    ['dashboard', 'Dashboard'],
-                ];
+                $links = [];
+                if ($navUser->canAccessDashboard()) {
+                    $links[] = ['dashboard', 'Dashboard'];
+                }
                 if ($navUser->canAccessCrm()) {
                     $links[] = ['customers.index', 'CRM'];
                 }

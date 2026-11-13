@@ -22,6 +22,8 @@
             'access_operations' => $u->appAccessOperations(),
             'access_pincodes' => $u->appAccessPincodes(),
             'access_inventory' => $u->appAccessInventory(),
+            'can_edit' => $u->canEditCustomers(),
+            'can_delete' => $u->canDeleteCustomers(),
         ];
         foreach ($formFields as $field) {
             if ($field->key === 'password') {
@@ -47,6 +49,8 @@
                 access_operations: !!user.access_operations,
                 access_pincodes: user.access_pincodes !== undefined ? !!user.access_pincodes : true,
                 access_inventory: !!user.access_inventory,
+                can_edit: !!user.can_edit,
+                can_delete: !!user.can_delete,
             };
             this.editOpen = true;
         },
@@ -143,6 +147,17 @@
                         <input type="checkbox" name="access_pincodes" value="1" class="rounded border-line text-brand"
                                @checked(old('access_pincodes', true))>
                         Pincode Manager
+                    </label>
+                    <div class="pt-2 border-t border-indigo-200/60 text-[11px] font-bold uppercase tracking-wide text-indigo-900">Record Actions</div>
+                    <label class="flex items-center gap-2 text-[13px] font-semibold text-ink">
+                        <input type="checkbox" name="can_edit" value="1" class="rounded border-line text-brand"
+                               @checked(old('can_edit'))>
+                        Allow Edit Customers
+                    </label>
+                    <label class="flex items-center gap-2 text-[13px] font-semibold text-ink">
+                        <input type="checkbox" name="can_delete" value="1" class="rounded border-line text-brand"
+                               @checked(old('can_delete'))>
+                        Allow Delete Customers
                     </label>
                 </div>
 
@@ -335,6 +350,17 @@
                             <input type="checkbox" name="access_pincodes" value="1" class="rounded border-line text-brand"
                                    x-model="form.access_pincodes">
                             Pincode Manager
+                        </label>
+                        <div class="pt-2 border-t border-line text-[11px] font-bold uppercase tracking-wide text-slate-500">Record Actions</div>
+                        <label class="flex items-center gap-2 text-[13px] font-semibold text-ink">
+                            <input type="checkbox" name="can_edit" value="1" class="rounded border-line text-brand"
+                                   x-model="form.can_edit">
+                            Allow Edit Customers
+                        </label>
+                        <label class="flex items-center gap-2 text-[13px] font-semibold text-ink">
+                            <input type="checkbox" name="can_delete" value="1" class="rounded border-line text-brand"
+                                   x-model="form.can_delete">
+                            Allow Delete Customers
                         </label>
                     </div>
                 </div>

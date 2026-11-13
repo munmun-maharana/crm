@@ -13,8 +13,11 @@ use Illuminate\View\View;
 
 class DashboardController extends Controller
 {
-    public function index(Request $request): View
+    public function index(Request $request): View|\Illuminate\Http\RedirectResponse
     {
+        if (! $request->user()->canAccessDashboard()) {
+            return redirect($request->user()->defaultRoute());
+        }
         $today = Carbon::today();
         $pipeline = $request->user()->isOperation() ? 'operations' : 'crm';
         $leads = fn () => Customer::query()->visibleTo($request->user())->inPipeline($pipeline);

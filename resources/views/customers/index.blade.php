@@ -376,7 +376,9 @@
                             @foreach($tableFields as $field)
                                 <th class="text-left font-bold px-4 py-2.5 whitespace-nowrap">{{ $field->label }}</th>
                             @endforeach
-                            <th class="text-right font-bold px-4 py-2.5 whitespace-nowrap">Action</th>
+                            @if(auth()->user()->canEditCustomers() || auth()->user()->canDeleteCustomers())
+                                <th class="text-right font-bold px-4 py-2.5 whitespace-nowrap">Action</th>
+                            @endif
                         </tr>
                     </thead>
                     <tbody>
@@ -453,39 +455,45 @@
                                         @endif
                                     </td>
                                 @endforeach
-                                <td class="px-4 py-2.5 text-right whitespace-nowrap" @click.stop>
-                                    <div class="inline-flex items-center gap-1.5 justify-end">
-                                        <button type="button"
-                                                title="Edit"
-                                                class="w-8 h-8 inline-flex items-center justify-center rounded-lg border border-line text-brand hover:bg-brand-soft transition"
-                                                @click="openEditForm(@js(array_merge([
-                                                    'id' => $c->id,
-                                                    'name' => $c->name,
-                                                    'email' => $c->email,
-                                                    'phone' => $c->phone,
-                                                    'company' => $c->company,
-                                                    'city' => $c->city,
-                                                    'source' => $c->source,
-                                                    'status' => $c->status,
-                                                    'notes' => $c->notes,
-                                                    'assigned_to' => $c->assigned_to,
-                                                    'meta' => $c->meta ?? (object) [],
-                                                ], $c->meta ?? [])))">
-                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
-                                        </button>
-                                        <form method="POST" action="{{ route('customers.destroy', $c) }}"
-                                              onsubmit="return confirm('Delete this customer?')">
-                                            @csrf @method('DELETE')
-                                            <button type="submit" title="Delete"
-                                                    class="w-8 h-8 inline-flex items-center justify-center rounded-lg border border-line text-rose-600 hover:bg-rose-50 transition">
-                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-                                            </button>
-                                        </form>
-                                    </div>
-                                </td>
+                                @if(auth()->user()->canEditCustomers() || auth()->user()->canDeleteCustomers())
+                                    <td class="px-4 py-2.5 text-right whitespace-nowrap" @click.stop>
+                                        <div class="inline-flex items-center gap-1.5 justify-end">
+                                            @if(auth()->user()->canEditCustomers())
+                                                <button type="button"
+                                                        title="Edit"
+                                                        class="w-8 h-8 inline-flex items-center justify-center rounded-lg border border-line text-brand hover:bg-brand-soft transition"
+                                                        @click="openEditForm(@js(array_merge([
+                                                            'id' => $c->id,
+                                                            'name' => $c->name,
+                                                            'email' => $c->email,
+                                                            'phone' => $c->phone,
+                                                            'company' => $c->company,
+                                                            'city' => $c->city,
+                                                            'source' => $c->source,
+                                                            'status' => $c->status,
+                                                            'notes' => $c->notes,
+                                                            'assigned_to' => $c->assigned_to,
+                                                            'meta' => $c->meta ?? (object) [],
+                                                        ], $c->meta ?? [])))">
+                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                                                </button>
+                                            @endif
+                                            @if(auth()->user()->canDeleteCustomers())
+                                                <form method="POST" action="{{ route('customers.destroy', $c) }}"
+                                                      onsubmit="return confirm('Delete this customer?')">
+                                                    @csrf @method('DELETE')
+                                                    <button type="submit" title="Delete"
+                                                            class="w-8 h-8 inline-flex items-center justify-center rounded-lg border border-line text-rose-600 hover:bg-rose-50 transition">
+                                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                                                    </button>
+                                                </form>
+                                            @endif
+                                        </div>
+                                    </td>
+                                @endif
                             </tr>
                         @empty
-                            <tr><td colspan="{{ $tableFields->count() + ((auth()->user()->canSeeAllRecords() && ($pipeline ?? 'crm') !== 'call_crm') ? 1 : 0) + ((($pipeline ?? 'crm') === 'operations') ? 1 : 0) + 2 }}" class="px-4 py-10 text-center text-slate-400">{{ auth()->user()->canSeeAllRecords() ? 'No customers found' : 'No customers mapped to you' }}</td></tr>
+                            <tr><td colspan="{{ $tableFields->count() + ((auth()->user()->canSeeAllRecords() && ($pipeline ?? 'crm') !== 'call_crm') ? 1 : 0) + ((($pipeline ?? 'crm') === 'operations') ? 1 : 0) + 1 + ((auth()->user()->canEditCustomers() || auth()->user()->canDeleteCustomers()) ? 1 : 0) }}" class="px-4 py-10 text-center text-slate-400">{{ auth()->user()->canSeeAllRecords() ? 'No customers found' : 'No customers mapped to you' }}</td></tr>
                         @endforelse
                     </tbody>
                 </table>

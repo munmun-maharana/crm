@@ -276,6 +276,7 @@ class CustomerController extends Controller
 
     public function update(Request $request, Customer $customer): RedirectResponse
     {
+        abort_unless($request->user()->canEditCustomers(), 403);
         $this->authorizeMapped($request, $customer);
         $fields = $this->formFieldsFor($request, $customer->pipeline ?? 'crm');
         $request->validate($this->fields->validationRules($fields));
@@ -857,6 +858,7 @@ class CustomerController extends Controller
 
     public function destroy(Request $request, Customer $customer): RedirectResponse
     {
+        abort_unless($request->user()->canDeleteCustomers(), 403);
         $this->authorizeMapped($request, $customer);
         $customer->delete();
 

@@ -84,7 +84,7 @@ class PincodeController extends Controller
 
     public function update(Request $request, Pincode $pincode): RedirectResponse
     {
-        abort_unless($request->user()->canAccessPincodes(), 403);
+        abort_unless($request->user()->canAccessPincodes() && ($request->user()->isAdmin() || $request->user()->canEditCustomers()), 403);
 
         // Quick status-only update
         if ($request->has('quick_status') && ! $request->has('pincode')) {
@@ -123,7 +123,7 @@ class PincodeController extends Controller
 
     public function destroy(Request $request, Pincode $pincode): RedirectResponse
     {
-        abort_unless($request->user()->canAccessPincodes(), 403);
+        abort_unless($request->user()->canAccessPincodes() && ($request->user()->isAdmin() || $request->user()->canDeleteCustomers()), 403);
 
         $pincode->delete();
 

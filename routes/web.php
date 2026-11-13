@@ -17,7 +17,7 @@ use App\Http\Controllers\WhatsappSettingController;
 use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/', fn () => auth()->check() ? redirect()->route('dashboard') : redirect()->route('login'));
+Route::get('/', fn () => auth()->check() ? redirect(auth()->user()->defaultRoute()) : redirect()->route('login'));
 
 Route::middleware('guest')->group(function () {
     Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
