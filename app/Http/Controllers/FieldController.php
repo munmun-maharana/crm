@@ -187,8 +187,8 @@ class FieldController extends Controller
             return back()->withErrors(['field' => 'The Pincode field is required by the system and cannot be deleted.']);
         }
 
-        if ($field->pipeline === 'products' && in_array($field->key, CrmField::PRODUCT_CORE_KEYS, true)) {
-            return back()->withErrors(['field' => 'Core product fields cannot be deleted.']);
+        if ($field->pipeline === 'products' && $field->key === 'name') {
+            return back()->withErrors(['field' => 'The Product Name field is required by the system and cannot be deleted.']);
         }
 
         if ($field->pipeline === 'users' && in_array($field->key, CrmField::USER_CORE_KEYS, true)) {
