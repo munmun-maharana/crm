@@ -3,13 +3,16 @@
 use App\Http\Controllers\Api\V1\AuthController as ApiAuthController;
 use App\Http\Controllers\Api\V1\CustomerController as ApiCustomerController;
 use App\Http\Controllers\Api\V1\DashboardController as ApiDashboardController;
+use App\Http\Controllers\Api\V1\ProductController as ApiProductController;
 use App\Http\Controllers\Api\V1\SettingsController as ApiSettingsController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BookingSlotController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\FieldController;
+use App\Http\Controllers\MenuSettingController;
 use App\Http\Controllers\NoteTemplateController;
 use App\Http\Controllers\OperationSettingController;
+use App\Http\Controllers\ProductController;
 use App\Http\Controllers\UploadController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\WhatsappSettingController;
@@ -41,6 +44,7 @@ Route::middleware(['api.token', 'api.mobile_json'])->group(function () {
     // Customer Actions
     Route::post('/customers/{customer}/activities', [CustomerController::class, 'addActivity']);
     Route::post('/customers/{customer}/assign-operations', [CustomerController::class, 'assignToOperations']);
+    Route::post('/customers/{customer}/assign-booking', [CustomerController::class, 'assignToBooking']);
     Route::post('/customers/{customer}/auto/{channel}', [CustomerController::class, 'autoAction']);
     Route::post('/customers/{customer}/compose', [CustomerController::class, 'compose']);
 
@@ -52,6 +56,16 @@ Route::middleware(['api.token', 'api.mobile_json'])->group(function () {
     // Requests pipeline
     Route::get('/requests', [ApiCustomerController::class, 'requests']);
 
+    // Products Catalog & Management
+    Route::get('/products', [ApiProductController::class, 'index']);
+    Route::get('/products/meta', [ApiProductController::class, 'meta']);
+    Route::post('/products', [ProductController::class, 'store']);
+    Route::get('/products/{product}', [ApiProductController::class, 'show']);
+    Route::put('/products/{product}', [ProductController::class, 'update']);
+    Route::delete('/products/{product}', [ProductController::class, 'destroy']);
+    Route::post('/products/bulk', [ProductController::class, 'bulkAction']);
+    Route::post('/products/{product}/toggle-active', [ApiProductController::class, 'toggleActive']);
+
     // Booking Slots
     Route::get('/booking-slots', [BookingSlotController::class, 'index']);
     Route::post('/booking-slots/{bookingSlot}/book', [BookingSlotController::class, 'book']);
@@ -61,9 +75,19 @@ Route::middleware(['api.token', 'api.mobile_json'])->group(function () {
     Route::get('/upload/export', [UploadController::class, 'export']);
     Route::post('/upload', [UploadController::class, 'store']);
 
+    // Menu Settings (readable by all authenticated users)
+    Route::get('/menu-settings', [MenuSettingController::class, 'index']);
+
     // Admin-only Settings & User Management
     Route::middleware('admin')->group(function () {
         Route::get('/settings', [ApiSettingsController::class, 'index']);
+
+        // Settings - Sidebar Menu Names
+        Route::get('/settings/menu-settings', [MenuSettingController::class, 'index']);
+        Route::post('/settings/menu-settings/update-all', [MenuSettingController::class, 'updateAll']);
+        Route::post('/settings/menu-settings/reorder', [MenuSettingController::class, 'reorder']);
+        Route::put('/settings/menu-settings/{menuSetting}', [MenuSettingController::class, 'update']);
+        Route::post('/settings/menu-settings/{menuSetting}/reset', [MenuSettingController::class, 'reset']);
 
         // Settings - Booking slots
         Route::get('/settings/booking-slots', [ApiSettingsController::class, 'bookingSlots']);

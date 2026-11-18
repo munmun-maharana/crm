@@ -15,7 +15,12 @@ trait FormatsPayload
 {
     protected function pipelineOf(?string $value): string
     {
-        return $value === 'operations' ? 'operations' : 'crm';
+        return match ($value) {
+            'operations' => 'operations',
+            'call_crm' => 'call_crm',
+            'booking' => 'booking',
+            default => 'crm',
+        };
     }
 
     protected function statusOptionsFor(string $pipeline): array
@@ -89,6 +94,29 @@ trait FormatsPayload
 
     protected function customerRow(Customer $c): array
     {
+        $attachedProducts = $c->relationLoaded('products')
+            ? $c->products
+            : (is_array($c->meta['products'] ?? null) ? collect($c->meta['products']) : $c->products);
+
+        $productSummaries = $attachedProducts->map(function ($p) {
+            if (is_array($p)) {
+                return [
+                    'id' => (int) ($p['id'] ?? 0),
+                    'name' => (string) ($p['name'] ?? ''),
+                    'code' => (string) ($p['code'] ?? ''),
+                    'price' => $p['price'] ?? null,
+                ];
+            }
+            return [
+                'id' => (int) $p->id,
+                'name' => (string) $p->name,
+                'code' => (string) $p->code,
+                'price' => $p->price,
+            ];
+        })->values()->all();
+
+        $productIds = collect($productSummaries)->pluck('id')->filter()->values()->all();
+
         return [
             'id' => $c->id,
             'name' => $c->name,
@@ -111,6 +139,8 @@ trait FormatsPayload
             'last_contact_at' => $c->last_contact_at?->toIso8601String(),
             'created_at' => $c->created_at?->toIso8601String(),
             'created_label' => $c->created_at?->format('d M Y'),
+            'products' => $productSummaries,
+            'product_ids' => $productIds,
             'meta' => (object) (is_array($c->meta) ? $c->meta : []),
         ];
     }
@@ -152,8 +182,13 @@ trait FormatsPayload
             'is_admin' => $user->isAdmin(),
             'is_coordinator' => $user->isCoordinator(),
             'is_operation' => $user->isOperation(),
+            'can_access_dashboard' => $user->canAccessDashboard(),
             'can_access_crm' => $user->canAccessCrm(),
+            'can_access_call_crm' => $user->canAccessCallCrm(),
             'can_access_operations' => $user->canAccessOperations(),
+            'can_access_booking' => $user->canAccessBooking(),
+            'can_access_pincodes' => $user->canAccessPincodes(),
+            'can_access_products' => $user->canAccessProducts(),
             'can_access_inventory' => false,
             'can_assign_users' => $user->canAssignUsers(),
             'can_bulk_map' => $user->canBulkMap(),

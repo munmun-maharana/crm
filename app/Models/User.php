@@ -174,6 +174,15 @@ class User extends Authenticatable
         return $this->appAccessFlag('access_operations', $this->isCoordinator() || $this->isOperation());
     }
 
+    public function canAccessBooking(): bool
+    {
+        if ($this->isAdmin()) {
+            return true;
+        }
+
+        return $this->appAccessFlag('access_booking', $this->isCoordinator() || $this->isFrontOffice() || $this->isOperation() || $this->canAccessCallCrm());
+    }
+
     public function canAccessPincodes(): bool
     {
         if ($this->isAdmin()) {
@@ -181,6 +190,15 @@ class User extends Authenticatable
         }
 
         return $this->appAccessFlag('access_pincodes', $this->isCoordinator() || $this->isFrontOffice() || $this->isOperation());
+    }
+
+    public function canAccessProducts(): bool
+    {
+        if ($this->isAdmin()) {
+            return true;
+        }
+
+        return $this->appAccessFlag('access_products', $this->isCoordinator() || $this->isFrontOffice());
     }
 
     public function canAccessInventory(): bool
@@ -243,9 +261,19 @@ class User extends Authenticatable
         return $this->appAccessFlag('access_operations', $this->isAdmin() || $this->isCoordinator() || $this->isOperation());
     }
 
+    public function appAccessBooking(): bool
+    {
+        return $this->appAccessFlag('access_booking', $this->isAdmin() || $this->isCoordinator() || $this->isFrontOffice() || $this->isOperation());
+    }
+
     public function appAccessPincodes(): bool
     {
         return $this->appAccessFlag('access_pincodes', $this->isAdmin() || $this->isCoordinator() || $this->isFrontOffice() || $this->isOperation());
+    }
+
+    public function appAccessProducts(): bool
+    {
+        return $this->appAccessFlag('access_products', $this->isAdmin() || $this->isCoordinator() || $this->isFrontOffice());
     }
 
     public function appAccessInventory(): bool
@@ -258,8 +286,10 @@ class User extends Authenticatable
         return [
             'crm' => $this->appAccessCrm(),
             'call_crm' => $this->appAccessCallCrm(),
+            'booking' => $this->appAccessBooking(),
             'operations' => $this->appAccessOperations(),
             'pincodes' => $this->appAccessPincodes(),
+            'products' => $this->appAccessProducts(),
             'inventory' => $this->appAccessInventory(),
         ];
     }

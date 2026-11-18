@@ -53,6 +53,10 @@ class CrmField extends Model
         'pincode', 'area', 'city', 'state', 'zone', 'status', 'assigned_to', 'notes',
     ];
 
+    public const PRODUCT_CORE_KEYS = [
+        'name', 'code', 'price', 'category', 'unit', 'description', 'status',
+    ];
+
     public const TYPES = [
         'text' => 'Text',
         'email' => 'Email',
@@ -83,9 +87,11 @@ class CrmField extends Model
     {
         return match ($pipeline) {
             'operations' => 'operations',
+            'booking' => 'booking',
             'users' => 'users',
             'pincodes' => 'pincodes',
             'call_crm' => 'call_crm',
+            'products' => 'products',
             default => 'crm',
         };
     }
@@ -103,6 +109,10 @@ class CrmField extends Model
 
         if ($this->pipeline === 'pincodes') {
             return in_array($this->key, self::PINCODE_CORE_KEYS, true);
+        }
+
+        if ($this->pipeline === 'products') {
+            return in_array($this->key, self::PRODUCT_CORE_KEYS, true);
         }
 
         return in_array($this->key, self::CORE_KEYS, true);

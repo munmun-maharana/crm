@@ -10,6 +10,8 @@ class AppUser {
   final bool isOperation;
   final bool canAccessCrm;
   final bool canAccessOperations;
+  final bool canAccessBooking;
+  final bool canAccessProducts;
   final bool canAccessInventory;
   final bool canAssignUsers;
   final bool canBulkMap;
@@ -29,6 +31,8 @@ class AppUser {
     this.isOperation = false,
     this.canAccessCrm = false,
     this.canAccessOperations = false,
+    this.canAccessBooking = false,
+    this.canAccessProducts = false,
     this.canAccessInventory = false,
     this.canAssignUsers = false,
     this.canBulkMap = false,
@@ -50,6 +54,8 @@ class AppUser {
       isOperation: json['is_operation'] == true,
       canAccessCrm: json['can_access_crm'] == true,
       canAccessOperations: json['can_access_operations'] == true,
+      canAccessBooking: json['can_access_booking'] == true,
+      canAccessProducts: json['can_access_products'] == true,
       canAccessInventory: json['can_access_inventory'] == true,
       canAssignUsers: json['can_assign_users'] == true,
       canBulkMap: json['can_bulk_map'] == true,

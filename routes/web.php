@@ -8,8 +8,10 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\FieldController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\InventoryTypeController;
+use App\Http\Controllers\MenuSettingController;
 use App\Http\Controllers\NoteTemplateController;
 use App\Http\Controllers\PincodeController;
+use App\Http\Controllers\ProductController;
 use App\Http\Controllers\UploadController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\OperationSettingController;
@@ -31,6 +33,7 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/customers', [CustomerController::class, 'index'])->name('customers.index');
     Route::get('/call-crm', [CustomerController::class, 'callCrm'])->name('call-crm.index');
+    Route::get('/booking', [CustomerController::class, 'booking'])->name('booking.index');
     Route::get('/operations', [CustomerController::class, 'operations'])->name('operations.index');
     Route::post('/customers', [CustomerController::class, 'store'])->name('customers.store');
     Route::post('/customers/bulk-map', [CustomerController::class, 'bulkMap'])->name('customers.bulk-map');
@@ -40,6 +43,7 @@ Route::middleware('auth')->group(function () {
     Route::put('/customers/{customer}', [CustomerController::class, 'update'])->name('customers.update');
     Route::delete('/customers/{customer}', [CustomerController::class, 'destroy'])->name('customers.destroy');
     Route::post('/customers/{customer}/assign-operations', [CustomerController::class, 'assignToOperations'])->name('customers.assign-operations');
+    Route::post('/customers/{customer}/assign-booking', [CustomerController::class, 'assignToBooking'])->name('customers.assign-booking');
     Route::post('/customers/{customer}/activities', [CustomerController::class, 'addActivity'])->name('customers.activities');
     Route::post('/customers/{customer}/auto/{channel}', [CustomerController::class, 'autoAction'])->name('customers.auto');
     Route::post('/customers/{customer}/compose', [CustomerController::class, 'compose'])->name('customers.compose');
@@ -61,6 +65,16 @@ Route::middleware('auth')->group(function () {
     Route::put('/pincodes/{pincode}', [PincodeController::class, 'update'])->name('pincodes.update');
     Route::delete('/pincodes/{pincode}', [PincodeController::class, 'destroy'])->name('pincodes.destroy');
 
+    Route::get('/products', [ProductController::class, 'index'])->name('products.index');
+    Route::post('/products', [ProductController::class, 'store'])->name('products.store');
+    Route::post('/products/bulk', [ProductController::class, 'bulkAction'])->name('products.bulk');
+    Route::get('/products/list-json', [ProductController::class, 'listJson'])->name('products.list-json');
+    Route::get('/products/export', [ProductController::class, 'export'])->name('products.export');
+    Route::get('/products/demo', [ProductController::class, 'downloadDemo'])->name('products.demo');
+    Route::post('/products/import', [ProductController::class, 'import'])->name('products.import');
+    Route::put('/products/{product}', [ProductController::class, 'update'])->name('products.update');
+    Route::delete('/products/{product}', [ProductController::class, 'destroy'])->name('products.destroy');
+
     Route::get('/upload', [UploadController::class, 'index'])->name('upload.index');
     Route::get('/upload/demo', [UploadController::class, 'demo'])->name('upload.demo');
     Route::get('/upload/export', [UploadController::class, 'export'])->name('upload.export');
@@ -75,6 +89,11 @@ Route::middleware('auth')->group(function () {
         Route::post('/fields/reorder', [FieldController::class, 'reorder'])->name('fields.reorder');
         Route::put('/fields/{field}', [FieldController::class, 'update'])->name('fields.update');
         Route::delete('/fields/{field}', [FieldController::class, 'destroy'])->name('fields.destroy');
+
+        Route::post('/menu-settings/update-all', [MenuSettingController::class, 'updateAll'])->name('settings.menu-settings.update-all');
+        Route::post('/menu-settings/reorder', [MenuSettingController::class, 'reorder'])->name('settings.menu-settings.reorder');
+        Route::put('/menu-settings/{menuSetting}', [MenuSettingController::class, 'update'])->name('settings.menu-settings.update');
+        Route::post('/menu-settings/{menuSetting}/reset', [MenuSettingController::class, 'reset'])->name('settings.menu-settings.reset');
 
         Route::get('/note-templates', fn () => redirect()->route('settings.index', ['tab' => 'notes']))->name('note-templates.index');
         Route::post('/note-templates', [NoteTemplateController::class, 'store'])->name('note-templates.store');

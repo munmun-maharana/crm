@@ -52,6 +52,7 @@ class CustomerController extends Controller
         $status = trim($request->string('status')->toString());
         $filter = trim($request->string('filter')->toString());
         $assignedTo = $request->integer('assigned_to') ?: null;
+        $productPending = $request->integer('product_pending') ?: null;
         $perPage = min(50, max(5, (int) $request->integer('per_page', 15)));
 
         if ($filter === 'interested' && $status === '') {
@@ -60,8 +61,33 @@ class CustomerController extends Controller
 
         $base = Customer::query()->visibleTo($request->user())->inPipeline($pipeline);
 
+        $allLeadsCount = (clone $base)->count();
+        $allActiveProducts = \App\Models\Product::active()->ordered()->get();
+        $productCards = [];
+        if ($allActiveProducts->isNotEmpty()) {
+            foreach ($allActiveProducts as $prod) {
+                $checkedCount = (clone $base)->where(function ($sub) use ($prod) {
+                    $sub->whereHas('products', fn ($p) => $p->where('products.id', $prod->id))
+                        ->orWhereJsonContains('meta->product_ids', (int) $prod->id)
+                        ->orWhereJsonContains('meta->product_ids', (string) $prod->id);
+                })->count();
+                $pendingCount = max(0, $allLeadsCount - $checkedCount);
+
+                $productCards[] = [
+                    'id' => $prod->id,
+                    'label' => $prod->short_name ?: $prod->name,
+                    'full_name' => $prod->name,
+                    'code' => $prod->code,
+                    'total_count' => $allLeadsCount,
+                    'checked_count' => $checkedCount,
+                    'pending_count' => $pendingCount,
+                    'active' => ($productPending === (int) $prod->id),
+                ];
+            }
+        }
+
         $page = (clone $base)
-            ->with('assignee')
+            ->with(['assignee', 'products'])
             ->when($q !== '', fn ($query) => $query->where(function ($inner) use ($q) {
                 $inner->where('name', 'like', "%{$q}%")
                     ->orWhere('email', 'like', "%{$q}%")
@@ -69,6 +95,16 @@ class CustomerController extends Controller
                     ->orWhere('company', 'like', "%{$q}%");
             }))
             ->when($request->user()->canSeeAllRecords() && $assignedTo, fn ($query) => $query->where('assigned_to', $assignedTo))
+            ->when($productPending, function ($query) use ($productPending) {
+                $query->whereDoesntHave('products', fn ($p) => $p->where('products.id', $productPending))
+                    ->where(function ($sub) use ($productPending) {
+                        $sub->whereNull('meta->product_ids')
+                            ->orWhere(function ($inner) use ($productPending) {
+                                $inner->whereJsonDoesntContain('meta->product_ids', (int) $productPending)
+                                      ->whereJsonDoesntContain('meta->product_ids', (string) $productPending);
+                            });
+                    });
+            })
             ->when($filter === 'follow_up_today', function ($query) {
                 $query->where('follow_up', true)
                     ->whereDate('follow_up_at', today())
@@ -88,12 +124,20 @@ class CustomerController extends Controller
         return response()->json([
             'ok' => true,
             'pipeline' => $pipeline,
-            'filters' => ['q' => $q, 'status' => $status, 'filter' => $filter, 'assigned_to' => $assignedTo],
+            'filters' => ['q' => $q, 'status' => $status, 'filter' => $filter, 'assigned_to' => $assignedTo, 'product_pending' => $productPending],
             'summary' => [
-                'total' => (clone $base)->count(),
+                'total' => $allLeadsCount,
                 'today' => (clone $base)->whereDate('created_at', today())->count(),
                 'follow_up_today' => (clone $base)->where('follow_up', true)->whereDate('follow_up_at', today())->count(),
             ],
+            'product_cards' => $productCards,
+            'available_products' => $allActiveProducts->map(fn ($p) => [
+                'id' => $p->id,
+                'name' => $p->name,
+                'short_name' => $p->short_name,
+                'code' => $p->code,
+                'price' => $p->price,
+            ])->values(),
             'pagination' => [
                 'current_page' => $page->currentPage(),
                 'last_page' => $page->lastPage(),
@@ -119,6 +163,13 @@ class CustomerController extends Controller
             'table_fields' => $this->fieldsPayload($this->fields->tableFields($pipeline)),
             'excel_fields' => $this->fieldsPayload($this->fields->excelFields($pipeline)),
             'status_options' => $this->statusOptionsFor($pipeline),
+            'available_products' => \App\Models\Product::active()->ordered()->get(['id', 'name', 'code', 'price'])->map(fn ($p) => [
+                'id' => $p->id,
+                'name' => $p->name,
+                'short_name' => $p->short_name,
+                'code' => $p->code,
+                'price' => $p->price,
+            ])->values(),
             'agents' => User::orderBy('name')->get(['id', 'name', 'role'])->map(fn ($u) => ['id' => $u->id, 'name' => $u->name, 'role' => $u->role])->values(),
             'note_templates' => NoteTemplate::active()->ordered()->get(['id', 'title', 'body']),
             'permissions' => [
@@ -136,7 +187,7 @@ class CustomerController extends Controller
         abort_unless($customer->accessibleBy($request->user()), 403);
         $pipeline = $customer->pipeline ?? 'crm';
 
-        $customer->load(['assignee', 'activities.user', 'operationCopy', 'sourceCustomer']);
+        $customer->load(['assignee', 'activities.user', 'operationCopy', 'bookingCopy', 'bookingCopies.products', 'sourceCustomer', 'products']);
 
         $allFields = CrmField::inPipeline($pipeline)->active()->ordered()->get();
         $fieldValues = $allFields->map(function (CrmField $f) use ($customer) {
@@ -165,6 +216,7 @@ class CustomerController extends Controller
             'customer' => [
                 ...$this->customerRow($customer),
                 'operation_copy_id' => $customer->operationCopy?->id,
+                'booking_copy_id' => $customer->bookingCopy?->id,
                 'source_customer_id' => $customer->source_customer_id,
                 'source_customer_name' => $customer->sourceCustomer?->name,
             ],
@@ -172,15 +224,19 @@ class CustomerController extends Controller
             'form_fields' => $this->fieldsPayload($this->formFieldsFor($request, $pipeline)),
             'update_fields' => $updateFields,
             'status_options' => $this->statusOptionsFor($pipeline),
-            'wash_statuses' => $isOps ? ['Success', 'Cancelled', 'Pending'] : [],
+            'wash_statuses' => $isOps ? ['Success', 'Cancelled', 'Pending'] : ($customer->isBooking() ? ['Success', 'Cancelled'] : []),
+            'available_products' => \App\Models\Product::active()->ordered()->get(['id', 'name', 'code', 'price', 'category', 'unit'])->values(),
             'note_templates' => NoteTemplate::active()->ordered()->get(['id', 'title', 'body']),
             'activities' => $customer->activities->sortByDesc('id')->map(fn ($a) => $this->activityPayload($a))->values(),
             'operation_setting' => $isOps ? null : OperationSetting::current()->only(['status', 'title', 'body']),
             'permissions' => [
                 'can_edit' => true,
                 'can_delete' => true,
-                'can_assign_operations' => ! $isOps && $user->canAccessCrm() && ! $customer->operationCopy,
+                'can_assign_operations' => ! $isOps && ! $customer->isBooking() && $user->canAccessCrm() && ! $customer->operationCopy,
                 'is_assigned_to_ops' => ! $isOps && (bool) $customer->operationCopy,
+                'can_assign_booking' => $customer->isCallCrm() && ($user->canAccessCallCrm() || $user->canAccessBooking()),
+                'is_assigned_to_booking' => $customer->isCallCrm() && (bool) $customer->bookingCopy,
+                'assigned_booking_product_ids' => $customer->assignedBookingProductIds(),
                 'can_assign_users' => $user->canAssignUsers(),
             ],
         ]);

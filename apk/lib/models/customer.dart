@@ -21,7 +21,10 @@ class Customer {
   final String? createdAt;
   final String? createdLabel;
   final Map<String, dynamic> meta;
+  final List<Map<String, dynamic>> products;
+  final List<int> productIds;
   final int? operationCopyId;
+  final int? bookingCopyId;
   final int? sourceCustomerId;
   final String? sourceCustomerName;
 
@@ -48,12 +51,17 @@ class Customer {
     this.createdAt,
     this.createdLabel,
     this.meta = const {},
+    this.products = const [],
+    this.productIds = const [],
     this.operationCopyId,
+    this.bookingCopyId,
     this.sourceCustomerId,
     this.sourceCustomerName,
   });
 
   bool get isOperations => pipeline == 'operations';
+  bool get isBooking => pipeline == 'booking';
+  bool get isCallCrm => pipeline == 'call_crm';
 
   dynamic getMetaValue(String key) {
     if (meta.containsKey(key)) return meta[key];
@@ -107,7 +115,20 @@ class Customer {
       meta: (json['meta'] is Map)
           ? Map<String, dynamic>.from(json['meta'] as Map)
           : {},
+      products: ((json['products'] as List?) ??
+              (json['meta'] is Map ? (json['meta']['products'] as List?) : null) ??
+              [])
+          .whereType<Map>()
+          .map((m) => Map<String, dynamic>.from(m))
+          .toList(),
+      productIds: ((json['product_ids'] as List?) ??
+              (json['meta'] is Map ? (json['meta']['product_ids'] as List?) : null) ??
+              [])
+          .map((e) => int.tryParse(e.toString()) ?? 0)
+          .where((id) => id > 0)
+          .toList(),
       operationCopyId: json['operation_copy_id'] as int?,
+      bookingCopyId: json['booking_copy_id'] as int?,
       sourceCustomerId: json['source_customer_id'] as int?,
       sourceCustomerName: json['source_customer_name']?.toString(),
     );

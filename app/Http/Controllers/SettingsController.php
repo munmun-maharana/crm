@@ -6,6 +6,7 @@ use App\Models\BookingSlot;
 use App\Models\BookingSlotSetting;
 use App\Models\CrmField;
 use App\Models\InventoryType;
+use App\Models\MenuSetting;
 use App\Models\NoteTemplate;
 use App\Models\OperationSetting;
 use App\Models\WhatsappSetting;
@@ -17,10 +18,10 @@ class SettingsController extends Controller
 {
     public function index(Request $request): View
     {
-        $allowed = ['fields', 'call-crm-fields', 'notes', 'whatsapp', 'booking-slots', 'op-assign', 'op-fields', 'user-fields', 'pincode-fields', 'security'];
+        $allowed = ['overview', 'fields', 'call-crm-fields', 'booking-fields', 'notes', 'whatsapp', 'booking-slots', 'op-assign', 'op-fields', 'user-fields', 'pincode-fields', 'product-fields', 'sidebar-menus', 'security'];
         $tab = $request->string('tab')->toString();
         if (! in_array($tab, $allowed, true)) {
-            $tab = 'fields';
+            $tab = 'overview';
         }
 
         $slotDateStr = $request->string('slot_date')->toString();
@@ -47,6 +48,7 @@ class SettingsController extends Controller
 
         $fields = CrmField::inPipeline('crm')->ordered()->get();
         $callCrmFields = CrmField::inPipeline('call_crm')->ordered()->get();
+        $bookingFields = CrmField::inPipeline('booking')->ordered()->get();
         $templates = NoteTemplate::ordered()->get();
         $setting = OperationSetting::current();
         $bookingSlotSetting = BookingSlotSetting::current();
@@ -55,6 +57,8 @@ class SettingsController extends Controller
         $opFields = CrmField::inPipeline('operations')->ordered()->get();
         $userFields = CrmField::inPipeline('users')->ordered()->get();
         $pincodeFields = CrmField::inPipeline('pincodes')->ordered()->get();
+        $productFields = CrmField::inPipeline('products')->ordered()->get();
+        $menuSettings = MenuSetting::ordered()->get();
         $inventoryTypes = InventoryType::ordered()->get();
         $crmFields = $fields->map(fn ($f) => (object) ['id' => $f->id, 'key' => $f->key, 'label' => $f->label]);
 
@@ -62,6 +66,7 @@ class SettingsController extends Controller
             'tab',
             'fields',
             'callCrmFields',
+            'bookingFields',
             'templates',
             'setting',
             'bookingSlotSetting',
@@ -70,6 +75,8 @@ class SettingsController extends Controller
             'opFields',
             'userFields',
             'pincodeFields',
+            'productFields',
+            'menuSettings',
             'inventoryTypes',
             'crmFields',
             'slotDate',

@@ -39,6 +39,9 @@ class _CrmScreenState extends State<CrmScreen> {
   String? _statusFilter;
   String? _specialFilter;
   int? _assignedToFilter;
+  int? _productPendingFilter;
+  List<Map<String, dynamic>> _productCards = [];
+  List<Map<String, dynamic>> _availableProducts = [];
 
   int _currentPage = 1;
   int _lastPage = 1;
@@ -67,6 +70,10 @@ class _CrmScreenState extends State<CrmScreen> {
           _statusOptions = (res['status_options'] as List?)?.map((e) => e.toString()).toList() ?? [];
           final rawAgents = (res['agents'] as List?) ?? [];
           _agents = rawAgents.whereType<Map>().map((m) => Map<String, dynamic>.from(m)).toList();
+          final rawAvail = (res['available_products'] as List?) ?? [];
+          if (rawAvail.isNotEmpty) {
+            _availableProducts = rawAvail.whereType<Map>().map((m) => Map<String, dynamic>.from(m)).toList();
+          }
         });
       }
     } catch (_) {}
@@ -85,6 +92,7 @@ class _CrmScreenState extends State<CrmScreen> {
         status: _statusFilter,
         filter: _specialFilter,
         assignedTo: _assignedToFilter,
+        productPending: _productPendingFilter,
         page: page,
       );
 
@@ -94,6 +102,11 @@ class _CrmScreenState extends State<CrmScreen> {
           .map((m) => Customer.fromJson(Map<String, dynamic>.from(m)))
           .toList();
 
+      final rawProdCards = (res['product_cards'] as List?) ?? [];
+      final prodCards = rawProdCards.whereType<Map>().map((m) => Map<String, dynamic>.from(m)).toList();
+      final rawAvail = (res['available_products'] as List?) ?? [];
+      final availProducts = rawAvail.whereType<Map>().map((m) => Map<String, dynamic>.from(m)).toList();
+
       final pagination = (res['pagination'] is Map) ? res['pagination'] as Map : {};
 
       if (mounted) {
@@ -102,6 +115,10 @@ class _CrmScreenState extends State<CrmScreen> {
           _lastPage = pagination['last_page'] as int? ?? 1;
           _totalCount = pagination['total'] as int? ?? items.length;
           _customers = items;
+          _productCards = prodCards;
+          if (availProducts.isNotEmpty) {
+            _availableProducts = availProducts;
+          }
           _loading = false;
         });
       }
@@ -388,6 +405,49 @@ class _CrmScreenState extends State<CrmScreen> {
                     ],
                   ),
                 ),
+
+                if (_productCards.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        ..._productCards.map((p) {
+                          final pid = p['id'] as int? ?? 0;
+                          final isSelected = _productPendingFilter == pid;
+                          final label = (p['label'] ?? p['code'] ?? p['name'])?.toString() ?? 'Product';
+                          final pendingCount = p['pending_count'] ?? 0;
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 6),
+                            child: ActionChip(
+                              avatar: Icon(
+                                isSelected ? Icons.check_circle : Icons.inventory_2_outlined,
+                                size: 14,
+                                color: isSelected ? Colors.white : const Color(0xFF4F46E5),
+                              ),
+                              label: Text(
+                                '$label: $pendingCount pending',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: isSelected ? Colors.white : const Color(0xFF3730A3),
+                                ),
+                              ),
+                              backgroundColor: isSelected ? const Color(0xFF4F46E5) : const Color(0xFFEEF2FF),
+                              side: BorderSide(color: isSelected ? const Color(0xFF4338CA) : const Color(0xFFC7D2FE)),
+                              onPressed: () {
+                                setState(() {
+                                  _productPendingFilter = isSelected ? null : pid;
+                                });
+                                _fetchCustomers(page: 1);
+                              },
+                            ),
+                          );
+                        }),
+                      ],
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -514,6 +574,14 @@ class _CrmScreenState extends State<CrmScreen> {
                                                   ],
                                                 ),
                                                 const SizedBox(height: 4),
+                                                if (widget.pipeline == 'booking' && c.sourceCustomerId != null)
+                                                  Padding(
+                                                    padding: const EdgeInsets.only(bottom: 2),
+                                                    child: Text(
+                                                      'Call CRM #${c.sourceCustomerId}',
+                                                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF4F46E5)),
+                                                    ),
+                                                  ),
                                                 Text(
                                                   '${c.phone ?? "No phone"} • ${c.city ?? "No city"}${c.assigneeName != null ? " • ${c.assigneeName}" : ""}',
                                                   style: const TextStyle(fontSize: 12, color: AppTheme.textMuted),
@@ -524,6 +592,57 @@ class _CrmScreenState extends State<CrmScreen> {
 
                                                 // Date summary badge
                                                 _buildDateSummaryBadge(c),
+
+                                                // Product badges (in booking/Assign Service show only checked products)
+                                                if (_availableProducts.isNotEmpty) ...[
+                                                  const SizedBox(height: 6),
+                                                  Wrap(
+                                                    spacing: 4,
+                                                    runSpacing: 4,
+                                                    children: _availableProducts
+                                                        .where((p) {
+                                                          if (widget.pipeline == 'booking') {
+                                                            final pid = p['id'] as int? ?? 0;
+                                                            return c.productIds.contains(pid);
+                                                          }
+                                                          return true;
+                                                        })
+                                                        .map((p) {
+                                                          final pid = p['id'] as int? ?? 0;
+                                                          final isChecked = c.productIds.contains(pid);
+                                                          final label = (p['short_name'] ?? p['code'] ?? p['name'])?.toString() ?? 'P';
+                                                          return Container(
+                                                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                                                        decoration: BoxDecoration(
+                                                          color: isChecked ? const Color(0xFFD1FAE5) : const Color(0xFFFFE4E6),
+                                                          borderRadius: BorderRadius.circular(4),
+                                                          border: Border.all(
+                                                            color: isChecked ? const Color(0xFF6EE7B7) : const Color(0xFFFECDD3),
+                                                          ),
+                                                        ),
+                                                        child: Row(
+                                                          mainAxisSize: MainAxisSize.min,
+                                                          children: [
+                                                            Icon(
+                                                              isChecked ? Icons.check : Icons.close,
+                                                              size: 10,
+                                                              color: isChecked ? const Color(0xFF065F46) : const Color(0xFF9F1239),
+                                                            ),
+                                                            const SizedBox(width: 2),
+                                                            Text(
+                                                              label,
+                                                              style: TextStyle(
+                                                                fontSize: 9,
+                                                                fontWeight: FontWeight.bold,
+                                                                color: isChecked ? const Color(0xFF065F46) : const Color(0xFF9F1239),
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                      );
+                                                    }).toList(),
+                                                  ),
+                                                ],
                                               ],
                                             ),
                                           ),

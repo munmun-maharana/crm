@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Models\BookingSlot;
 use App\Models\BookingSlotSetting;
 use App\Models\CrmField;
+use App\Models\MenuSetting;
 use App\Models\NoteTemplate;
 use App\Models\OperationSetting;
 use App\Models\User;
@@ -36,6 +37,7 @@ class SettingsController extends Controller
                 'crm' => $this->fieldsPayload($crmFields),
                 'operations' => $this->fieldsPayload(CrmField::inPipeline('operations')->ordered()->get()),
                 'users' => $this->fieldsPayload(CrmField::inPipeline('users')->ordered()->get()),
+                'products' => $this->fieldsPayload(CrmField::inPipeline('products')->ordered()->get()),
             ],
             'crm_field_keys' => $crmFields->map(fn ($f) => ['key' => $f->key, 'label' => $f->label])->values(),
             'note_templates' => NoteTemplate::ordered()->get(['id', 'title', 'body', 'sort_order', 'is_active']),
@@ -43,6 +45,8 @@ class SettingsController extends Controller
             'operation_statuses' => $opStatuses,
             'whatsapp_setting' => WhatsappSetting::current()->only(['phone', 'message_template']),
             'booking_slot_setting' => BookingSlotSetting::current()->only(['status', 'title', 'body']),
+            'menu_settings' => MenuSetting::ordered()->get(),
+            'menu_map' => MenuSetting::allMap(),
         ]);
     }
 

@@ -47,6 +47,13 @@ class CustomerController extends Controller
         return $this->listing($request, 'operations');
     }
 
+    public function booking(Request $request): View
+    {
+        abort_unless($request->user()->canAccessBooking(), 403);
+
+        return $this->listing($request, 'booking');
+    }
+
     private function listing(Request $request, string $pipeline): View
     {
         $q = $request->string('q')->toString();
@@ -54,9 +61,11 @@ class CustomerController extends Controller
         $filter = $request->string('filter')->toString();
         $assignedTo = $request->integer('assigned_to') ?: null;
         $area = trim($request->string('area')->toString());
+        $productPending = $request->integer('product_pending') ?: null;
         $listRoute = match ($pipeline) {
             'operations' => 'operations.index',
             'call_crm' => 'call-crm.index',
+            'booking' => 'booking.index',
             default => 'customers.index',
         };
 
@@ -66,7 +75,7 @@ class CustomerController extends Controller
 
         $customers = $this->mappedCustomers($request)
             ->inPipeline($pipeline)
-            ->with('assignee')
+            ->with(['assignee', 'products'])
             ->when($q, fn ($query) => $query->where(function ($inner) use ($q) {
                 $inner->where('name', 'like', "%{$q}%")
                     ->orWhere('email', 'like', "%{$q}%")
@@ -95,6 +104,16 @@ class CustomerController extends Controller
                         ->orWhere('status', str_replace(' ', '-', $status))
                         ->orWhere('status', str_replace('-', ' ', $status));
                 });
+            })
+            ->when($productPending, function ($query) use ($productPending) {
+                $query->whereDoesntHave('products', fn ($p) => $p->where('products.id', $productPending))
+                    ->where(function ($sub) use ($productPending) {
+                        $sub->whereNull('meta->product_ids')
+                            ->orWhere(function ($inner) use ($productPending) {
+                                $inner->whereJsonDoesntContain('meta->product_ids', (int) $productPending)
+                                      ->whereJsonDoesntContain('meta->product_ids', (string) $productPending);
+                            });
+                    });
             })
             ->when($filter !== 'follow_up_today', fn ($query) => $query->latest())
             ->paginate(15)
@@ -164,6 +183,7 @@ class CustomerController extends Controller
                     'q' => $q ?: null,
                     'area' => $area ?: null,
                     'assigned_to' => $assignedTo ?: null,
+                    'product_pending' => $productPending ?: null,
                 ])),
             ],
             [
@@ -175,6 +195,7 @@ class CustomerController extends Controller
                     'q' => $q ?: null,
                     'area' => $area ?: null,
                     'assigned_to' => $assignedTo ?: null,
+                    'product_pending' => $productPending ?: null,
                     'filter' => $filter === 'follow_up_today' ? null : 'follow_up_today',
                 ])),
             ],
@@ -192,9 +213,43 @@ class CustomerController extends Controller
                     'q' => $q ?: null,
                     'area' => $area ?: null,
                     'assigned_to' => $assignedTo ?: null,
+                    'product_pending' => $productPending ?: null,
                     'status' => $isActive ? null : $st,
                 ])),
             ];
+        }
+
+        $allActiveProducts = \App\Models\Product::active()->ordered()->get();
+        $productCards = [];
+        if ($allActiveProducts->isNotEmpty()) {
+            foreach ($allActiveProducts as $prod) {
+                $checkedCount = (clone $countQuery)->where(function ($sub) use ($prod) {
+                    $sub->whereHas('products', fn ($p) => $p->where('products.id', $prod->id))
+                        ->orWhereJsonContains('meta->product_ids', (int) $prod->id)
+                        ->orWhereJsonContains('meta->product_ids', (string) $prod->id);
+                })->count();
+                $pendingCount = max(0, $allLeadsCount - $checkedCount);
+                $isActive = ($productPending === (int) $prod->id);
+
+                $productCards[] = [
+                    'id' => $prod->id,
+                    'label' => $prod->short_name ?: $prod->name,
+                    'full_name' => $prod->name,
+                    'code' => $prod->code,
+                    'total_count' => $allLeadsCount,
+                    'checked_count' => $checkedCount,
+                    'pending_count' => $pendingCount,
+                    'active' => $isActive,
+                    'url' => route($listRoute, array_filter([
+                        'q' => $q ?: null,
+                        'area' => $area ?: null,
+                        'assigned_to' => $assignedTo ?: null,
+                        'status' => $status ?: null,
+                        'filter' => $filter ?: null,
+                        'product_pending' => $isActive ? null : $prod->id,
+                    ])),
+                ];
+            }
         }
 
         $pincodeDirectory = $this->getPincodeDirectory();
@@ -222,7 +277,7 @@ class CustomerController extends Controller
         }
 
         return view('customers.index', compact(
-            'customers', 'agents', 'q', 'status', 'filter', 'assignedTo', 'area', 'areaOptions', 'pincodeDirectory', 'formFields', 'tableFields', 'excelFields', 'pipeline', 'listRoute', 'statusOptions', 'statusCards'
+            'customers', 'agents', 'q', 'status', 'filter', 'assignedTo', 'area', 'areaOptions', 'pincodeDirectory', 'formFields', 'tableFields', 'excelFields', 'pipeline', 'listRoute', 'statusOptions', 'statusCards', 'allActiveProducts', 'productCards', 'productPending'
         ));
     }
 
@@ -245,12 +300,14 @@ class CustomerController extends Controller
         $pipeline = match ($rawPipeline) {
             'operations' => 'operations',
             'call_crm' => 'call_crm',
+            'booking' => 'booking',
             default => 'crm',
         };
         abort_unless(
             match ($pipeline) {
                 'operations' => $request->user()->canAccessOperations(),
                 'call_crm' => $request->user()->canAccessCallCrm(),
+                'booking' => $request->user()->canAccessBooking(),
                 default => $request->user()->canAccessCrm(),
             },
             403
@@ -346,6 +403,7 @@ class CustomerController extends Controller
             'activities.user',
             'operationCopy',
             'sourceCustomer',
+            'products',
         ]);
         $formFields = $this->formFieldsFor($request, $customer->pipeline ?? 'crm');
         $noteTemplates = NoteTemplate::active()->ordered()->get(['id', 'title', 'body']);
@@ -430,6 +488,16 @@ class CustomerController extends Controller
 
         $core = $this->applyAssignment($request, $core, $customer);
 
+        if ($request->has('product_ids') || $request->has('products')) {
+            $inputProdIds = $request->input('product_ids', $request->input('products', []));
+            $inputProdIds = is_array($inputProdIds) ? array_values(array_filter(array_map('intval', $inputProdIds))) : [];
+            $customer->products()->sync($inputProdIds);
+
+            $selectedProds = \App\Models\Product::whereIn('id', $inputProdIds)->get(['id', 'name', 'code', 'price']);
+            $meta['products'] = $selectedProds->toArray();
+            $meta['product_ids'] = $inputProdIds;
+        }
+
         $oldStatus = $customer->status;
         $customer->update([...$core, 'meta' => array_merge($customer->meta ?? [], $meta)]);
 
@@ -498,11 +566,11 @@ class CustomerController extends Controller
         $targetStatus = null;
         if ($statusChangeVal !== '') {
             $lowerVal = strtolower($statusChangeVal);
-            if ($customer->isOperations() && in_array($lowerVal, ['success', 'wash success', 'completed'], true)) {
+            if (($customer->isOperations() || $customer->isBooking()) && in_array($lowerVal, ['success', 'wash success', 'completed'], true)) {
                 $targetStatus = 'Success';
-            } elseif ($customer->isOperations() && in_array($lowerVal, ['cancel', 'cancelled', 'canceled'], true)) {
+            } elseif (($customer->isOperations() || $customer->isBooking()) && in_array($lowerVal, ['cancel', 'cancelled', 'canceled'], true)) {
                 $targetStatus = 'Cancelled';
-            } elseif ($customer->isOperations() && $lowerVal === 'pending') {
+            } elseif (($customer->isOperations() || $customer->isBooking()) && $lowerVal === 'pending') {
                 $targetStatus = 'Pending';
             } else {
                 $matched = collect($statusOptions)->first(fn ($s) => strtolower(trim((string)$s)) === $lowerVal);
@@ -605,6 +673,21 @@ class CustomerController extends Controller
             }
         }
 
+        $selectedProductNames = [];
+        if ($request->has('product_ids') || $request->has('products')) {
+            $inputProdIds = $request->input('product_ids', $request->input('products', []));
+            $inputProdIds = is_array($inputProdIds) ? array_values(array_filter(array_map('intval', $inputProdIds))) : [];
+            if (! empty($inputProdIds)) {
+                $customer->products()->syncWithoutDetaching($inputProdIds);
+                $existingMetaIds = (array) ($currentMeta['product_ids'] ?? []);
+                $allProdIds = array_values(array_unique(array_merge(array_map('intval', $existingMetaIds), $inputProdIds)));
+                $currentMeta['product_ids'] = $allProdIds;
+                $selectedProds = \App\Models\Product::whereIn('id', $allProdIds)->get(['id', 'name', 'code', 'price']);
+                $currentMeta['products'] = $selectedProds->toArray();
+                $selectedProductNames = \App\Models\Product::whereIn('id', $inputProdIds)->pluck('name')->all();
+            }
+        }
+
         if ($body === '' || strtolower($body) === 'null') {
             if ($statusChanged && $followUp) {
                 $body = "Status updated to {$targetStatus} and follow-up scheduled.";
@@ -618,10 +701,12 @@ class CustomerController extends Controller
                     $parts[] = "{$label}: {$chg['from']} → {$chg['to']}";
                 }
                 $body = "Updated " . implode(', ', $parts) . ".";
+            } elseif (! empty($selectedProductNames)) {
+                $body = "Products selected: " . implode(', ', $selectedProductNames) . ".";
             } elseif (! empty($uploadedImages)) {
                 $body = "Uploaded " . count($uploadedImages) . " image(s).";
             } else {
-                return response()->json(['ok' => false, 'message' => 'Please write feedback/note, upload an image, change status/fields, or set a follow-up.'], 422);
+                return response()->json(['ok' => false, 'message' => 'Please write feedback/note, select products, upload an image, change status/fields, or set a follow-up.'], 422);
             }
         }
 
@@ -676,6 +761,9 @@ class CustomerController extends Controller
         }
         if (! empty($uploadedImages)) {
             $meta['images'] = $uploadedImages;
+        }
+        if (! empty($selectedProductNames)) {
+            $meta['products'] = $selectedProductNames;
         }
 
         CustomerActivity::create([
@@ -779,12 +867,93 @@ class CustomerController extends Controller
                 }
             }
         }
+
+        // If this is a CALL CRM record and status changed to 'Booked', auto-assign a new DB row in Booking for any newly selected products
+        if ($customer->isCallCrm() && $statusChanged && in_array(strtolower(trim((string) $targetStatus)), ['booked', 'booking'], true)) {
+            $alreadyAssignedIds = $customer->assignedBookingProductIds();
+            $newBookingPids = ! empty($inputProdIds ?? [])
+                ? array_values(array_diff($inputProdIds, $alreadyAssignedIds))
+                : [];
+            if (! empty($newBookingPids) || ! Customer::where('pipeline', 'booking')->where('source_customer_id', $customer->id)->exists()) {
+                $pidsForCopy = ! empty($newBookingPids) ? $newBookingPids : $customer->products()->pluck('products.id')->map(fn ($id) => (int) $id)->all();
+                $attrs = $customer->mappedBookingAttributes();
+                $copyMeta = $attrs['meta'] ?? [];
+                $copyMeta['product_ids'] = $pidsForCopy;
+                $attrs['meta'] = $copyMeta;
+                $copy = Customer::create($attrs);
+                if (! empty($pidsForCopy)) {
+                    $copy->products()->sync($pidsForCopy);
+                }
+                CustomerActivity::create([
+                    'customer_id' => $copy->id,
+                    'user_id' => $request->user()->id,
+                    'type' => 'system',
+                    'title' => 'Received from Call CRM',
+                    'body' => 'Auto-assigned to Assign Service from Call CRM #'.$customer->id.' upon status update to Booked.',
+                ]);
+            }
+        }
+
+        // If this is a BOOKING (Assign Service) record, sync status updates to source Call CRM customer
+        if ($customer->isBooking()) {
+            $sourceCustomer = $customer->source_customer_id
+                ? Customer::find($customer->source_customer_id)
+                : null;
+
+            if ($sourceCustomer) {
+                $srcCore = [];
+                if ($statusChanged && $targetStatus !== null) {
+                    $srcCore['status'] = $targetStatus;
+                    $srcCore['last_contact_at'] = now();
+                    if (in_array(strtolower((string) $targetStatus), ['success', 'cancelled', 'cancel', 'canceled'], true)) {
+                        $srcCore['follow_up'] = false;
+                        $srcCore['follow_up_at'] = null;
+                        $srcCore['follow_up_has_time'] = false;
+                    }
+                }
+                if (! empty($srcCore)) {
+                    $sourceCustomer->update($srcCore);
+                }
+                CustomerActivity::create([
+                    'customer_id' => $sourceCustomer->id,
+                    'user_id' => $request->user()->id,
+                    'type' => $activityType,
+                    'title' => "Assign Service · {$title}",
+                    'body' => $body,
+                    'meta' => $meta ?: null,
+                ]);
+            }
+        }
+
         if ($request->wantsJson()) {
-            $customer->load(['assignee', 'activities.user']);
+            $customer->load(['assignee', 'activities.user', 'products']);
             $formFields = $this->formFieldsFor($request, $customer->pipeline ?? 'crm');
             $customer->refresh();
+            $customer->load(['assignee', 'activities.user', 'products']);
 
             $followUpHtml = $customer->actionDateCellHtml();
+            $allActiveProducts = \App\Models\Product::active()->ordered()->get();
+            $productsHtml = $customer->productBadgesHtml($allActiveProducts, false);
+            $productsListHtml = $customer->productBadgesHtml($allActiveProducts, true);
+
+            // Recompute product cards counts for header
+            $pipeline = $customer->pipeline ?? 'call_crm';
+            $countQuery = $this->mappedCustomers($request)->inPipeline($pipeline);
+            $allLeadsCount = (clone $countQuery)->count();
+            $updatedProductCards = [];
+            foreach ($allActiveProducts as $prod) {
+                $checkedCount = (clone $countQuery)->where(function ($sub) use ($prod) {
+                    $sub->whereHas('products', fn ($p) => $p->where('products.id', $prod->id))
+                        ->orWhereJsonContains('meta->product_ids', (int) $prod->id)
+                        ->orWhereJsonContains('meta->product_ids', (string) $prod->id);
+                })->count();
+                $updatedProductCards[] = [
+                    'id' => $prod->id,
+                    'pending_count' => max(0, $allLeadsCount - $checkedCount),
+                    'checked_count' => $checkedCount,
+                    'total_count' => $allLeadsCount,
+                ];
+            }
 
             $toneMap = [
                 'new' => 'text-sky-700 bg-sky-50',
@@ -814,6 +983,9 @@ class CustomerController extends Controller
                     : null,
                 'follow_up_html' => $followUpHtml,
                 'list_date_html' => $customer->listDateSummaryHtml(),
+                'products_html' => $productsHtml,
+                'products_list_html' => $productsListHtml,
+                'product_cards' => $updatedProductCards,
                 'html' => view('customers.partials.panel', [
                     'customer' => $customer,
                     'formFields' => $formFields,
@@ -1042,6 +1214,110 @@ class CustomerController extends Controller
         }
 
         return back()->with('success', 'Assigned to Operation Team.');
+    }
+
+    public function assignToBooking(Request $request, Customer $customer): JsonResponse|RedirectResponse
+    {
+        $this->authorizeMapped($request, $customer);
+
+        abort_unless($request->user()->canAccessCallCrm() || $request->user()->canAccessBooking(), 403);
+
+        if ($customer->isBooking()) {
+            return $request->wantsJson()
+                ? response()->json(['ok' => false, 'message' => 'This record is already in Assign Service.'], 422)
+                : back()->withErrors(['customer' => 'This record is already in Assign Service.']);
+        }
+
+        $pids = array_values(array_unique(array_filter(array_map('intval', (array) $request->input('product_ids', [])))));
+        if (empty($pids)) {
+            $msg = 'Please select minimum 1 product to Assign Service.';
+            return $request->wantsJson()
+                ? response()->json(['ok' => false, 'code' => 'min_product', 'message' => $msg], 422)
+                : back()->withErrors(['product_ids' => $msg]);
+        }
+
+        $selectedProducts = \App\Models\Product::whereIn('id', $pids)->get();
+        $productNamesList = $selectedProducts->map(fn ($p) => $p->name . ($p->code ? " (#{$p->code})" : ''))->all();
+        $productNamesStr = implode(', ', $productNamesList);
+
+        // Attach selected products to Call CRM customer without detaching previously checked products
+        $customer->products()->syncWithoutDetaching($pids);
+        $cMeta = $customer->meta ?? [];
+        $existingCustomerMetaIds = array_map('intval', (array) ($cMeta['product_ids'] ?? []));
+        $cMeta['product_ids'] = array_values(array_unique(array_merge($existingCustomerMetaIds, $pids)));
+
+        $existingBookingCount = Customer::where('pipeline', 'booking')
+            ->where('source_customer_id', $customer->id)
+            ->count();
+
+        $isFirstAssign = $existingBookingCount === 0;
+
+        // Always create a NEW DB row in Assign Service (booking pipeline) for every assignment
+        $attrs = $customer->mappedBookingAttributes();
+        $copyMeta = $attrs['meta'] ?? [];
+        $copyMeta['product_ids'] = $pids;
+        $attrs['meta'] = $copyMeta;
+        $copy = Customer::create($attrs);
+        $copy->products()->sync($pids);
+
+        $oldStatus = $customer->status;
+        $customer->update([
+            'status' => 'Booked',
+            'meta' => $cMeta,
+            'last_contact_at' => now(),
+        ]);
+
+        $metaProductsPayload = $selectedProducts->map(fn ($p) => [
+            'id' => $p->id,
+            'name' => $p->name,
+            'code' => $p->code,
+            'price' => (float) $p->price,
+        ])->values()->all();
+
+        CustomerActivity::create([
+            'customer_id' => $customer->id,
+            'user_id' => $request->user()->id,
+            'type' => 'status',
+            'title' => $isFirstAssign ? 'Assigned to Service' : 'Multi-Assigned to Service',
+            'body' => "Assigned to Service (#{$copy->id}) with product(s): {$productNamesStr}. Status: Booked.",
+            'meta' => ['products' => $metaProductsPayload],
+        ]);
+
+        CustomerActivity::create([
+            'customer_id' => $copy->id,
+            'user_id' => $request->user()->id,
+            'type' => 'system',
+            'title' => $isFirstAssign ? 'Received from Call CRM' : 'Additional Service Product Assigned',
+            'body' => "Assigned from Call CRM #{$customer->id} with product(s): {$productNamesStr}.",
+            'meta' => ['products' => $metaProductsPayload],
+        ]);
+
+        $customer->refresh();
+
+        if ($request->wantsJson()) {
+            $customer->load(['assignee', 'activities.user', 'bookingCopy', 'bookingCopies.products', 'products']);
+            $formFields = $this->formFieldsFor($request, $customer->pipeline ?? 'call_crm');
+            $allActiveProducts = \App\Models\Product::active()->ordered()->get();
+
+            return response()->json([
+                'ok' => true,
+                'message' => 'Assigned to Service successfully with product(s): ' . $productNamesStr,
+                'customer_id' => $customer->id,
+                'booking_id' => $copy->id,
+                'status' => $customer->status,
+                'assigned_product_ids' => $customer->assignedBookingProductIds(),
+                'product_badges_html' => $customer->productBadgesHtml($allActiveProducts, false),
+                'product_badges_compact_html' => $customer->productBadgesHtml($allActiveProducts, true),
+                'html' => view('customers.partials.panel', [
+                    'customer' => $customer,
+                    'formFields' => $formFields,
+                    'noteTemplates' => NoteTemplate::active()->ordered()->get(['id', 'title', 'body']),
+                    'pincodeDirectory' => $this->getPincodeDirectory(),
+                ])->render(),
+            ]);
+        }
+
+        return back()->with('success', 'Assigned to Service successfully.');
     }
 
     public function bulkMap(Request $request): RedirectResponse

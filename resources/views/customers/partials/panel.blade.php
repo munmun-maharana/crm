@@ -140,7 +140,7 @@
                             class="flex-1 h-7 inline-flex items-center justify-center rounded-md bg-indigo-100/90 text-indigo-700 hover:bg-indigo-200 transition">
                         <svg class="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M21 12c0 4.418-4.03 8-9 8a9.86 9.86 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
                     </button>
-                    @unless($customer->isOperations() || $customer->isCallCrm())
+                    @unless($customer->isOperations() || $customer->isCallCrm() || $customer->isBooking())
                         @if($customer->operationCopy)
                             <span title="Assigned to Operation Team"
                                   class="h-7 inline-flex items-center justify-center px-2 rounded-md bg-emerald-100/90 text-emerald-800 text-[10px] font-bold whitespace-nowrap">
@@ -153,6 +153,25 @@
                             </button>
                         @endif
                     @endunless
+                    @if($customer->isCallCrm())
+                        @if($customer->bookingCopy)
+                            <span title="Assigned to Service"
+                                  class="h-7 inline-flex items-center justify-center px-2 rounded-md bg-emerald-100/90 text-emerald-800 text-[10px] font-bold whitespace-nowrap">
+                                Assigned to Service
+                            </span>
+                        @else
+                            <button type="button" title="Assign Service" data-cid="{{ $customer->id }}" onclick="assignToBooking(this.dataset.cid)"
+                                    class="h-7 inline-flex items-center justify-center px-2 rounded-md bg-indigo-600 text-white text-[10px] font-bold hover:bg-indigo-700 transition whitespace-nowrap">
+                                Assign Service
+                            </button>
+                        @endif
+                    @endif
+                    @if($customer->isBooking() && $customer->source_customer_id)
+                        <span title="Source: Call CRM #{{ $customer->source_customer_id }}"
+                              class="h-7 inline-flex items-center justify-center px-2 rounded-md bg-indigo-100 text-indigo-800 text-[10px] font-bold whitespace-nowrap border border-indigo-200">
+                            From Call CRM #{{ $customer->source_customer_id }}
+                        </span>
+                    @endif
                 </div>
 
                 {{-- All Customer Fields Grid (Compact, light color backgrounds) --}}
@@ -206,6 +225,27 @@
                                 @endif
                             </div>
                         @endforeach
+                        @if($customer->products->isNotEmpty())
+                            <div class="rounded-md bg-cyan-100/70 border border-cyan-300/80 px-2 py-1.5 col-span-2">
+                                <div class="text-cyan-900 text-[9.5px] font-bold uppercase tracking-wide flex items-center justify-between">
+                                    <span class="flex items-center gap-1">
+                                        <span>📦</span>
+                                        <span>Products ({{ $customer->products->count() }})</span>
+                                    </span>
+                                    <span class="font-extrabold text-emerald-800">₹{{ number_format($customer->products->sum('price'), 2) }}</span>
+                                </div>
+                                <div class="mt-1 flex flex-wrap gap-1">
+                                    @foreach($customer->products as $cp)
+                                        <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-white text-cyan-950 text-[10.5px] font-semibold border border-cyan-300 shadow-2xs">
+                                            <span>{{ $cp->name }}</span>
+                                            @if($cp->price > 0)
+                                                <span class="text-emerald-700 font-bold">₹{{ number_format($cp->price, 0) }}</span>
+                                            @endif
+                                        </span>
+                                    @endforeach
+                                </div>
+                            </div>
+                        @endif
                     </div>
                 @endif
             </div>
@@ -501,10 +541,58 @@
                             </span>
                             <span class="text-[12px] font-bold text-indigo-950">Update Form</span>
                         </div>
+                        @if($customer->isCallCrm())
+                            <div class="inline-flex items-center gap-1.5">
+                                @if($customer->bookingCopy)
+                                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10.5px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                        <span>Assigned to Service</span>
+                                    </span>
+                                @else
+                                    <button type="button" title="Assign Service" data-cid="{{ $customer->id }}" onclick="assignToBooking(this.dataset.cid)"
+                                            class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-bold shadow-xs transition whitespace-nowrap">
+                                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                                        <span>Assign Service</span>
+                                    </button>
+                                @endif
+                            </div>
+                        @endif
                     </div>
 
                     <div class="flex-1 flex flex-col p-3 space-y-2.5">
                         <input type="hidden" name="type" value="note">
+                        @if($customer->isBooking())
+                            @php
+                                $curBookStatus = strtolower(trim((string) $customer->status));
+                                $activeBookingState = match (true) {
+                                    in_array($curBookStatus, ['success', 'completed', 'converted'], true) => 'success',
+                                    in_array($curBookStatus, ['cancel', 'cancelled', 'canceled', 'lost'], true) => 'cancelled',
+                                    default => 'pending',
+                                };
+                            @endphp
+                            <input type="hidden" name="wash_action" value="0" id="bookingActionFlag-{{ $customer->id }}">
+                            <div class="grid grid-cols-2 gap-2" x-data="{ bookState: '{{ $activeBookingState }}' }">
+                                <button type="button"
+                                        @click="bookState = 'success'; const f = $el.closest('form'); f.querySelector('[name=type]').value = 'status'; const wf = f.querySelector('[name=wash_action]'); if (wf) wf.value = '1'; const sel = f.querySelector('[name=status_change]'); if (sel) { if (!Array.from(sel.options).some(o => o.value === 'Success')) { sel.add(new Option('Success', 'Success')); } sel.value = 'Success'; } Alpine.$data(document.body).postActivity(f);"
+                                        :class="bookState === 'success'
+                                            ? 'border-emerald-600 bg-emerald-600 text-white ring-2 ring-emerald-600/25'
+                                            : 'border-emerald-200 bg-emerald-50/80 text-emerald-800 hover:bg-emerald-100'"
+                                        class="inline-flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-[12px] font-bold transition shadow-2xs">
+                                    <span>✓</span>
+                                    <span>Success</span>
+                                </button>
+
+                                <button type="button"
+                                        @click="bookState = 'cancelled'; const f = $el.closest('form'); f.querySelector('[name=type]').value = 'status'; const wf = f.querySelector('[name=wash_action]'); if (wf) wf.value = '1'; const sel = f.querySelector('[name=status_change]'); if (sel) { if (!Array.from(sel.options).some(o => o.value === 'Cancelled')) { sel.add(new Option('Cancelled', 'Cancelled')); } sel.value = 'Cancelled'; } Alpine.$data(document.body).postActivity(f);"
+                                        :class="bookState === 'cancelled'
+                                            ? 'border-rose-600 bg-rose-600 text-white ring-2 ring-rose-600/25'
+                                            : 'border-rose-200 bg-rose-50/80 text-rose-800 hover:bg-rose-100'"
+                                        class="inline-flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-[12px] font-bold transition shadow-2xs">
+                                    <span>✕</span>
+                                    <span>Cancel</span>
+                                </button>
+                            </div>
+                        @endif
                         {{-- Section 1: Status + Internal Message + Note (Soft Violet Tint) --}}
                         <div class="rounded-lg bg-violet-50/60 p-2.5 space-y-2">
                             <div class="flex items-center gap-2">
@@ -732,6 +820,113 @@
                             </div>
                         @endif
 
+                        {{-- Section: Products Multi-Select Section (Below Update Feedback in Call CRM / CRM) --}}
+                        @php
+                            $availableProducts = \App\Models\Product::active()->ordered()->get();
+                            $assignedBookingProductIds = $customer->assignedBookingProductIds();
+                            $initialSelectedProductIds = $customer->isBooking()
+                                ? $assignedBookingProductIds
+                                : [];
+                            $availableProductsForJs = $availableProducts->map(fn ($p) => [
+                                'id' => (int) $p->id,
+                                'name' => $p->name,
+                                'code' => $p->code ?? '',
+                                'price' => (float) $p->price,
+                                'formatted_price' => $p->formattedPrice(),
+                                'category' => $p->category ?? '',
+                                'already_assigned' => in_array((int) $p->id, $assignedBookingProductIds, true),
+                            ])->values();
+                        @endphp
+                        @if($availableProducts->isNotEmpty())
+                            <div class="rounded-lg border border-cyan-200/90 bg-cyan-50/60 p-2.5 space-y-2"
+                                 data-assigned-product-ids='@json($assignedBookingProductIds)'
+                                 x-data="{
+                                     search: '',
+                                     assignedIds: @js($assignedBookingProductIds),
+                                     products: @js($availableProductsForJs),
+                                     selected: @js($initialSelectedProductIds),
+                                     toggle(id) {
+                                         id = Number(id);
+                                         if (this.selected.includes(id)) {
+                                             this.selected = this.selected.filter(x => x !== id);
+                                         } else {
+                                             this.selected.push(id);
+                                         }
+                                     },
+                                     selectAll() {
+                                         this.selected = this.filtered().map(p => p.id);
+                                     },
+                                     clearAll() {
+                                         this.selected = [];
+                                     },
+                                     filtered() {
+                                         if (!this.search.trim()) return this.products;
+                                         const s = this.search.toLowerCase();
+                                         return this.products.filter(p =>
+                                             (p.name || '').toLowerCase().includes(s) ||
+                                             (p.code || '').toLowerCase().includes(s) ||
+                                             (p.category || '').toLowerCase().includes(s)
+                                         );
+                                     }
+                                 }">
+                                <div class="flex flex-wrap items-center justify-between gap-1.5">
+                                    <div class="flex items-center gap-1.5">
+                                        <span class="w-4 h-4 rounded bg-cyan-600 text-white inline-flex items-center justify-center shrink-0 text-[10px]">📦</span>
+                                        <span class="text-[11.5px] font-bold uppercase tracking-wide text-cyan-950">Select Products</span>
+                                        <span class="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-cyan-200 text-cyan-900"
+                                              x-text="selected.length + ' selected'"></span>
+                                    </div>
+                                    <div class="flex items-center gap-2 text-[10.5px]">
+                                        <template x-if="products.length > 4">
+                                            <input type="text"
+                                                   x-model="search"
+                                                   placeholder="Search product…"
+                                                   class="h-6 px-2 rounded border border-cyan-300 bg-white text-[11px] outline-none focus:border-cyan-600">
+                                        </template>
+                                        <button type="button" @click="selectAll()" class="font-bold text-cyan-700 hover:text-cyan-950 hover:underline">Select All</button>
+                                        <span class="text-cyan-300">·</span>
+                                        <button type="button" @click="clearAll()" class="text-slate-400 hover:text-slate-600 hover:underline">Clear</button>
+                                    </div>
+                                </div>
+
+                                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-1.5 max-h-48 overflow-y-auto crm-scroll p-0.5">
+                                    <template x-for="p in filtered()" :key="p.id">
+                                        <label class="relative flex items-start gap-2 p-2 rounded-lg border cursor-pointer select-none transition"
+                                               :class="selected.includes(p.id)
+                                                    ? 'border-cyan-500 bg-cyan-100/90 shadow-2xs'
+                                                    : 'border-slate-200 bg-white/95 hover:border-cyan-300 hover:bg-white'">
+                                            <input type="checkbox"
+                                                   name="product_ids[]"
+                                                   :value="p.id"
+                                                   :data-product-label="p.name + (p.code ? ' (#' + p.code + ')' : '')"
+                                                   :data-already-assigned="p.already_assigned ? '1' : '0'"
+                                                   :checked="selected.includes(p.id)"
+                                                   @change="toggle(p.id)"
+                                                   class="mt-0.5 rounded border-slate-300 text-cyan-600 focus:ring-cyan-500/20">
+                                            <div class="min-w-0 flex-1 leading-tight">
+                                                <div class="flex items-center justify-between gap-1">
+                                                    <div class="font-bold text-[12px] text-ink truncate" x-text="p.name"></div>
+                                                    @if($customer->isCallCrm())
+                                                        <template x-if="p.already_assigned">
+                                                            <span class="shrink-0 px-1 py-0.2 rounded bg-emerald-100 text-emerald-800 border border-emerald-200 text-[9px] font-bold" title="Already assigned to Service">✓ Assigned</span>
+                                                        </template>
+                                                    @endif
+                                                </div>
+                                                <div class="flex items-center gap-1.5 mt-0.5 text-[10.5px]">
+                                                    <template x-if="p.price > 0">
+                                                        <span class="font-extrabold text-emerald-700" x-text="p.formatted_price"></span>
+                                                    </template>
+                                                    <template x-if="p.code">
+                                                        <span class="text-slate-400 font-mono text-[10px]" x-text="'#' + p.code"></span>
+                                                    </template>
+                                                </div>
+                                            </div>
+                                        </label>
+                                    </template>
+                                </div>
+                            </div>
+                        @endif
+
                         {{-- Section 3: Bottom Footer Bar: Left = Follow up controls | Right = Post Update button (Soft Amber Tint) --}}
                         <div class="mt-auto rounded-lg bg-amber-50/60 p-2 flex items-center justify-between gap-2 flex-wrap">
                             <div class="inline-flex flex-wrap items-center gap-1.5 rounded-lg bg-white/90 p-1 max-w-full">
@@ -793,11 +988,21 @@
                                 </div>
                             </div>
 
-                            <button type="submit"
-                                    class="w-full sm:w-auto ml-auto inline-flex items-center justify-center gap-1.5 rounded-lg bg-brand hover:bg-brand-dark text-white text-[12.5px] font-semibold px-4 py-2 shadow-xs transition">
-                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
-                                Post Update
-                            </button>
+                            <div class="w-full sm:w-auto ml-auto inline-flex items-center gap-2 flex-wrap justify-end">
+                                @if($customer->isCallCrm())
+                                    <button type="button" title="Assign Service" data-cid="{{ $customer->id }}" onclick="assignToBooking(this.dataset.cid)"
+                                            class="h-9 inline-flex items-center justify-center gap-1.5 px-3.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-[12px] font-bold shadow-xs transition whitespace-nowrap">
+                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                                        <span>Assign Service</span>
+                                    </button>
+                                @endif
+
+                                <button type="submit"
+                                        class="h-9 inline-flex items-center justify-center gap-1.5 rounded-lg bg-brand hover:bg-brand-dark text-white text-[12.5px] font-semibold px-4 shadow-xs transition whitespace-nowrap">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
+                                    Post Update
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </form>
@@ -858,6 +1063,18 @@
                                     · Anytime
                                 @endif
                             </span>
+                        @endif
+                        @if(!empty($a->meta['products']) && is_array($a->meta['products']))
+                            @foreach($a->meta['products'] as $ap)
+                                @php
+                                    $pName = is_array($ap) ? ($ap['name'] ?? '') : (string) $ap;
+                                @endphp
+                                @if($pName)
+                                    <span class="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[9.5px] font-bold bg-cyan-100 text-cyan-800 border border-cyan-200">
+                                        📦 {{ $pName }}
+                                    </span>
+                                @endif
+                            @endforeach
                         @endif
                         <span class="text-[11.5px] font-semibold">{{ $a->title }}</span>
                         <span class="ml-auto text-[10.5px] text-slate-400">{{ $a->created_at?->diffForHumans() }}</span>

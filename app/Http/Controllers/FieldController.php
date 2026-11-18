@@ -63,8 +63,8 @@ class FieldController extends Controller
             'active' => true,
             'in_form' => $request->boolean('in_form', true),
             'in_table' => $request->boolean('in_table'),
-            'in_excel' => in_array($pipeline, ['crm', 'call_crm', 'pincodes'], true) ? $request->boolean('in_excel', true) : false,
-            'in_update' => in_array($pipeline, ['crm', 'call_crm', 'operations'], true) ? $request->boolean('in_update') : false,
+            'in_excel' => in_array($pipeline, ['crm', 'call_crm', 'booking', 'pincodes', 'products'], true) ? $request->boolean('in_excel', true) : false,
+            'in_update' => in_array($pipeline, ['crm', 'call_crm', 'booking', 'operations'], true) ? $request->boolean('in_update') : false,
             'auto_select' => $request->boolean('auto_select'),
             'is_system' => false,
             'sort_order' => $maxSort + 1,
@@ -76,11 +76,17 @@ class FieldController extends Controller
         if ($pipeline === 'call_crm') {
             return redirect()->route('settings.index', ['tab' => 'call-crm-fields'])->with('success', 'Call CRM field added.');
         }
+        if ($pipeline === 'booking') {
+            return redirect()->route('settings.index', ['tab' => 'booking-fields'])->with('success', 'Booking field added.');
+        }
         if ($pipeline === 'users') {
             return redirect()->route('settings.index', ['tab' => 'user-fields'])->with('success', 'User field added.');
         }
         if ($pipeline === 'pincodes') {
             return redirect()->route('settings.index', ['tab' => 'pincode-fields'])->with('success', 'Pincode field added.');
+        }
+        if ($pipeline === 'products') {
+            return redirect()->route('settings.index', ['tab' => 'product-fields'])->with('success', 'Product field added.');
         }
 
         return redirect()->route('settings.index', ['tab' => 'fields'])->with('success', 'Field added.');
@@ -164,6 +170,9 @@ class FieldController extends Controller
         if ($field->pipeline === 'pincodes') {
             return redirect()->route('settings.index', ['tab' => 'pincode-fields'])->with('success', 'Pincode field updated.');
         }
+        if ($field->pipeline === 'products') {
+            return redirect()->route('settings.index', ['tab' => 'product-fields'])->with('success', 'Product field updated.');
+        }
 
         return redirect()->route('settings.index', ['tab' => 'fields'])->with('success', 'Field updated.');
     }
@@ -176,6 +185,10 @@ class FieldController extends Controller
 
         if ($field->pipeline === 'pincodes' && $field->key === 'pincode') {
             return back()->withErrors(['field' => 'The Pincode field is required by the system and cannot be deleted.']);
+        }
+
+        if ($field->pipeline === 'products' && in_array($field->key, CrmField::PRODUCT_CORE_KEYS, true)) {
+            return back()->withErrors(['field' => 'Core product fields cannot be deleted.']);
         }
 
         if ($field->pipeline === 'users' && in_array($field->key, CrmField::USER_CORE_KEYS, true)) {
@@ -251,6 +264,28 @@ class FieldController extends Controller
             return redirect()->route('settings.index', ['tab' => 'call-crm-fields'])->with('success', 'Call CRM field deleted.');
         }
 
+        if ($pipeline === 'booking') {
+            Customer::query()->inPipeline('booking')->orderBy('id')->chunkById(100, function ($rows) use ($key) {
+                foreach ($rows as $customer) {
+                    $meta = $customer->meta ?? [];
+                    if (is_array($meta) && array_key_exists($key, $meta)) {
+                        unset($meta[$key]);
+                        $customer->meta = $meta ?: null;
+                    }
+                    if (in_array($key, CrmField::CORE_KEYS, true) && $key !== 'name') {
+                        if ($key === 'status') {
+                            $customer->status = 'Pending';
+                        } else {
+                            $customer->{$key} = null;
+                        }
+                    }
+                    $customer->save();
+                }
+            });
+
+            return redirect()->route('settings.index', ['tab' => 'booking-fields'])->with('success', 'Booking field deleted.');
+        }
+
         if ($pipeline === 'users') {
             User::query()->orderBy('id')->chunkById(100, function ($rows) use ($key) {
                 foreach ($rows as $user) {
@@ -287,6 +322,28 @@ class FieldController extends Controller
             });
 
             return redirect()->route('settings.index', ['tab' => 'pincode-fields'])->with('success', 'Pincode field deleted.');
+        }
+
+        if ($pipeline === 'products') {
+            \App\Models\Product::query()->orderBy('id')->chunkById(100, function ($rows) use ($key) {
+                foreach ($rows as $productRow) {
+                    $meta = $productRow->meta ?? [];
+                    if (is_array($meta) && array_key_exists($key, $meta)) {
+                        unset($meta[$key]);
+                        $productRow->meta = $meta ?: null;
+                    }
+                    if (in_array($key, CrmField::PRODUCT_CORE_KEYS, true) && $key !== 'name') {
+                        if ($key === 'status') {
+                            $productRow->status = 'Active';
+                        } else {
+                            $productRow->{$key} = null;
+                        }
+                    }
+                    $productRow->save();
+                }
+            });
+
+            return redirect()->route('settings.index', ['tab' => 'product-fields'])->with('success', 'Product field deleted.');
         }
 
         return redirect()->route('settings.index', ['tab' => 'fields'])->with('success', 'Field deleted. Existing values cleared.');

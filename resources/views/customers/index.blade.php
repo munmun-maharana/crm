@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', ($pipeline ?? 'crm') === 'operations' ? 'TEAM OPS' : (($pipeline ?? 'crm') === 'call_crm' ? 'CALL CRM' : 'CRM'))
+@section('title', ($pipeline ?? 'crm') === 'operations' ? 'TEAM OPS' : (($pipeline ?? 'crm') === 'call_crm' ? 'CALL CRM' : (($pipeline ?? 'crm') === 'booking' ? 'ASSIGN SERVICE' : 'CRM')))
 
 @section('split')
 @php
@@ -90,7 +90,7 @@
                 <span>Today Follow-up</span>
             </a>
 
-            @if(($pipeline ?? 'crm') !== 'call_crm')
+            @if(!in_array(($pipeline ?? 'crm'), ['call_crm', 'booking'], true))
                 <button type="button" title="Booking Slots"
                         @click="toggleBookingSlots()"
                         :class="bookingSlotsOpen ? 'bg-indigo-700 text-white ring-2 ring-indigo-300' : 'bg-indigo-600 text-white hover:bg-indigo-700'"
@@ -137,6 +137,7 @@
         @endforeach
     </datalist>
 
+    @if(!in_array(($pipeline ?? 'crm'), ['call_crm', 'booking'], true))
     <div class="fixed inset-0 z-50" x-show="bookingSlotsOpen" x-cloak>
         <div class="absolute inset-0 bg-ink/25 transition-opacity"
              x-show="bookingSlotsOpen"
@@ -334,6 +335,7 @@
             </div>
         </aside>
     </div>
+    @endif
 
     @if(session('success'))
         <div class="shrink-0 px-3 py-1.5 text-[12px] bg-emerald-50 text-emerald-800 border-b border-emerald-100">{{ session('success') }}</div>
@@ -387,11 +389,55 @@
                 </div>
             @endif
 
+            @if(!empty($productCards))
+                <div class="mb-3 sm:mb-3.5">
+                    <div class="flex items-center justify-between mb-1.5 px-0.5">
+                        <span class="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                            <svg class="w-3.5 h-3.5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+                            <span>Products Pending (Total DB - Checked)</span>
+                        </span>
+                        @if(!empty($productPending))
+                            <a href="{{ route($listRoute, array_filter(['q' => $q ?: null, 'status' => $status ?: null, 'area' => $area ?: null, 'assigned_to' => $assignedTo ?: null, 'filter' => $filter ?: null])) }}"
+                               class="text-[11px] font-semibold text-rose-600 hover:text-rose-800 flex items-center gap-1 hover:underline">
+                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                                <span>Clear Product Filter</span>
+                            </a>
+                        @endif
+                    </div>
+                    <div class="grid gap-2 sm:gap-2.5 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:[grid-template-columns:repeat(var(--prod-cols),minmax(0,1fr))]" style="--prod-cols: {{ min(8, max(2, count($productCards))) }};">
+                        @foreach($productCards as $pCard)
+                            <a href="{{ $pCard['url'] }}"
+                               class="stat-card block rounded-xl border {{ !empty($pCard['active']) ? 'ring-2 ring-indigo-600 bg-white shadow-md border-indigo-500' : 'bg-slate-50/90 hover:bg-white border-slate-200/90' }} px-3 py-2 sm:py-2.5 hover:shadow-sm transition min-w-0"
+                               title="{{ $pCard['full_name'] }} ({{ $pCard['pending_count'] }} pending out of {{ $pCard['total_count'] }})">
+                                <div class="flex items-center justify-between gap-1">
+                                    <span class="text-[10px] sm:text-[11px] uppercase tracking-wider font-bold {{ !empty($pCard['active']) ? 'text-indigo-700' : 'text-slate-600' }} truncate">
+                                        {{ $pCard['label'] }}
+                                    </span>
+                                    @if(!empty($pCard['active']))
+                                        <span class="w-2 h-2 rounded-full bg-indigo-600 shrink-0" title="Active filter"></span>
+                                    @endif
+                                </div>
+                                <div class="mt-0.5 flex items-baseline justify-between gap-1">
+                                    <div class="text-lg sm:text-xl font-extrabold {{ !empty($pCard['active']) ? 'text-indigo-700' : 'text-slate-800' }} leading-tight"
+                                         data-prod-pending-val="{{ $pCard['id'] }}">
+                                        {{ $pCard['pending_count'] }}
+                                    </div>
+                                    <span class="text-[10px] text-slate-400 font-medium whitespace-nowrap"
+                                          data-prod-pending-sub="{{ $pCard['id'] }}">
+                                        {{ $pCard['checked_count'] }} done / {{ $pCard['total_count'] }}
+                                    </span>
+                                </div>
+                            </a>
+                        @endforeach
+                    </div>
+                </div>
+            @endif
+
             <div class="rounded-xl border border-indigo-200/80 bg-indigo-50/35 overflow-x-auto shadow-xs select-none">
                 <table class="w-full text-[13px]">
                     <thead class="bg-indigo-100/75 text-indigo-950 text-[11px] uppercase tracking-wide border-b border-indigo-200/80">
                         <tr>
-                            @if(auth()->user()->canSeeAllRecords() && ($pipeline ?? 'crm') !== 'call_crm')
+                            @if(auth()->user()->canSeeAllRecords() && ($pipeline ?? 'crm') !== 'call_crm' && ($pipeline ?? 'crm') !== 'booking')
                                 <th class="text-left font-bold px-3 py-2.5 w-10">
                                     <button type="button" class="crm-check"
                                             :class="pageSelected(@js($pageIds)) ? 'on' : ''"
@@ -404,10 +450,16 @@
                             @if(($pipeline ?? 'crm') === 'operations')
                                 <th class="text-left font-bold px-4 py-2.5 whitespace-nowrap">CRM ID</th>
                             @endif
+                            @if(($pipeline ?? 'crm') === 'booking')
+                                <th class="text-left font-bold px-4 py-2.5 whitespace-nowrap">Call CRM ID</th>
+                            @endif
                             <th class="text-left font-bold px-4 py-2.5 whitespace-nowrap">Date</th>
                             @foreach($tableFields as $field)
                                 <th class="text-left font-bold px-4 py-2.5 whitespace-nowrap">{{ $field->label }}</th>
                             @endforeach
+                            @if(!empty($allActiveProducts) && $allActiveProducts->isNotEmpty())
+                                <th class="text-left font-bold px-4 py-2.5 whitespace-nowrap">Products</th>
+                            @endif
                             @if(auth()->user()->canEditCustomers() || auth()->user()->canDeleteCustomers())
                                 <th class="text-right font-bold px-4 py-2.5 whitespace-nowrap">Action</th>
                             @endif
@@ -417,7 +469,7 @@
                         @forelse($customers as $c)
                             <tr class="border-t border-line hover:bg-mist/70 table-row-press" data-table-row="{{ $c->id }}" @click="selectCustomer({{ $c->id }})"
                                 :class="isSelected({{ (int) $c->id }}) ? 'bg-brand-soft/40' : ''">
-                                @if(auth()->user()->canSeeAllRecords() && ($pipeline ?? 'crm') !== 'call_crm')
+                                @if(auth()->user()->canSeeAllRecords() && ($pipeline ?? 'crm') !== 'call_crm' && ($pipeline ?? 'crm') !== 'booking')
                                     <td class="px-3 py-2.5" @click.stop>
                                         <button type="button" class="crm-check"
                                                 :class="isSelected({{ (int) $c->id }}) ? 'on' : ''"
@@ -429,6 +481,9 @@
                                 @endif
                                 @if(($pipeline ?? 'crm') === 'operations')
                                     <td class="px-4 py-2.5 text-slate-500 font-semibold whitespace-nowrap">{{ $c->source_customer_id ? '#'.$c->source_customer_id : '—' }}</td>
+                                @endif
+                                @if(($pipeline ?? 'crm') === 'booking')
+                                    <td class="px-4 py-2.5 text-indigo-600 font-semibold whitespace-nowrap">{{ $c->source_customer_id ? '#'.$c->source_customer_id : '—' }}</td>
                                 @endif
                                 <td class="px-4 py-2.5 text-[12px] whitespace-nowrap" data-fu-cell="{{ $c->id }}">
                                     {!! $c->actionDateCellHtml() !!}
@@ -497,6 +552,11 @@
                                         @endif
                                     </td>
                                 @endforeach
+                                @if(!empty($allActiveProducts) && $allActiveProducts->isNotEmpty())
+                                    <td class="px-4 py-2.5 whitespace-nowrap" @click.stop data-prod-cell="{{ $c->id }}">
+                                        {!! $c->productBadgesHtml($allActiveProducts, false) !!}
+                                    </td>
+                                @endif
                                 @if(auth()->user()->canEditCustomers() || auth()->user()->canDeleteCustomers())
                                     <td class="px-4 py-2.5 text-right whitespace-nowrap" @click.stop>
                                         <div class="inline-flex items-center gap-1.5 justify-end">
@@ -535,7 +595,7 @@
                                 @endif
                             </tr>
                         @empty
-                            <tr><td colspan="{{ $tableFields->count() + ((auth()->user()->canSeeAllRecords() && ($pipeline ?? 'crm') !== 'call_crm') ? 1 : 0) + ((($pipeline ?? 'crm') === 'operations') ? 1 : 0) + 1 + ((auth()->user()->canEditCustomers() || auth()->user()->canDeleteCustomers()) ? 1 : 0) }}" class="px-4 py-10 text-center text-slate-400">{{ auth()->user()->canSeeAllRecords() ? 'No customers found' : 'No customers mapped to you' }}</td></tr>
+                            <tr><td colspan="{{ $tableFields->count() + ((auth()->user()->canSeeAllRecords() && ($pipeline ?? 'crm') !== 'call_crm' && ($pipeline ?? 'crm') !== 'booking') ? 1 : 0) + ((($pipeline ?? 'crm') === 'operations' || ($pipeline ?? 'crm') === 'booking') ? 1 : 0) + 1 + (!empty($allActiveProducts) && $allActiveProducts->isNotEmpty() ? 1 : 0) + ((auth()->user()->canEditCustomers() || auth()->user()->canDeleteCustomers()) ? 1 : 0) }}" class="px-4 py-10 text-center text-slate-400">{{ auth()->user()->canSeeAllRecords() ? 'No customers found' : 'No customers mapped to you' }}</td></tr>
                         @endforelse
                     </tbody>
                 </table>
@@ -583,6 +643,9 @@
                                     @if(($pipeline ?? 'crm') === 'operations' && $c->source_customer_id)
                                         <div class="text-[10px] text-brand font-semibold mt-0.5">CRM #{{ $c->source_customer_id }}</div>
                                     @endif
+                                    @if(($pipeline ?? 'crm') === 'booking' && $c->source_customer_id)
+                                        <div class="text-[10px] text-indigo-600 font-semibold mt-0.5">Call CRM #{{ $c->source_customer_id }}</div>
+                                    @endif
                                     @if($c->company)
                                         <div class="text-[10.5px] text-slate-500 truncate">{{ $c->company }}</div>
                                     @endif
@@ -593,6 +656,11 @@
                                         <span class="text-[9.5px] font-semibold px-1.5 py-0.2 rounded capitalize shrink-0 {{ $statusTone[strtolower($c->status)] ?? ($statusTone[$c->status] ?? 'bg-mist text-slate-600') }}" data-status-list="{{ $c->id }}">{{ $c->status }}</span>
                                         <span class="text-[10px] text-slate-400 truncate">{{ trim(($c->source ?: '').' · '.($c->city ?: ''), ' ·') }}</span>
                                     </div>
+                                    @if(!empty($allActiveProducts) && $allActiveProducts->isNotEmpty())
+                                        <div data-prod-list="{{ $c->id }}">
+                                            {!! $c->productBadgesHtml($allActiveProducts, true) !!}
+                                        </div>
+                                    @endif
                                 </button>
                             @endforeach
                         </div>

@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Customer extends Model
@@ -155,9 +156,125 @@ class Customer extends Model
         return $this->belongsTo(User::class, 'assigned_to');
     }
 
+    public function products(): BelongsToMany
+    {
+        return $this->belongsToMany(Product::class, 'customer_product')
+            ->withPivot(['quantity', 'price', 'notes'])
+            ->withTimestamps();
+    }
+
+    public function hasProduct(int $productId): bool
+    {
+        if ($this->relationLoaded('products')) {
+            if ($this->products->contains('id', $productId)) {
+                return true;
+            }
+        }
+        $metaIds = (array) data_get($this->meta, 'product_ids', []);
+        return in_array($productId, array_map('intval', $metaIds), true);
+    }
+
+    public function productBadgesHtml($allActiveProducts = null, bool $compact = false, ?bool $onlyChecked = null): string
+    {
+        if ($allActiveProducts === null) {
+            $allActiveProducts = \App\Models\Product::active()->ordered()->get();
+        }
+        if ($allActiveProducts->isEmpty()) {
+            return '';
+        }
+
+        // In Assign Service table / listing, show ONLY checked products
+        if ($onlyChecked === null) {
+            $onlyChecked = $this->isBooking();
+        }
+
+        $html = '';
+        if ($compact) {
+            $items = '';
+            foreach ($allActiveProducts as $prod) {
+                $isChecked = $this->hasProduct($prod->id);
+                if ($onlyChecked && !$isChecked) {
+                    continue;
+                }
+                $bg = $isChecked ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : 'bg-rose-50 text-rose-700 border-rose-200';
+                $icon = $isChecked ? '✓' : '✕';
+                $title = htmlspecialchars($prod->name . ' (' . ($isChecked ? 'Checked' : 'Not Checked') . ')');
+                $short = htmlspecialchars($prod->short_name);
+                $items .= "<span class=\"text-[9px] font-bold px-1 py-0.5 rounded border {$bg}\" title=\"{$title}\">{$icon} {$short}</span>";
+            }
+            if ($items !== '') {
+                $html = "<div class=\"mt-1 flex items-center gap-1 flex-wrap\">{$items}</div>";
+            }
+        } else {
+            $items = '';
+            foreach ($allActiveProducts as $prod) {
+                $isChecked = $this->hasProduct($prod->id);
+                if ($onlyChecked && !$isChecked) {
+                    continue;
+                }
+                $title = htmlspecialchars($prod->name . ' (' . ($isChecked ? 'Checked in Feedback' : 'Not Checked') . ')');
+                $short = htmlspecialchars($prod->short_name);
+                if ($isChecked) {
+                    $items .= "<span class=\"inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-2xs\" title=\"{$title}\">"
+                        . '<svg class="w-3 h-3 text-emerald-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>'
+                        . "<span>{$short}</span></span>";
+                } else {
+                    $items .= "<span class=\"inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200\" title=\"{$title}\">"
+                        . '<svg class="w-3 h-3 text-rose-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>'
+                        . "<span>{$short}</span></span>";
+                }
+            }
+            if ($items !== '') {
+                $html = "<div class=\"inline-flex items-center gap-1.5 flex-wrap max-w-[340px]\">{$items}</div>";
+            } elseif ($onlyChecked) {
+                $html = '<span class="text-slate-400 text-[11.5px]">—</span>';
+            }
+        }
+
+        return $html;
+    }
+
     public function operationCopy(): \Illuminate\Database\Eloquent\Relations\HasOne
     {
-        return $this->hasOne(self::class, 'source_customer_id');
+        return $this->hasOne(self::class, 'source_customer_id')->where('pipeline', 'operations');
+    }
+
+    public function bookingCopy(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(self::class, 'source_customer_id')->where('pipeline', 'booking')->latestOfMany();
+    }
+
+    public function bookingCopies(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(self::class, 'source_customer_id')->where('pipeline', 'booking');
+    }
+
+    /**
+     * Return all product IDs already assigned to Assign Service (booking pipeline) for this customer.
+     */
+    public function assignedBookingProductIds(): array
+    {
+        if ($this->isBooking()) {
+            $ids = $this->products->pluck('id')->map(fn ($id) => (int) $id)->all();
+            $metaIds = array_map('intval', (array) data_get($this->meta, 'product_ids', []));
+            return array_values(array_unique(array_filter(array_merge($ids, $metaIds))));
+        }
+
+        $copies = $this->relationLoaded('bookingCopies')
+            ? $this->bookingCopies
+            : $this->bookingCopies()->with('products:id')->get();
+
+        $ids = [];
+        foreach ($copies as $copy) {
+            foreach ($copy->products as $p) {
+                $ids[] = (int) $p->id;
+            }
+            foreach ((array) data_get($copy->meta, 'product_ids', []) as $mid) {
+                $ids[] = (int) $mid;
+            }
+        }
+
+        return array_values(array_unique(array_filter($ids)));
     }
 
     public function sourceCustomer(): BelongsTo
@@ -168,6 +285,11 @@ class Customer extends Model
     public function isOperations(): bool
     {
         return $this->pipeline === 'operations';
+    }
+
+    public function isBooking(): bool
+    {
+        return $this->pipeline === 'booking';
     }
 
     public function isCallCrm(): bool
@@ -258,6 +380,10 @@ class Customer extends Model
             return $this->assigned_to === null || (int) $this->assigned_to === (int) $user->id || $user->isOperation();
         }
 
+        if ($this->isBooking() && $user->canAccessBooking()) {
+            return $this->assigned_to === null || (int) $this->assigned_to === (int) $user->id || $user->isOperation() || $user->isCoordinator();
+        }
+
         if ($this->isCallCrm() && $user->canAccessCallCrm()) {
             return $this->assigned_to === null || (int) $this->assigned_to === (int) $user->id;
         }
@@ -332,6 +458,72 @@ class Customer extends Model
             if (array_key_exists($key, $core) && $core[$key] === '') {
                 $core[$key] = null;
             }
+        }
+
+        $core['meta'] = $meta ?: null;
+
+        return $core;
+    }
+
+    public function mappedBookingAttributes(): array
+    {
+        $core = [
+            'pipeline' => 'booking',
+            'source_customer_id' => $this->id,
+        ];
+        $meta = [];
+
+        $bookingFields = CrmField::inPipeline('booking')->active()->ordered()->get();
+        if ($bookingFields->isEmpty()) {
+            $callFields = CrmField::inPipeline('call_crm')->active()->ordered()->get();
+            foreach ($callFields as $field) {
+                $val = $this->fieldValue($field->key);
+                if ($field->isCore()) {
+                    $core[$field->key] = $val;
+                } else {
+                    $meta[$field->key] = $val;
+                }
+            }
+        } else {
+            foreach ($bookingFields as $field) {
+                $from = trim((string) ($field->maps_from ?: $field->key));
+                if ($from === '') {
+                    continue;
+                }
+                $value = $this->fieldValue($from);
+                if ($field->isCore()) {
+                    $core[$field->key] = $value;
+                } else {
+                    $meta[$field->key] = $value;
+                }
+            }
+        }
+
+        if (empty($core['name'])) {
+            $core['name'] = $this->name ?: 'Untitled';
+        }
+        if (empty($core['phone'])) {
+            $core['phone'] = $this->phone;
+        }
+        if (empty($core['city'])) {
+            $core['city'] = $this->city;
+        }
+        $core['status'] = 'Pending';
+        if (array_key_exists('assigned_to', $core)) {
+            $core['assigned_to'] = $core['assigned_to'] ?: null;
+        }
+        foreach (['email', 'phone', 'company', 'city', 'source', 'notes'] as $key) {
+            if (array_key_exists($key, $core) && $core[$key] === '') {
+                $core[$key] = null;
+            }
+        }
+
+        if ($this->relationLoaded('products') && $this->products->isNotEmpty()) {
+            $meta['product_ids'] = $this->products->pluck('id')->all();
+            $meta['products'] = $this->products->toArray();
+        } elseif (! empty($this->meta['product_ids'])) {
+            $meta['product_ids'] = (array) $this->meta['product_ids'];
+            $meta['products'] = (array) ($this->meta['products'] ?? []);
         }
 
         $core['meta'] = $meta ?: null;

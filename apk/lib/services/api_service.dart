@@ -18,11 +18,47 @@ class ApiService {
   bool get isAdmin => user?['is_admin'] == true || user?['role'] == 'admin';
   bool get isCoordinator => user?['is_coordinator'] == true || user?['role'] == 'coordinator';
   bool get isOperation => user?['is_operation'] == true || user?['role'] == 'operation';
-  bool get canAccessCrm => user?['can_access_crm'] == true;
-  bool get canAccessOperations => user?['can_access_operations'] == true;
+  bool get canAccessDashboard => isAdmin || user?['can_access_dashboard'] != false;
+  bool get canAccessCrm => isAdmin || user?['can_access_crm'] == true;
+  bool get canAccessCallCrm => isAdmin || user?['can_access_call_crm'] == true;
+  bool get canAccessOperations => isAdmin || user?['can_access_operations'] == true;
+  bool get canAccessBooking => isAdmin || user?['can_access_booking'] == true;
+  bool get canAccessPincodes => isAdmin || user?['can_access_pincodes'] == true;
+  bool get canAccessProducts => isAdmin || user?['can_access_products'] == true || user?['can_access_crm'] == true;
   bool get canAssignUsers => user?['can_assign_users'] == true;
   bool get canBulkMap => user?['can_bulk_map'] == true;
   bool get canSeeAll => user?['can_see_all'] == true;
+
+  Map<String, String> menuLabels = {};
+  List<String> menuOrder = [];
+
+  void updateMenuData(Map<String, dynamic> res) {
+    if (res['map'] is Map) {
+      menuLabels = (res['map'] as Map).map((k, v) => MapEntry(k.toString(), v.toString()));
+    }
+    if (res['menus'] is List) {
+      menuOrder = (res['menus'] as List)
+          .whereType<Map>()
+          .map((m) => m['key']?.toString() ?? '')
+          .where((k) => k.isNotEmpty)
+          .toList();
+    }
+  }
+
+  String menuLabel(String key, String fallback) {
+    final custom = menuLabels[key];
+    if (custom != null && custom.trim().isNotEmpty) {
+      return custom.trim();
+    }
+    return fallback;
+  }
+
+  Future<void> loadMenuLabels() async {
+    try {
+      final res = await get('/menu-settings');
+      updateMenuData(res);
+    } catch (_) {}
+  }
 
   Future<void> loadSession() async {
     final prefs = await SharedPreferences.getInstance();
@@ -32,6 +68,9 @@ class ApiService {
       try {
         user = jsonDecode(rawUser) as Map<String, dynamic>;
       } catch (_) {}
+    }
+    if (token != null) {
+      loadMenuLabels();
     }
   }
 
@@ -195,6 +234,7 @@ class ApiService {
     String? status,
     String? filter,
     int? assignedTo,
+    int? productPending,
     int page = 1,
     int perPage = 15,
   }) {
@@ -204,6 +244,7 @@ class ApiService {
       'status': status,
       'filter': filter,
       'assigned_to': assignedTo,
+      'product_pending': productPending,
       'page': page,
       'per_page': perPage,
     });
@@ -259,6 +300,9 @@ class ApiService {
 
   Future<Map<String, dynamic>> customerAssignOperations(int id) =>
       post('/customers/$id/assign-operations');
+
+  Future<Map<String, dynamic>> customerAssignBooking(int id, [List<int>? productIds]) =>
+      post('/customers/$id/assign-booking', productIds != null ? {'product_ids': productIds} : null);
 
   Future<Map<String, dynamic>> customerAutoAction(int id, String channel) =>
       post('/customers/$id/auto/$channel');
@@ -404,4 +448,66 @@ class ApiService {
       put('/users/$id', data);
 
   Future<Map<String, dynamic>> userDestroy(int id) => delete('/users/$id');
+
+  // --- Products Catalog & Management ---
+  Future<Map<String, dynamic>> products({
+    String? q,
+    String? status,
+    String? category,
+    int page = 1,
+    int perPage = 20,
+  }) =>
+      get('/products', {
+        if (q != null && q.isNotEmpty) 'q': q,
+        if (status != null && status.isNotEmpty) 'status': status,
+        if (category != null && category.isNotEmpty) 'category': category,
+        'page': page,
+        'per_page': perPage,
+      });
+
+  Future<Map<String, dynamic>> productMeta() => get('/products/meta');
+
+  Future<Map<String, dynamic>> productShow(int id) => get('/products/$id');
+
+  Future<Map<String, dynamic>> productStore(Map<String, dynamic> data) =>
+      post('/products', data);
+
+  Future<Map<String, dynamic>> productUpdate(int id, Map<String, dynamic> data) =>
+      put('/products/$id', data);
+
+  Future<Map<String, dynamic>> productDestroy(int id) =>
+      delete('/products/$id');
+
+  Future<Map<String, dynamic>> productToggleActive(int id) =>
+      post('/products/$id/toggle-active');
+
+  Future<Map<String, dynamic>> productBulkAction(List<int> ids, String actionType) =>
+      post('/products/bulk', {'ids': ids, 'action_type': actionType});
+
+  // --- Sidebar Menu Settings ---
+  Future<Map<String, dynamic>> menuSettings() => get('/menu-settings');
+
+  Future<Map<String, dynamic>> menuSettingsUpdate(int id, String label) async {
+    final res = await put('/settings/menu-settings/$id', {'label': label});
+    updateMenuData(res);
+    return res;
+  }
+
+  Future<Map<String, dynamic>> menuSettingsUpdateAll(Map<String, dynamic> data) async {
+    final res = await post('/settings/menu-settings/update-all', data);
+    updateMenuData(res);
+    return res;
+  }
+
+  Future<Map<String, dynamic>> menuSettingsReset(int id) async {
+    final res = await post('/settings/menu-settings/$id/reset');
+    updateMenuData(res);
+    return res;
+  }
+
+  Future<Map<String, dynamic>> menuSettingsReorder(List<int> order) async {
+    final res = await post('/settings/menu-settings/reorder', {'order': order});
+    updateMenuData(res);
+    return res;
+  }
 }

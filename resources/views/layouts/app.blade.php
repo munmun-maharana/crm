@@ -102,26 +102,51 @@
         <nav class="p-2 flex-1 overflow-y-auto crm-scroll text-[13px] space-y-1">
             @php
                 $navUser = auth()->user();
+                $allMenuSettings = \App\Models\MenuSetting::ordered()->get();
                 $links = [];
-                if ($navUser->canAccessDashboard()) {
-                    $links[] = ['dashboard', 'Dashboard'];
-                }
-                if ($navUser->canAccessCrm()) {
-                    $links[] = ['customers.index', 'CRM'];
-                }
-                if ($navUser->canAccessCallCrm()) {
-                    $links[] = ['call-crm.index', 'CALL CRM'];
-                }
-                if ($navUser->canAccessOperations()) {
-                    $links[] = ['operations.index', 'TEAM OPS'];
-                }
-                if ($navUser->canAccessPincodes()) {
-                    $links[] = ['pincodes.index', 'Pincode Manager'];
-                }
-                if ($navUser->isAdmin()) {
-                    $links = array_merge($links, [
-                        ['users.index', 'Users'],
-                    ]);
+
+                foreach ($allMenuSettings as $m) {
+                    if (!$m->is_active) continue;
+                    $canAccess = false;
+                    $route = null;
+                    switch ($m->key) {
+                        case 'dashboard':
+                            $canAccess = $navUser->canAccessDashboard();
+                            $route = 'dashboard';
+                            break;
+                        case 'crm':
+                            $canAccess = $navUser->canAccessCrm();
+                            $route = 'customers.index';
+                            break;
+                        case 'call_crm':
+                            $canAccess = $navUser->canAccessCallCrm();
+                            $route = 'call-crm.index';
+                            break;
+                        case 'booking':
+                            $canAccess = $navUser->canAccessBooking();
+                            $route = 'booking.index';
+                            break;
+                        case 'operations':
+                            $canAccess = $navUser->canAccessOperations();
+                            $route = 'operations.index';
+                            break;
+                        case 'pincodes':
+                            $canAccess = $navUser->canAccessPincodes();
+                            $route = 'pincodes.index';
+                            break;
+                        case 'products':
+                            $canAccess = $navUser->canAccessProducts();
+                            $route = 'products.index';
+                            break;
+                        case 'users':
+                            $canAccess = $navUser->isAdmin();
+                            $route = 'users.index';
+                            break;
+                    }
+
+                    if ($canAccess && $route) {
+                        $links[] = [$route, $m->label];
+                    }
                 }
             @endphp
             <div class="px-2 pt-1 pb-1.5 text-[11px] font-semibold text-indigo-500">Favorites</div>
@@ -694,6 +719,171 @@
     </div>
 </div>
 
+{{-- Assign Service Popup Modal (All Products Checkboxes + Min 1 Product + Duplicate Alert) --}}
+<div x-show="assignServiceModalOpen" x-cloak
+     @keydown.escape.window="if (assignServiceModalOpen && !assignServiceSubmitting) assignServiceModalOpen = false"
+     class="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+    <div @click.outside="if (!assignServiceSubmitting) assignServiceModalOpen = false"
+         class="w-full max-w-lg rounded-2xl bg-white shadow-2xl border border-line overflow-hidden">
+
+        {{-- Header --}}
+        <div class="px-5 py-3.5 text-white flex items-center justify-between"
+             :class="(assignServiceProductIds.length === 0 || assignServiceSelectedDuplicates().length > 0)
+                 ? 'bg-gradient-to-r from-amber-500 to-rose-600'
+                 : 'bg-gradient-to-r from-indigo-600 to-indigo-700'">
+            <div class="flex items-center gap-2.5 min-w-0">
+                <span class="w-8 h-8 rounded-xl bg-white/15 inline-flex items-center justify-center shrink-0">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                </span>
+                <div class="min-w-0">
+                    <div class="text-[10.5px] font-bold uppercase tracking-wider text-white/80"
+                         x-text="assignServiceSelectedDuplicates().length > 0 ? 'Already Assigned Alert' : (assignServiceProductIds.length === 0 ? 'Product Required' : 'Assign Service')"></div>
+                    <div class="text-[14px] font-bold leading-tight truncate"
+                         x-text="assignServiceSelectedDuplicates().length > 0 ? 'Already Assigned With This Product' : (assignServiceProductIds.length === 0 ? 'Select Minimum 1 Product' : 'Confirm Assign Service (' + assignServiceProductIds.length + ' Selected)')"></div>
+                </div>
+            </div>
+            <button type="button" @click="if (!assignServiceSubmitting) assignServiceModalOpen = false"
+                    class="w-7 h-7 rounded-lg bg-white/10 hover:bg-white/20 inline-flex items-center justify-center text-white text-sm">✕</button>
+        </div>
+
+        {{-- Body --}}
+        <div class="p-5 space-y-3.5 max-h-[75vh] overflow-y-auto">
+            {{-- Server Error --}}
+            <div x-show="assignServiceError"
+                 class="rounded-xl border border-rose-200 bg-rose-50 px-3.5 py-2.5 text-[12px] text-rose-700 font-semibold"
+                 x-text="assignServiceError"></div>
+
+            {{-- Alert 1: Minimum 1 Product Required (shown when 0 products selected) --}}
+            <div x-show="assignServiceProductIds.length === 0"
+                 class="rounded-xl border border-amber-200 bg-amber-50/80 px-3.5 py-2.5 flex items-center gap-2.5">
+                <span class="w-6 h-6 rounded-full bg-amber-100 text-amber-700 shrink-0 inline-flex items-center justify-center text-xs font-extrabold">!</span>
+                <div class="text-[12px] text-slate-700">
+                    <span class="font-bold text-slate-900">Please select minimum 1 product:</span>
+                    Check at least 1 product below to assign to <strong>Assign Service</strong>.
+                </div>
+            </div>
+
+            {{-- Alert 2: Duplicate Product Notice (shown if any checked product is already assigned, but still allows re-assigning) --}}
+            <div x-show="assignServiceSelectedDuplicates().length > 0"
+                 class="rounded-xl border border-amber-300 bg-amber-50/90 p-3 space-y-1.5">
+                <div class="text-[12px] font-bold text-amber-900 flex items-center gap-1.5">
+                    <span>⚠</span>
+                    <span>Already assigned to Service with product(s):</span>
+                </div>
+                <div class="flex flex-wrap gap-1.5">
+                    <template x-for="dp in assignServiceSelectedDuplicates()" :key="dp.id">
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white text-amber-800 border border-amber-300 text-[11px] font-bold shadow-2xs">
+                            <span x-text="dp.name + (dp.code ? ' (#' + dp.code + ')' : '')"></span>
+                        </span>
+                    </template>
+                </div>
+                <div class="text-[11px] text-amber-800">
+                    Note: This product was already assigned earlier. Clicking <strong>Assign Service</strong> will assign it again and create a new row.
+                </div>
+            </div>
+
+            {{-- Info: Previously Assigned Products Summary (if customer has any assigned products) --}}
+            <div x-show="assignServiceAssignedIds.length > 0 && assignServiceSelectedDuplicates().length === 0"
+                 class="rounded-xl border border-emerald-200 bg-emerald-50/60 px-3 py-2 flex items-center justify-between gap-2 flex-wrap text-[11.5px]">
+                <span class="font-bold text-emerald-900">✓ Already assigned product(s):</span>
+                <div class="flex flex-wrap gap-1">
+                    <template x-for="ap in assignServiceAllProducts.filter(p => assignServiceAssignedIds.includes(p.id))" :key="ap.id">
+                        <span class="px-2 py-0.5 rounded bg-white text-emerald-800 border border-emerald-200 font-bold text-[10.5px]"
+                              x-text="ap.name + (ap.code ? ' (#' + ap.code + ')' : '')"></span>
+                    </template>
+                </div>
+            </div>
+
+            {{-- All Products Checkbox Section --}}
+            <div class="rounded-xl border border-cyan-200/90 bg-cyan-50/60 p-3 space-y-2.5">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <div class="flex items-center gap-1.5">
+                        <span class="w-4 h-4 rounded bg-cyan-600 text-white inline-flex items-center justify-center shrink-0 text-[10px]">📦</span>
+                        <span class="text-[11.5px] font-bold uppercase tracking-wide text-cyan-950">Select Products</span>
+                        <span class="text-[10.5px] font-bold px-2 py-0.5 rounded-full bg-cyan-200 text-cyan-900"
+                              x-text="assignServiceProductIds.length + ' selected'"></span>
+                    </div>
+                    <div class="flex items-center gap-2 text-[11px]">
+                        <template x-if="assignServiceAllProducts.length > 4">
+                            <input type="text"
+                                   x-model="assignServiceSearch"
+                                   placeholder="Search product…"
+                                   class="h-6 px-2 rounded border border-cyan-300 bg-white text-[11px] outline-none focus:border-cyan-600">
+                        </template>
+                        <button type="button" @click="assignServiceSelectAllNew()" class="font-bold text-cyan-700 hover:text-cyan-950 hover:underline">Select All</button>
+                        <span class="text-cyan-300">·</span>
+                        <button type="button" @click="assignServiceClearAll()" class="text-slate-400 hover:text-slate-600 hover:underline">Clear</button>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-60 overflow-y-auto crm-scroll p-0.5">
+                    <template x-for="p in assignServiceFilteredProducts()" :key="p.id">
+                        <label class="relative flex items-start gap-2.5 p-2.5 rounded-xl border cursor-pointer select-none transition"
+                               :class="assignServiceProductIds.includes(p.id)
+                                    ? (assignServiceAssignedIds.includes(p.id)
+                                        ? 'border-rose-400 bg-rose-50/90 shadow-2xs'
+                                        : 'border-indigo-500 bg-indigo-50/90 shadow-2xs')
+                                    : (assignServiceAssignedIds.includes(p.id)
+                                        ? 'border-emerald-200 bg-emerald-50/40 hover:border-emerald-300'
+                                        : 'border-slate-200 bg-white hover:border-cyan-300')">
+                            <input type="checkbox"
+                                   :value="p.id"
+                                   :checked="assignServiceProductIds.includes(p.id)"
+                                   @change="assignServiceToggleProduct(p.id)"
+                                   class="mt-0.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500/20">
+                            <div class="min-w-0 flex-1 leading-tight">
+                                <div class="flex items-center justify-between gap-1">
+                                    <div class="font-bold text-[12px] text-ink truncate" x-text="p.name"></div>
+                                    <template x-if="assignServiceAssignedIds.includes(p.id)">
+                                        <span class="shrink-0 px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-800 border border-emerald-200 text-[9.5px] font-bold">
+                                            ✓ Already Assigned
+                                        </span>
+                                    </template>
+                                </div>
+                                <div class="flex items-center gap-1.5 mt-0.5 text-[10.5px]">
+                                    <template x-if="p.price > 0">
+                                        <span class="font-extrabold text-emerald-700" x-text="p.formatted_price"></span>
+                                    </template>
+                                    <template x-if="p.code">
+                                        <span class="text-slate-400 font-mono text-[10px]" x-text="'#' + p.code"></span>
+                                    </template>
+                                </div>
+                            </div>
+                        </label>
+                    </template>
+                </div>
+            </div>
+        </div>
+
+        {{-- Footer --}}
+        <div class="px-5 py-3 bg-mist/40 border-t border-line flex items-center justify-end gap-2">
+            <button type="button"
+                    @click="assignServiceModalOpen = false"
+                    :disabled="assignServiceSubmitting"
+                    class="px-4 py-2 rounded-xl border border-line bg-white hover:bg-mist text-slate-700 text-[12.5px] font-semibold transition disabled:opacity-50">
+                Cancel
+            </button>
+            <button type="button"
+                    @click="confirmAssignService()"
+                    :disabled="assignServiceSubmitting || assignServiceProductIds.length === 0"
+                    class="inline-flex items-center gap-1.5 px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-[12.5px] font-bold transition shadow-sm shadow-indigo-600/20 disabled:opacity-50 disabled:cursor-not-allowed">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                <span x-text="assignServiceSubmitting ? 'Assigning…' : 'Assign Service'"></span>
+            </button>
+        </div>
+    </div>
+</div>
+
+@php
+    $globalAssignProducts = \App\Models\Product::active()->ordered()->get()->map(fn ($p) => [
+        'id' => (int) $p->id,
+        'name' => $p->name,
+        'code' => $p->code ?? '',
+        'price' => (float) $p->price,
+        'formatted_price' => $p->formattedPrice(),
+        'category' => $p->category ?? '',
+    ])->values();
+@endphp
 <script>
 function crmShell() {
     return {
@@ -739,6 +929,122 @@ function crmShell() {
         postUpdateFormEl: null,
         postUpdateCustomerName: '',
         postUpdateChanges: [],
+        assignServiceModalOpen: false,
+        assignServiceSubmitting: false,
+        assignServiceCustomerId: null,
+        assignServiceSearch: '',
+        assignServiceAllProducts: @json($globalAssignProducts),
+        assignServiceAssignedIds: [],
+        assignServiceProductIds: [],
+        assignServiceError: '',
+        assignServiceFilteredProducts() {
+            if (!this.assignServiceSearch.trim()) return this.assignServiceAllProducts;
+            const s = this.assignServiceSearch.toLowerCase();
+            return this.assignServiceAllProducts.filter(p =>
+                (p.name || '').toLowerCase().includes(s) ||
+                (p.code || '').toLowerCase().includes(s) ||
+                (p.category || '').toLowerCase().includes(s)
+            );
+        },
+        assignServiceSelectedDuplicates() {
+            return this.assignServiceAllProducts.filter(p =>
+                this.assignServiceProductIds.includes(p.id) &&
+                this.assignServiceAssignedIds.includes(p.id)
+            );
+        },
+        assignServiceToggleProduct(id) {
+            id = Number(id);
+            if (this.assignServiceProductIds.includes(id)) {
+                this.assignServiceProductIds = this.assignServiceProductIds.filter(x => x !== id);
+            } else {
+                this.assignServiceProductIds.push(id);
+            }
+            this.syncAssignServiceToForm();
+        },
+        assignServiceSelectAllNew() {
+            this.assignServiceProductIds = this.assignServiceFilteredProducts().map(p => p.id);
+            this.syncAssignServiceToForm();
+        },
+        assignServiceClearAll() {
+            this.assignServiceProductIds = [];
+            this.syncAssignServiceToForm();
+        },
+        syncAssignServiceToForm() {
+            if (!this.assignServiceCustomerId) return;
+            const form = document.querySelector(`form[action*="/customers/${this.assignServiceCustomerId}/activity"]`);
+            if (!form) return;
+            const prodBox = form.querySelector('[data-assigned-product-ids]');
+            if (prodBox && prodBox._x_dataStack && prodBox._x_dataStack[0]) {
+                prodBox._x_dataStack[0].selected = [...this.assignServiceProductIds];
+            }
+        },
+        openAssignServiceModal(customerId) {
+            this.assignServiceCustomerId = customerId;
+            this.assignServiceError = '';
+            this.assignServiceSearch = '';
+            const form = document.querySelector(`form[action*="/customers/${customerId}/activity"]`);
+            const prodBox = form ? form.querySelector('[data-assigned-product-ids]') : document.querySelector('[data-assigned-product-ids]');
+
+            let assignedIds = [];
+            if (prodBox && prodBox.dataset.assignedProductIds) {
+                try {
+                    assignedIds = JSON.parse(prodBox.dataset.assignedProductIds).map(Number);
+                } catch (_) {}
+            }
+            this.assignServiceAssignedIds = assignedIds;
+
+            const checkedBoxes = form ? Array.from(form.querySelectorAll('input[name="product_ids[]"]:checked')) : [];
+            this.assignServiceProductIds = checkedBoxes.map(cb => Number(cb.value));
+            this.assignServiceModalOpen = true;
+        },
+        async confirmAssignService() {
+            if (!this.assignServiceCustomerId || this.assignServiceSubmitting) return;
+            if (this.assignServiceProductIds.length === 0) {
+                this.assignServiceError = 'Please select minimum 1 product.';
+                return;
+            }
+            this.assignServiceSubmitting = true;
+            this.assignServiceError = '';
+            try {
+                const res = await fetch(`{{ url('/customers') }}/${this.assignServiceCustomerId}/assign-booking`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content
+                    },
+                    body: JSON.stringify({
+                        product_ids: this.assignServiceProductIds
+                    })
+                });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) {
+                    this.assignServiceError = data.message || 'Could not assign to Assign Service';
+                    return;
+                }
+                this.assignServiceModalOpen = false;
+                if (data.html) this.html = data.html;
+                if (data.customer_id != null && data.status) {
+                    const statusCell = document.querySelector(`[data-status-cell="${data.customer_id}"]`);
+                    if (statusCell) statusCell.textContent = data.status;
+                    const statusList = document.querySelector(`[data-status-list="${data.customer_id}"]`);
+                    if (statusList) statusList.textContent = data.status;
+                }
+                if (data.customer_id != null && data.product_badges_html !== undefined) {
+                    const prodCell = document.querySelector(`[data-prod-cell="${data.customer_id}"]`);
+                    if (prodCell) prodCell.innerHTML = data.product_badges_html;
+                }
+                if (data.customer_id != null && data.product_badges_compact_html !== undefined) {
+                    const prodList = document.querySelector(`[data-prod-list="${data.customer_id}"]`);
+                    if (prodList) prodList.innerHTML = data.product_badges_compact_html;
+                }
+            } catch (e) {
+                this.assignServiceError = 'Could not assign to Assign Service';
+            } finally {
+                this.assignServiceSubmitting = false;
+            }
+        },
         async toggleBookingSlots() {
             this.bookingSlotsOpen = !this.bookingSlotsOpen;
             if (this.bookingSlotsOpen) {
@@ -1502,6 +1808,17 @@ function crmShell() {
                 });
             }
 
+            const checkedProducts = Array.from(form.querySelectorAll('input[name="product_ids[]"]:checked'))
+                .map(cb => cb.closest('label')?.querySelector('.text-ink')?.textContent?.trim() || cb.value);
+            if (checkedProducts.length > 0) {
+                changes.push({
+                    label: 'Products Selected',
+                    from: null,
+                    to: checkedProducts.join(', '),
+                    changed: true
+                });
+            }
+
             const ufEls = form.querySelectorAll('[name^="update_fields["]');
             ufEls.forEach(el => {
                 const label = el.dataset.fieldLabel || el.getAttribute('placeholder') || el.name;
@@ -1628,6 +1945,23 @@ function crmShell() {
                             statusList.className = `text-[10px] font-semibold px-1.5 py-0.5 rounded capitalize shrink-0 ${data.status_tone_class}`;
                         }
                     }
+                }
+
+                if (data.products_html != null) {
+                    const prodCell = document.querySelector(`[data-prod-cell="${data.customer_id}"]`);
+                    if (prodCell) prodCell.innerHTML = data.products_html;
+                }
+                if (data.products_list_html != null) {
+                    const prodList = document.querySelector(`[data-prod-list="${data.customer_id}"]`);
+                    if (prodList) prodList.innerHTML = data.products_list_html;
+                }
+                if (Array.isArray(data.product_cards)) {
+                    data.product_cards.forEach(card => {
+                        const valEl = document.querySelector(`[data-prod-pending-val="${card.id}"]`);
+                        if (valEl) valEl.textContent = card.pending_count;
+                        const subEl = document.querySelector(`[data-prod-pending-sub="${card.id}"]`);
+                        if (subEl) subEl.textContent = `${card.checked_count} done / ${card.total_count}`;
+                    });
                 }
 
                 // Auto-remove lead from current filter and auto-view next one if status changed
@@ -2065,6 +2399,13 @@ async function assignToOperations(customerId) {
         }
     } catch (e) {
         alert('Could not assign to Operation Team');
+    }
+}
+
+function assignToBooking(customerId) {
+    const root = Alpine.$data(document.body);
+    if (root && typeof root.openAssignServiceModal === 'function') {
+        root.openAssignServiceModal(customerId);
     }
 }
 
