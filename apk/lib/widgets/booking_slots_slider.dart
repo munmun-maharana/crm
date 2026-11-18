@@ -81,6 +81,8 @@ class _BookingSlotsSliderState extends State<BookingSlotsSlider> {
     if (!slot.isAvailable) return;
 
     final nameController = TextEditingController();
+    final mrpController = TextEditingController();
+    final sellingPriceController = TextEditingController();
     int step = 1;
     String? error;
     bool submitting = false;
@@ -196,6 +198,40 @@ class _BookingSlotsSliderState extends State<BookingSlotsSlider> {
                           });
                         },
                       ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text('MRP (₹)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: AppTheme.textMuted)),
+                                const SizedBox(height: 6),
+                                TextField(
+                                  controller: mrpController,
+                                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                  decoration: const InputDecoration(hintText: 'Enter MRP...'),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text('BUSINESS SELLING PRICE (₹)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: AppTheme.textMuted)),
+                                const SizedBox(height: 6),
+                                TextField(
+                                  controller: sellingPriceController,
+                                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                  decoration: const InputDecoration(hintText: 'Selling price...'),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
                       const SizedBox(height: 20),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.end,
@@ -261,6 +297,28 @@ class _BookingSlotsSliderState extends State<BookingSlotsSlider> {
                                 ),
                               ],
                             ),
+                            const Divider(height: 16),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text('MRP', style: TextStyle(fontSize: 12, color: AppTheme.textMuted)),
+                                Text(
+                                  mrpController.text.trim().isNotEmpty ? '₹${mrpController.text.trim()}' : '—',
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                ),
+                              ],
+                            ),
+                            const Divider(height: 16),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text('Business Selling Price', style: TextStyle(fontSize: 12, color: AppTheme.textMuted)),
+                                Text(
+                                  sellingPriceController.text.trim().isNotEmpty ? '₹${sellingPriceController.text.trim()}' : '—',
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppTheme.emeraldText),
+                                ),
+                              ],
+                            ),
                           ],
                         ),
                       ),
@@ -291,6 +349,8 @@ class _BookingSlotsSliderState extends State<BookingSlotsSlider> {
                                       await ApiService.instance.bookingSlotBook(
                                         slot.id,
                                         customerName: nameController.text.trim(),
+                                        mrp: double.tryParse(mrpController.text.trim()),
+                                        sellingPrice: double.tryParse(sellingPriceController.text.trim()),
                                       );
                                       if (ctx.mounted) Navigator.of(ctx).pop(true);
                                     } catch (e) {

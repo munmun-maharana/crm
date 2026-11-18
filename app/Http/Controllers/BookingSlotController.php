@@ -64,6 +64,8 @@ class BookingSlotController extends Controller
             'customer_name' => ['required', 'string', 'max:160'],
             'customer_id' => ['nullable', 'integer', 'exists:customers,id'],
             'notes' => ['nullable', 'string', 'max:500'],
+            'mrp' => ['nullable', 'numeric', 'min:0'],
+            'selling_price' => ['nullable', 'numeric', 'min:0'],
         ]);
 
         $customerName = trim($data['customer_name']);
@@ -131,6 +133,13 @@ class BookingSlotController extends Controller
                 }
             }
 
+            $mrpVal = array_key_exists('mrp', $data) && $data['mrp'] !== null && $data['mrp'] !== ''
+                ? round((float) $data['mrp'], 2)
+                : null;
+            $sellingPriceVal = array_key_exists('selling_price', $data) && $data['selling_price'] !== null && $data['selling_price'] !== ''
+                ? round((float) $data['selling_price'], 2)
+                : null;
+
             $locked->update([
                 'status' => BookingSlot::STATUS_BOOKED,
                 'customer_name' => $customerName,
@@ -138,6 +147,8 @@ class BookingSlotController extends Controller
                 'booked_by' => $request->user()->id,
                 'booked_at' => now(),
                 'notes' => isset($data['notes']) ? trim((string) $data['notes']) : $locked->notes,
+                'mrp' => $mrpVal,
+                'selling_price' => $sellingPriceVal,
             ]);
 
             $customerStatusPayload = null;
@@ -153,6 +164,12 @@ class BookingSlotController extends Controller
                 $custMeta = is_array($matchedCustomer->meta) ? $matchedCustomer->meta : [];
                 $custMeta['booking_slot_time'] = $slotTimeLabel;
                 $custMeta['booking_time'] = $slotTimeLabel;
+                if ($mrpVal !== null) {
+                    $custMeta['mrp'] = $mrpVal;
+                }
+                if ($sellingPriceVal !== null) {
+                    $custMeta['selling_price'] = $sellingPriceVal;
+                }
 
                 $bookingDateTime = $locked->slot_date->toDateString() . ' ' . substr($locked->start_time, 0, 5) . ':00';
 
@@ -164,38 +181,43 @@ class BookingSlotController extends Controller
                     'meta' => $custMeta,
                 ]);
 
-                // Automatically assign to Operation Team when booking a slot
+                // Always create a new Team Ops row for every booking (supports multi-booking on 1 CRM record)
                 if (! $matchedCustomer->isOperations()) {
-                    $opCopy = Customer::where('source_customer_id', $matchedCustomer->id)->first();
                     $opAttrs = $matchedCustomer->mappedOperationAttributes();
                     $opMeta = is_array($opAttrs['meta'] ?? null) ? $opAttrs['meta'] : [];
+                    $opMeta['booking_slot_id'] = $locked->id;
                     $opMeta['booking_slot_time'] = $slotTimeLabel;
                     $opMeta['booking_time'] = $slotTimeLabel;
+                    if ($mrpVal !== null) {
+                        $opMeta['mrp'] = $mrpVal;
+                    }
+                    if ($sellingPriceVal !== null) {
+                        $opMeta['selling_price'] = $sellingPriceVal;
+                    }
                     $opAttrs['meta'] = $opMeta;
+                    $opAttrs['status'] = 'Pending';
                     $opAttrs['follow_up'] = false;
                     $opAttrs['follow_up_at'] = $bookingDateTime;
                     $opAttrs['follow_up_has_time'] = true;
 
-                    if (! $opCopy) {
-                        $opAttrs['status'] = 'Pending';
-                        $opCopy = Customer::create($opAttrs);
+                    $opCopy = Customer::create($opAttrs);
 
-                        CustomerActivity::create([
-                            'customer_id' => $opCopy->id,
-                            'user_id' => $request->user()->id,
-                            'type' => 'system',
-                            'title' => 'Received from CRM (Booking Slot)',
-                            'body' => "Auto-assigned to Operation Team from CRM #{$matchedCustomer->id} for slot {$slotDateFormatted} ({$slotTimeLabel}).",
-                        ]);
-                    } else {
-                        $existingOpMeta = is_array($opCopy->meta) ? $opCopy->meta : [];
-                        $opCopy->update([
-                            'follow_up' => false,
-                            'follow_up_at' => $bookingDateTime,
-                            'follow_up_has_time' => true,
-                            'meta' => array_merge($existingOpMeta, $opMeta),
-                        ]);
+                    $priceParts = [];
+                    if ($mrpVal !== null) {
+                        $priceParts[] = 'MRP: ₹' . number_format($mrpVal, 2);
                     }
+                    if ($sellingPriceVal !== null) {
+                        $priceParts[] = 'Business Selling Price: ₹' . number_format($sellingPriceVal, 2);
+                    }
+                    $priceNote = ! empty($priceParts) ? ' | ' . implode(' | ', $priceParts) : '';
+
+                    CustomerActivity::create([
+                        'customer_id' => $opCopy->id,
+                        'user_id' => $request->user()->id,
+                        'type' => 'system',
+                        'title' => 'Received from CRM (Booking Slot)',
+                        'body' => "Assigned to Operation Team from CRM #{$matchedCustomer->id} for slot {$slotDateFormatted} ({$slotTimeLabel}){$priceNote}.",
+                    ]);
                 }
 
                 $rawTitle = trim((string) $slotSetting->title) ?: 'Booking Slot Confirmed';
@@ -213,11 +235,23 @@ class BookingSlotController extends Controller
                 if (! str_contains($actBody, $slotDateFormatted) && ! str_contains($actBody, $locked->slot_date->toDateString())) {
                     $actBody .= "\nDate: {$slotDateFormatted} | Time: {$slotTimeLabel}";
                 }
+                if ($mrpVal !== null || $sellingPriceVal !== null) {
+                    $priceLine = [];
+                    if ($mrpVal !== null) {
+                        $priceLine[] = 'MRP: ₹' . number_format($mrpVal, 2);
+                    }
+                    if ($sellingPriceVal !== null) {
+                        $priceLine[] = 'Business Selling Price: ₹' . number_format($sellingPriceVal, 2);
+                    }
+                    $actBody .= "\n" . implode(' | ', $priceLine);
+                }
 
                 $actMeta = [
                     'slot_id' => $locked->id,
                     'slot_date' => $locked->slot_date->toDateString(),
                     'slot_time' => $slotTimeLabel,
+                    'mrp' => $mrpVal,
+                    'selling_price' => $sellingPriceVal,
                 ];
                 if ($statusChanged) {
                     $actMeta['status_from'] = $oldStatus;
@@ -539,7 +573,11 @@ class BookingSlotController extends Controller
         $customerPhone = $c?->phone ?: $pickMeta(['phone_no', 'phone', 'mobile', 'contact_no']);
         $carModel = $pickMeta(['model', 'car_model', 'vehicle_model', 'vehicle_type']);
         $serviceType = $pickMeta(['service_details', 'service_type', 'service', 'package']);
-        $price = $pickMeta(['seal_price', 'sale_price', 'selling_price', 'price', 'amount', 'mrp']);
+        $mrp = $slot->mrp !== null ? (string) $slot->mrp : $pickMeta(['mrp']);
+        $sellingPrice = $slot->selling_price !== null
+            ? (string) $slot->selling_price
+            : $pickMeta(['selling_price', 'seal_price', 'sale_price', 'price', 'amount']);
+        $price = $sellingPrice ?? $mrp;
 
         return [
             'id' => $slot->id,
@@ -555,6 +593,8 @@ class BookingSlotController extends Controller
             'customer_phone' => $customerPhone,
             'car_model' => $carModel,
             'service_type' => $serviceType,
+            'mrp' => $mrp,
+            'selling_price' => $sellingPrice,
             'price' => $price,
             'notes' => $slot->notes,
             'booked_at' => $slot->booked_at?->format('d M Y, h:i A'),

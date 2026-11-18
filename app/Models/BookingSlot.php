@@ -31,6 +31,8 @@ class BookingSlot extends Model
         'booked_by',
         'booked_at',
         'notes',
+        'mrp',
+        'selling_price',
         'sort_order',
     ];
 

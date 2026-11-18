@@ -352,11 +352,15 @@ class ApiService {
     required String customerName,
     int? customerId,
     String? notes,
+    double? mrp,
+    double? sellingPrice,
   }) {
     return post('/booking-slots/$slotId/book', {
       'customer_name': customerName,
       'customer_id': customerId,
       'notes': notes,
+      if (mrp != null) 'mrp': mrp,
+      if (sellingPrice != null) 'selling_price': sellingPrice,
     });
   }
 

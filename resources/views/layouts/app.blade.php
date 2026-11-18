@@ -596,6 +596,31 @@
                        class="w-full rounded-xl border border-line bg-white px-3.5 py-2.5 text-[13px] text-ink focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand">
             </div>
 
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">MRP (₹)</label>
+                    <input type="number"
+                           step="0.01"
+                           min="0"
+                           id="bookingMrpInput"
+                           x-model="bookingModalMrp"
+                           @keydown.enter.prevent="proceedToBookingConfirm()"
+                           placeholder="Enter MRP…"
+                           class="w-full rounded-xl border border-line bg-white px-3.5 py-2.5 text-[13px] text-ink focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand">
+                </div>
+                <div>
+                    <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">Business Selling Price (₹)</label>
+                    <input type="number"
+                           step="0.01"
+                           min="0"
+                           id="bookingSellingPriceInput"
+                           x-model="bookingModalSellingPrice"
+                           @keydown.enter.prevent="proceedToBookingConfirm()"
+                           placeholder="Enter selling price…"
+                           class="w-full rounded-xl border border-line bg-white px-3.5 py-2.5 text-[13px] text-ink focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand">
+                </div>
+            </div>
+
             <div class="pt-2 flex items-center justify-end gap-2.5 border-t border-line">
                 <button type="button"
                         @click="bookingModalOpen = false"
@@ -621,9 +646,17 @@
                     <span class="text-[12px] font-semibold text-slate-500">Selected Date</span>
                     <span class="text-[13px] font-bold text-slate-800" x-text="bookingSlotsDateFormatted + ' (' + bookingSlotsDate + ')'"></span>
                 </div>
-                <div class="flex items-center justify-between">
+                <div class="flex items-center justify-between border-b border-emerald-200/60 pb-2.5">
                     <span class="text-[12px] font-semibold text-slate-500">Booking Time</span>
                     <span class="text-[13px] font-bold text-emerald-700 bg-emerald-100 px-2.5 py-0.5 rounded-md" x-text="bookingModalSlot?.label || ''"></span>
+                </div>
+                <div class="flex items-center justify-between border-b border-emerald-200/60 pb-2.5">
+                    <span class="text-[12px] font-semibold text-slate-500">MRP</span>
+                    <span class="text-[13px] font-bold text-slate-800" x-text="bookingModalMrp !== '' && bookingModalMrp !== null ? ('₹' + bookingModalMrp) : '—'"></span>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-[12px] font-semibold text-slate-500">Business Selling Price</span>
+                    <span class="text-[13px] font-bold text-emerald-700" x-text="bookingModalSellingPrice !== '' && bookingModalSellingPrice !== null ? ('₹' + bookingModalSellingPrice) : '—'"></span>
                 </div>
             </div>
 
@@ -922,6 +955,8 @@ function crmShell() {
         bookingModalStep: 1,
         bookingModalSlot: null,
         bookingModalCustomerName: '',
+        bookingModalMrp: '',
+        bookingModalSellingPrice: '',
         bookingModalSubmitting: false,
         bookingModalError: '',
         postUpdateModalOpen: false,
@@ -1091,6 +1126,9 @@ function crmShell() {
                 this.bookingSlotsDate = slot.slot_date;
             }
             this.bookingModalCustomerName = this.title || '';
+            const panelPriceEl = document.querySelector('[data-panel-mrp]');
+            this.bookingModalMrp = panelPriceEl?.dataset?.panelMrp || '';
+            this.bookingModalSellingPrice = panelPriceEl?.dataset?.panelSellingPrice || '';
             this.bookingModalStep = 1;
             this.bookingModalError = '';
             this.bookingModalOpen = true;
@@ -1130,7 +1168,9 @@ function crmShell() {
                     },
                     body: JSON.stringify({
                         customer_name: name,
-                        customer_id: this.selectedId || null
+                        customer_id: this.selectedId || null,
+                        mrp: this.bookingModalMrp !== '' ? this.bookingModalMrp : null,
+                        selling_price: this.bookingModalSellingPrice !== '' ? this.bookingModalSellingPrice : null
                     })
                 });
                 const data = await res.json().catch(() => ({}));

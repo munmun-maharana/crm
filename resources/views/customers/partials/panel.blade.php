@@ -66,7 +66,13 @@
     $activitiesCount = $customer->activities->count();
 @endphp
 
-<div class="p-3 sm:p-4 space-y-3 w-full">
+@php
+    $panelMrp = $customer->fieldValue('mrp');
+    $panelSellingPrice = $customer->fieldValue('selling_price') ?? $customer->fieldValue('seal_price') ?? $customer->fieldValue('sale_price');
+@endphp
+<div class="p-3 sm:p-4 space-y-3 w-full"
+     data-panel-mrp="{{ $panelMrp !== null ? $panelMrp : '' }}"
+     data-panel-selling-price="{{ $panelSellingPrice !== null ? $panelSellingPrice : '' }}">
     {{-- Main 2-Column Layout: Left = Compact Customer Details (4 cols) | Right = Update Form (8 cols) --}}
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-2.5 items-stretch">
 
@@ -225,6 +231,18 @@
                                 @endif
                             </div>
                         @endforeach
+                        @if(($panelMrp !== null && $panelMrp !== '' && $visibleExtras->where('key', 'mrp')->isEmpty()) || ($panelSellingPrice !== null && $panelSellingPrice !== '' && $visibleExtras->where('key', 'selling_price')->isEmpty()))
+                            <div class="rounded-md bg-emerald-100/70 border border-emerald-300/80 px-2 py-1.5 col-span-2 grid grid-cols-2 gap-2">
+                                <div>
+                                    <div class="text-emerald-900 text-[9px] font-bold uppercase tracking-wide">MRP</div>
+                                    <div class="font-bold text-ink">{{ ($panelMrp !== null && $panelMrp !== '') ? '₹' . number_format((float) $panelMrp, 2) : '—' }}</div>
+                                </div>
+                                <div>
+                                    <div class="text-emerald-900 text-[9px] font-bold uppercase tracking-wide">Business Selling Price</div>
+                                    <div class="font-extrabold text-emerald-700">{{ ($panelSellingPrice !== null && $panelSellingPrice !== '') ? '₹' . number_format((float) $panelSellingPrice, 2) : '—' }}</div>
+                                </div>
+                            </div>
+                        @endif
                         @if($customer->products->isNotEmpty())
                             <div class="rounded-md bg-cyan-100/70 border border-cyan-300/80 px-2 py-1.5 col-span-2">
                                 <div class="text-cyan-900 text-[9.5px] font-bold uppercase tracking-wide flex items-center justify-between">

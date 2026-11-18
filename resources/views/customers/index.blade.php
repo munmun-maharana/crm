@@ -281,7 +281,7 @@
                                                         </span>
                                                     </template>
                                                 </div>
-                                                <template x-if="slot.car_model || slot.service_type || slot.price">
+                                                <template x-if="slot.car_model || slot.service_type || slot.mrp || slot.selling_price || slot.price">
                                                     <div class="flex flex-wrap items-center gap-1.5 text-[11px] text-slate-700">
                                                         <template x-if="slot.car_model">
                                                             <span class="inline-flex items-center gap-1 rounded bg-white/90 border border-line px-1.5 py-0.5 font-semibold text-slate-700">
@@ -295,10 +295,16 @@
                                                                 <span class="text-ink" x-text="slot.service_type"></span>
                                                             </span>
                                                         </template>
-                                                        <template x-if="slot.price">
+                                                        <template x-if="slot.mrp">
+                                                            <span class="inline-flex items-center gap-1 rounded bg-slate-100 border border-slate-200 px-1.5 py-0.5 font-bold text-slate-700">
+                                                                <span class="text-slate-400">MRP:</span>
+                                                                <span x-text="'₹' + slot.mrp"></span>
+                                                            </span>
+                                                        </template>
+                                                        <template x-if="slot.selling_price || (!slot.mrp && slot.price)">
                                                             <span class="inline-flex items-center gap-1 rounded bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 font-bold text-emerald-800">
-                                                                <span>₹</span>
-                                                                <span x-text="slot.price"></span>
+                                                                <span class="text-emerald-600">Selling:</span>
+                                                                <span x-text="'₹' + (slot.selling_price || slot.price)"></span>
                                                             </span>
                                                         </template>
                                                     </div>
