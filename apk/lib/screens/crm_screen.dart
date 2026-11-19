@@ -593,8 +593,8 @@ class _CrmScreenState extends State<CrmScreen> {
                                                 // Date summary badge
                                                 _buildDateSummaryBadge(c),
 
-                                                // Product badges (in booking/Assign Service show only checked products)
-                                                if (_availableProducts.isNotEmpty) ...[
+                                                // Product badges (only for Call CRM and Assign Service, NOT CRM or Team Ops)
+                                                if ((widget.pipeline == 'call_crm' || widget.pipeline == 'booking') && _availableProducts.isNotEmpty) ...[
                                                   const SizedBox(height: 6),
                                                   Wrap(
                                                     spacing: 4,

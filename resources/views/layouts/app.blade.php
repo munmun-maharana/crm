@@ -585,14 +585,69 @@
                 </div>
             </div>
 
-            <div>
+            <div class="relative" @click.outside="bookingCustomerDropdownOpen = false">
                 <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">Customer Name <span class="text-rose-500">*</span></label>
+                <div class="relative">
+                    <input type="text"
+                           id="bookingCustomerNameInput"
+                           x-model="bookingModalCustomerName"
+                           @focus="bookingCustomerDropdownOpen = true"
+                           @input="bookingCustomerDropdownOpen = true; bookingModalCustomerId = null"
+                           @keydown.escape.stop="bookingCustomerDropdownOpen = false"
+                           @keydown.enter.prevent="if (bookingCustomerDropdownOpen && filteredBookingCustomers().length > 0 && !bookingModalCustomerId) { selectBookingCustomer(filteredBookingCustomers()[0]); } else { bookingCustomerDropdownOpen = false; proceedToBookingConfirm(); }"
+                           autocomplete="off"
+                           placeholder="Search or enter customer name / phone / car model…"
+                           class="w-full rounded-xl border border-line bg-white pl-3.5 pr-9 py-2.5 text-[13px] text-ink focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand">
+                    <button type="button"
+                            @click="bookingCustomerDropdownOpen = !bookingCustomerDropdownOpen"
+                            class="absolute right-2.5 top-1/2 -translate-y-1/2 w-6 h-6 rounded-md hover:bg-slate-100 text-slate-400 hover:text-slate-600 inline-flex items-center justify-center">
+                        <svg class="w-4 h-4 transition-transform" :class="bookingCustomerDropdownOpen ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                    </button>
+                </div>
+
+                {{-- Searchable Customer Dropdown --}}
+                <div x-show="bookingCustomerDropdownOpen" x-cloak
+                     class="absolute left-0 right-0 mt-1 max-h-52 overflow-y-auto crm-scroll rounded-xl border border-line bg-white shadow-xl z-30 divide-y divide-slate-100">
+                    <template x-if="filteredBookingCustomers().length === 0">
+                        <div class="px-3.5 py-2.5 text-[12px] text-slate-400">
+                            No matching CRM customer — will book with "<span class="font-semibold text-ink" x-text="bookingModalCustomerName"></span>"
+                        </div>
+                    </template>
+                    <template x-for="cust in filteredBookingCustomers()" :key="cust.id">
+                        <button type="button"
+                                @click="selectBookingCustomer(cust)"
+                                class="w-full text-left px-3.5 py-2 hover:bg-brand-soft/60 transition flex items-center justify-between gap-2">
+                            <div class="min-w-0 flex-1">
+                                <div class="text-[12.5px] font-bold text-ink truncate" x-text="cust.name"></div>
+                                <div class="flex flex-wrap items-center gap-2 text-[11px] text-slate-500 mt-0.5">
+                                    <template x-if="cust.phone">
+                                        <span x-text="'📞 ' + cust.phone"></span>
+                                    </template>
+                                    <template x-if="cust.car_model">
+                                        <span class="px-1.5 py-0.2 rounded bg-teal-50 text-teal-800 border border-teal-200 font-semibold" x-text="'🚗 ' + cust.car_model"></span>
+                                    </template>
+                                </div>
+                            </div>
+                            <div class="text-right shrink-0 text-[10.5px]">
+                                <template x-if="cust.selling_price">
+                                    <div class="font-bold text-emerald-700" x-text="'₹' + cust.selling_price"></div>
+                                </template>
+                                <template x-if="cust.mrp">
+                                    <div class="text-slate-400" x-text="'MRP ₹' + cust.mrp"></div>
+                                </template>
+                            </div>
+                        </button>
+                    </template>
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">Car Model</label>
                 <input type="text"
-                       id="bookingCustomerNameInput"
-                       x-model="bookingModalCustomerName"
+                       id="bookingCarModelInput"
+                       x-model="bookingModalCarModel"
                        @keydown.enter.prevent="proceedToBookingConfirm()"
-                       list="crmCustomerNamesDatalist"
-                       placeholder="Enter customer name…"
+                       placeholder="Enter car model (e.g. Camry, Swift, Creta)…"
                        class="w-full rounded-xl border border-line bg-white px-3.5 py-2.5 text-[13px] text-ink focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand">
             </div>
 
@@ -641,6 +696,10 @@
                 <div class="flex items-center justify-between border-b border-emerald-200/60 pb-2.5">
                     <span class="text-[12px] font-semibold text-slate-500">Customer Name</span>
                     <span class="text-[14px] font-bold text-ink" x-text="bookingModalCustomerName"></span>
+                </div>
+                <div class="flex items-center justify-between border-b border-emerald-200/60 pb-2.5">
+                    <span class="text-[12px] font-semibold text-slate-500">Car Model</span>
+                    <span class="text-[13px] font-bold text-teal-800" x-text="bookingModalCarModel !== '' && bookingModalCarModel !== null ? bookingModalCarModel : '—'"></span>
                 </div>
                 <div class="flex items-center justify-between border-b border-emerald-200/60 pb-2.5">
                     <span class="text-[12px] font-semibold text-slate-500">Selected Date</span>
@@ -916,6 +975,34 @@
         'formatted_price' => $p->formattedPrice(),
         'category' => $p->category ?? '',
     ])->values();
+    $globalBookingCustomers = auth()->check()
+        ? \App\Models\Customer::query()
+            ->visibleTo(auth()->user())
+            ->inPipeline('crm')
+            ->latest('id')
+            ->limit(300)
+            ->get()
+            ->map(function ($c) {
+                $carModel = $c->fieldValue('car_model')
+                    ?? $c->fieldValue('model')
+                    ?? $c->fieldValue('vehicle_model')
+                    ?? $c->fieldValue('vehicle_type')
+                    ?? '';
+                $mrp = $c->fieldValue('mrp');
+                $sellingPrice = $c->fieldValue('selling_price')
+                    ?? $c->fieldValue('seal_price')
+                    ?? $c->fieldValue('sale_price');
+                return [
+                    'id' => (int) $c->id,
+                    'name' => (string) $c->name,
+                    'phone' => (string) ($c->phone ?? ''),
+                    'car_model' => (string) (is_array($carModel) ? implode(', ', $carModel) : $carModel),
+                    'mrp' => $mrp !== null ? (string) $mrp : '',
+                    'selling_price' => $sellingPrice !== null ? (string) $sellingPrice : '',
+                ];
+            })
+            ->values()
+        : collect();
 @endphp
 <script>
 function crmShell() {
@@ -954,9 +1041,13 @@ function crmShell() {
         bookingModalOpen: false,
         bookingModalStep: 1,
         bookingModalSlot: null,
+        bookingModalCustomerId: null,
         bookingModalCustomerName: '',
+        bookingModalCarModel: '',
         bookingModalMrp: '',
         bookingModalSellingPrice: '',
+        bookingCustomerDropdownOpen: false,
+        bookingCustomersList: @json($globalBookingCustomers),
         bookingModalSubmitting: false,
         bookingModalError: '',
         postUpdateModalOpen: false,
@@ -1119,16 +1210,38 @@ function crmShell() {
                 el.scrollBy({ left: dir * 280, behavior: 'smooth' });
             }
         },
+        filteredBookingCustomers() {
+            const q = (this.bookingModalCustomerName || '').trim().toLowerCase();
+            const list = this.bookingCustomersList || [];
+            if (!q) return list.slice(0, 40);
+            return list.filter(c =>
+                (c.name || '').toLowerCase().includes(q) ||
+                (c.phone || '').toLowerCase().includes(q) ||
+                (c.car_model || '').toLowerCase().includes(q)
+            ).slice(0, 40);
+        },
+        selectBookingCustomer(cust) {
+            if (!cust) return;
+            this.bookingModalCustomerId = cust.id;
+            this.bookingModalCustomerName = cust.name || '';
+            this.bookingModalCarModel = cust.car_model || '';
+            this.bookingModalMrp = cust.mrp || '';
+            this.bookingModalSellingPrice = cust.selling_price || '';
+            this.bookingCustomerDropdownOpen = false;
+        },
         openBookSlotModal(slot) {
             if (!slot || slot.status !== 'available') return;
             this.bookingModalSlot = slot;
             if (slot.slot_date) {
                 this.bookingSlotsDate = slot.slot_date;
             }
+            this.bookingModalCustomerId = this.selectedId || null;
             this.bookingModalCustomerName = this.title || '';
             const panelPriceEl = document.querySelector('[data-panel-mrp]');
+            this.bookingModalCarModel = panelPriceEl?.dataset?.panelCarModel || '';
             this.bookingModalMrp = panelPriceEl?.dataset?.panelMrp || '';
             this.bookingModalSellingPrice = panelPriceEl?.dataset?.panelSellingPrice || '';
+            this.bookingCustomerDropdownOpen = false;
             this.bookingModalStep = 1;
             this.bookingModalError = '';
             this.bookingModalOpen = true;
@@ -1143,6 +1256,7 @@ function crmShell() {
                 this.bookingModalError = 'Please enter the customer name.';
                 return;
             }
+            this.bookingCustomerDropdownOpen = false;
             this.bookingModalCustomerName = name;
             this.bookingModalError = '';
             this.bookingModalStep = 2;
@@ -1168,7 +1282,8 @@ function crmShell() {
                     },
                     body: JSON.stringify({
                         customer_name: name,
-                        customer_id: this.selectedId || null,
+                        customer_id: this.bookingModalCustomerId || this.selectedId || null,
+                        car_model: (this.bookingModalCarModel || '').trim() || null,
                         mrp: this.bookingModalMrp !== '' ? this.bookingModalMrp : null,
                         selling_price: this.bookingModalSellingPrice !== '' ? this.bookingModalSellingPrice : null
                     })

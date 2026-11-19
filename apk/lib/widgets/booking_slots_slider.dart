@@ -81,6 +81,7 @@ class _BookingSlotsSliderState extends State<BookingSlotsSlider> {
     if (!slot.isAvailable) return;
 
     final nameController = TextEditingController();
+    final carModelController = TextEditingController();
     final mrpController = TextEditingController();
     final sellingPriceController = TextEditingController();
     int step = 1;
@@ -199,6 +200,13 @@ class _BookingSlotsSliderState extends State<BookingSlotsSlider> {
                         },
                       ),
                       const SizedBox(height: 12),
+                      const Text('CAR MODEL', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: AppTheme.textMuted)),
+                      const SizedBox(height: 6),
+                      TextField(
+                        controller: carModelController,
+                        decoration: const InputDecoration(hintText: 'Enter car model...'),
+                      ),
+                      const SizedBox(height: 12),
                       Row(
                         children: [
                           Expanded(
@@ -278,6 +286,17 @@ class _BookingSlotsSliderState extends State<BookingSlotsSlider> {
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
+                                const Text('Car Model', style: TextStyle(fontSize: 12, color: AppTheme.textMuted)),
+                                Text(
+                                  carModelController.text.trim().isNotEmpty ? carModelController.text.trim() : '—',
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                ),
+                              ],
+                            ),
+                            const Divider(height: 16),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
                                 const Text('Selected Date', style: TextStyle(fontSize: 12, color: AppTheme.textMuted)),
                                 Text(_formattedDate, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                               ],
@@ -349,6 +368,7 @@ class _BookingSlotsSliderState extends State<BookingSlotsSlider> {
                                       await ApiService.instance.bookingSlotBook(
                                         slot.id,
                                         customerName: nameController.text.trim(),
+                                        carModel: carModelController.text.trim().isNotEmpty ? carModelController.text.trim() : null,
                                         mrp: double.tryParse(mrpController.text.trim()),
                                         sellingPrice: double.tryParse(sellingPriceController.text.trim()),
                                       );

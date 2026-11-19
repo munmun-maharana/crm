@@ -219,9 +219,12 @@ class CustomerController extends Controller
             ];
         }
 
-        $allActiveProducts = \App\Models\Product::active()->ordered()->get();
+        $showProductsForPipeline = in_array($pipeline, ['call_crm', 'booking'], true);
+        $allActiveProducts = $showProductsForPipeline
+            ? \App\Models\Product::active()->ordered()->get()
+            : collect();
         $productCards = [];
-        if ($allActiveProducts->isNotEmpty()) {
+        if ($showProductsForPipeline && $allActiveProducts->isNotEmpty()) {
             foreach ($allActiveProducts as $prod) {
                 $checkedCount = (clone $countQuery)->where(function ($sub) use ($prod) {
                     $sub->whereHas('products', fn ($p) => $p->where('products.id', $prod->id))

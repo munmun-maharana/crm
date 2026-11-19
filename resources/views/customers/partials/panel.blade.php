@@ -69,31 +69,71 @@
 @php
     $panelMrp = $customer->fieldValue('mrp');
     $panelSellingPrice = $customer->fieldValue('selling_price') ?? $customer->fieldValue('seal_price') ?? $customer->fieldValue('sale_price');
+    $panelCarModel = $customer->fieldValue('car_model') ?? $customer->fieldValue('model') ?? $customer->fieldValue('vehicle_model') ?? $customer->fieldValue('vehicle_type');
+    if (is_array($panelCarModel)) {
+        $panelCarModel = implode(', ', $panelCarModel);
+    }
+
+    $bookingTargetCid = ($customer->isOperations() && $customer->source_customer_id)
+        ? $customer->source_customer_id
+        : $customer->id;
+    $allCustomerBookings = \App\Models\BookingSlot::query()
+        ->where(function ($q) use ($bookingTargetCid, $customer) {
+            $q->where('customer_id', $bookingTargetCid);
+            $slotMetaId = data_get($customer->meta, 'booking_slot_id');
+            if ($slotMetaId) {
+                $q->orWhere('id', (int) $slotMetaId);
+            }
+        })
+        ->orderByDesc('slot_date')
+        ->orderByDesc('start_time')
+        ->get();
+
+    $panelEditPayload = array_merge([
+        'id' => $customer->id,
+        'name' => $customer->name,
+        'email' => $customer->email,
+        'phone' => $customer->phone,
+        'company' => $customer->company,
+        'city' => $customer->city,
+        'source' => $customer->source,
+        'status' => $customer->status,
+        'notes' => $customer->notes,
+        'assigned_to' => $customer->assigned_to,
+        'meta' => $customer->meta ?? (object) [],
+    ], is_array($customer->meta) ? $customer->meta : []);
 @endphp
-<div class="p-3 sm:p-4 space-y-3 w-full"
+@php
+    $hasBookingsCol = $allCustomerBookings->isNotEmpty();
+    $leftColSpan = $hasBookingsCol ? 'lg:col-span-3' : 'lg:col-span-4';
+    $midColSpan = $hasBookingsCol ? 'lg:col-span-6' : 'lg:col-span-8';
+@endphp
+<div class="p-2.5 sm:p-3 space-y-2.5 w-full"
+     data-panel-edit-payload='@json($panelEditPayload)'
+     data-panel-car-model="{{ $panelCarModel !== null ? $panelCarModel : '' }}"
      data-panel-mrp="{{ $panelMrp !== null ? $panelMrp : '' }}"
      data-panel-selling-price="{{ $panelSellingPrice !== null ? $panelSellingPrice : '' }}">
-    {{-- Main 2-Column Layout: Left = Compact Customer Details (4 cols) | Right = Update Form (8 cols) --}}
+    {{-- Main 3-Column Layout when bookings exist: Left = Compact Customer Details | Mid = Update Form | Right = Compact Booking List --}}
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-2.5 items-stretch">
 
-        {{-- LEFT COLUMN: Compact Customer Details Card (4 cols on lg) - Soft Sky Blue Theme --}}
-        <div class="lg:col-span-4 h-full flex flex-col rounded-xl border border-sky-200/90 bg-sky-50/70 shadow-xs overflow-hidden">
+        {{-- LEFT COLUMN: More Compact Customer Details Card - Soft Sky Blue Theme --}}
+        <div class="{{ $leftColSpan }} h-full flex flex-col rounded-xl border border-sky-200/90 bg-sky-50/70 shadow-xs overflow-hidden">
             {{-- Card Header --}}
-            <div class="h-9 shrink-0 px-3 bg-sky-100/80 border-b border-sky-200/80 flex items-center justify-between gap-2">
-                <div class="flex items-center gap-1.5">
-                    <span class="w-5 h-5 rounded bg-sky-600 text-white inline-flex items-center justify-center shrink-0">
-                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+            <div class="h-8 shrink-0 px-2.5 bg-sky-100/80 border-b border-sky-200/80 flex items-center justify-between gap-1.5">
+                <div class="flex items-center gap-1.5 min-w-0">
+                    <span class="w-4 h-4 rounded bg-sky-600 text-white inline-flex items-center justify-center shrink-0">
+                        <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
                     </span>
-                    <span class="text-[12px] font-bold text-sky-950">Customer Details</span>
+                    <span class="text-[11.5px] font-bold text-sky-950 truncate">Customer Details</span>
                 </div>
-                <span class="text-[10px] font-bold px-1.5 py-0.2 rounded capitalize bg-white/90 text-sky-800 shrink-0">
+                <span class="text-[9.5px] font-bold px-1.5 py-0.2 rounded capitalize bg-white/90 text-sky-800 shrink-0">
                     {{ $customer->status }}
                 </span>
             </div>
 
-            <div class="p-2.5 space-y-2 flex-1 flex flex-col">
+            <div class="p-2 space-y-1.5 flex-1 flex flex-col">
                 {{-- Profile Summary --}}
-                <div class="flex items-start gap-2 rounded-lg bg-white/80 p-2">
+                <div class="flex items-start gap-1.5 rounded-lg bg-white/85 p-1.5">
                     <div class="w-8 h-8 rounded-full bg-brand text-white flex items-center justify-center font-bold text-[11px] shrink-0">
                         {{ strtoupper($initials) }}
                     </div>
@@ -146,19 +186,6 @@
                             class="flex-1 h-7 inline-flex items-center justify-center rounded-md bg-indigo-100/90 text-indigo-700 hover:bg-indigo-200 transition">
                         <svg class="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M21 12c0 4.418-4.03 8-9 8a9.86 9.86 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
                     </button>
-                    @unless($customer->isOperations() || $customer->isCallCrm() || $customer->isBooking())
-                        @if($customer->operationCopy)
-                            <span title="Assigned to Operation Team"
-                                  class="h-7 inline-flex items-center justify-center px-2 rounded-md bg-emerald-100/90 text-emerald-800 text-[10px] font-bold whitespace-nowrap">
-                                Assigned to OPS
-                            </span>
-                        @else
-                            <button type="button" title="Assign to Operation Team" data-cid="{{ $customer->id }}" onclick="assignToOperations(this.dataset.cid)"
-                                    class="h-7 inline-flex items-center justify-center px-2 rounded-md bg-ink text-white text-[10px] font-bold hover:bg-slate-800 transition whitespace-nowrap">
-                                Assign to OPS
-                            </button>
-                        @endif
-                    @endunless
                     @if($customer->isCallCrm())
                         @if($customer->bookingCopy)
                             <span title="Assigned to Service"
@@ -192,17 +219,17 @@
                             'bg-rose-100/60 border border-rose-200/70',
                         ];
                     @endphp
-                    <div class="pt-1.5 border-t border-sky-200/60 grid grid-cols-2 gap-x-2 gap-y-1.5 text-[11px] leading-tight break-words">
+                    <div class="pt-1 border-t border-sky-200/60 flex flex-col gap-1 text-[10.5px] leading-tight break-words">
                         @if($createdDateVal)
-                            <div class="rounded-md bg-white/90 border border-sky-200/70 px-2 py-1.5">
-                                <div class="text-slate-500 text-[9.5px] font-semibold uppercase tracking-wide">Created Date</div>
-                                <div class="font-semibold text-ink">{{ $createdDateVal }}</div>
+                            <div class="rounded bg-white/90 border border-sky-200/70 px-2 py-1 flex items-center justify-between gap-2">
+                                <span class="text-slate-500 text-[9px] font-semibold uppercase tracking-wide shrink-0">Created</span>
+                                <span class="font-semibold text-ink text-right">{{ $createdDateVal }}</span>
                             </div>
                         @endif
                         @if($actionDateVal)
-                            <div class="rounded-md {{ $customer->follow_up ? 'bg-amber-100/80 border border-amber-200/80' : 'bg-emerald-100/80 border border-emerald-200/80' }} px-2 py-1.5">
-                                <div class="text-slate-600 text-[9.5px] font-semibold uppercase tracking-wide">{{ $actionDateLabel }}</div>
-                                <div class="font-bold {{ $customer->follow_up ? 'text-amber-900' : 'text-emerald-900' }}">{{ $actionDateVal }}</div>
+                            <div class="rounded {{ $customer->follow_up ? 'bg-amber-100/80 border border-amber-200/80' : 'bg-emerald-100/80 border border-emerald-200/80' }} px-2 py-1 flex items-center justify-between gap-2">
+                                <span class="text-slate-600 text-[9px] font-semibold uppercase tracking-wide shrink-0">{{ $actionDateLabel }}</span>
+                                <span class="font-bold {{ $customer->follow_up ? 'text-amber-900' : 'text-emerald-900' }} text-right">{{ $actionDateVal }}</span>
                             </div>
                         @endif
                         @foreach($visibleExtras as $field)
@@ -213,8 +240,8 @@
                                 $isUrlVal = (bool) filter_var($strVal, FILTER_VALIDATE_URL) || (bool) preg_match('~^https?://~i', $strVal);
                                 $tileBg = $fieldBgPalette[$loop->index % count($fieldBgPalette)];
                             @endphp
-                            <div class="rounded-md {{ $tileBg }} px-2 py-1.5">
-                                <div class="text-slate-500 text-[9.5px] font-semibold uppercase tracking-wide">{{ $field->label }}</div>
+                            <div class="rounded {{ $tileBg }} px-2 py-1 flex items-center justify-between gap-2">
+                                <span class="text-slate-500 text-[9px] font-semibold uppercase tracking-wide shrink-0">{{ $field->label }}</span>
                                 @if($isMapField || $isUrlVal)
                                     @php
                                         $mapHref = $isUrlVal
@@ -222,39 +249,33 @@
                                             : 'https://www.google.com/maps/search/?api=1&query=' . rawurlencode($strVal);
                                     @endphp
                                     <a href="{{ $mapHref }}" target="_blank" rel="noopener noreferrer"
-                                       class="mt-0.5 inline-flex items-center gap-1 rounded bg-brand-soft hover:bg-brand hover:text-white text-brand px-1.5 py-0.5 text-[10px] font-bold transition">
+                                       class="inline-flex items-center gap-1 rounded bg-brand-soft hover:bg-brand hover:text-white text-brand px-1.5 py-0.5 text-[10px] font-bold transition shrink-0">
                                         <svg class="w-2.5 h-2.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
                                         <span>{{ $isMapField ? 'Open Map URL' : 'Open URL' }}</span>
                                     </a>
                                 @else
-                                    <div class="font-semibold text-ink">{{ $strVal }}</div>
+                                    <span class="font-semibold text-ink text-right">{{ $strVal }}</span>
                                 @endif
                             </div>
                         @endforeach
-                        @if(($panelMrp !== null && $panelMrp !== '' && $visibleExtras->where('key', 'mrp')->isEmpty()) || ($panelSellingPrice !== null && $panelSellingPrice !== '' && $visibleExtras->where('key', 'selling_price')->isEmpty()))
-                            <div class="rounded-md bg-emerald-100/70 border border-emerald-300/80 px-2 py-1.5 col-span-2 grid grid-cols-2 gap-2">
-                                <div>
-                                    <div class="text-emerald-900 text-[9px] font-bold uppercase tracking-wide">MRP</div>
-                                    <div class="font-bold text-ink">{{ ($panelMrp !== null && $panelMrp !== '') ? '₹' . number_format((float) $panelMrp, 2) : '—' }}</div>
-                                </div>
-                                <div>
-                                    <div class="text-emerald-900 text-[9px] font-bold uppercase tracking-wide">Business Selling Price</div>
-                                    <div class="font-extrabold text-emerald-700">{{ ($panelSellingPrice !== null && $panelSellingPrice !== '') ? '₹' . number_format((float) $panelSellingPrice, 2) : '—' }}</div>
-                                </div>
+                        @if(($panelMrp !== null && $panelMrp !== '' && $visibleExtras->where('key', 'mrp')->isEmpty()))
+                            <div class="rounded bg-amber-100/70 border border-amber-200/80 px-2 py-1 flex items-center justify-between gap-2">
+                                <span class="text-amber-900 text-[9px] font-bold uppercase tracking-wide shrink-0">MRP</span>
+                                <span class="font-bold text-ink text-right">₹{{ number_format((float) $panelMrp, 2) }}</span>
                             </div>
                         @endif
-                        @if($customer->products->isNotEmpty())
-                            <div class="rounded-md bg-cyan-100/70 border border-cyan-300/80 px-2 py-1.5 col-span-2">
-                                <div class="text-cyan-900 text-[9.5px] font-bold uppercase tracking-wide flex items-center justify-between">
+                        @if(($customer->isCallCrm() || $customer->isBooking()) && $customer->products->isNotEmpty())
+                            <div class="rounded-md bg-cyan-100/70 border border-cyan-300/80 px-2 py-1">
+                                <div class="text-cyan-900 text-[9px] font-bold uppercase tracking-wide flex items-center justify-between">
                                     <span class="flex items-center gap-1">
                                         <span>📦</span>
                                         <span>Products ({{ $customer->products->count() }})</span>
                                     </span>
                                     <span class="font-extrabold text-emerald-800">₹{{ number_format($customer->products->sum('price'), 2) }}</span>
                                 </div>
-                                <div class="mt-1 flex flex-wrap gap-1">
+                                <div class="mt-0.5 flex flex-wrap gap-1">
                                     @foreach($customer->products as $cp)
-                                        <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-white text-cyan-950 text-[10.5px] font-semibold border border-cyan-300 shadow-2xs">
+                                        <span class="inline-flex items-center gap-1 px-1.5 py-0.2 rounded bg-white text-cyan-950 text-[10px] font-semibold border border-cyan-300 shadow-2xs">
                                             <span>{{ $cp->name }}</span>
                                             @if($cp->price > 0)
                                                 <span class="text-emerald-700 font-bold">₹{{ number_format($cp->price, 0) }}</span>
@@ -269,8 +290,8 @@
             </div>
         </div>
 
-        {{-- RIGHT COLUMN: Update Form Card (8 cols on lg) --}}
-        <div class="lg:col-span-8 flex flex-col">
+        {{-- MIDDLE COLUMN: Update Form Card --}}
+        <div class="{{ $midColSpan }} flex flex-col">
             @if($customer->isOperations())
                 @php
                     $curOpStatus = strtolower(trim((string) $customer->status));
@@ -838,10 +859,13 @@
                             </div>
                         @endif
 
-                        {{-- Section: Products Multi-Select Section (Below Update Feedback in Call CRM / CRM) --}}
+                        {{-- Section: Products Multi-Select Section (Call CRM & Assign Service only, NOT CRM or Team Ops) --}}
                         @php
-                            $availableProducts = \App\Models\Product::active()->ordered()->get();
-                            $assignedBookingProductIds = $customer->assignedBookingProductIds();
+                            $showProductSelector = $customer->isCallCrm() || $customer->isBooking();
+                            $availableProducts = $showProductSelector
+                                ? \App\Models\Product::active()->ordered()->get()
+                                : collect();
+                            $assignedBookingProductIds = $showProductSelector ? $customer->assignedBookingProductIds() : [];
                             $initialSelectedProductIds = $customer->isBooking()
                                 ? $assignedBookingProductIds
                                 : [];
@@ -855,7 +879,7 @@
                                 'already_assigned' => in_array((int) $p->id, $assignedBookingProductIds, true),
                             ])->values();
                         @endphp
-                        @if($availableProducts->isNotEmpty())
+                        @if($showProductSelector && $availableProducts->isNotEmpty())
                             <div class="rounded-lg border border-cyan-200/90 bg-cyan-50/60 p-2.5 space-y-2"
                                  data-assigned-product-ids='@json($assignedBookingProductIds)'
                                  x-data="{
@@ -1026,6 +1050,79 @@
                 </form>
             @endif
         </div>
+
+        @if($hasBookingsCol)
+            @php
+                $lifetimeSellingTotal = $allCustomerBookings->sum(fn ($b) => (float) ($b->selling_price ?? 0));
+                $lifetimeMrpTotal = $allCustomerBookings->sum(fn ($b) => (float) ($b->mrp ?? 0));
+            @endphp
+            {{-- RIGHT COLUMN: Compact Booking List Card + Lifetime Total --}}
+            <div class="lg:col-span-3 h-full flex flex-col rounded-xl border border-indigo-200/90 bg-indigo-50/50 shadow-xs overflow-hidden">
+                <div class="h-8 shrink-0 px-2.5 bg-indigo-100/80 border-b border-indigo-200/80 flex items-center justify-between gap-1.5">
+                    <div class="flex items-center gap-1.5 min-w-0">
+                        <span class="w-4 h-4 rounded bg-indigo-600 text-white inline-flex items-center justify-center shrink-0 text-[10px]">📅</span>
+                        <span class="text-[11.5px] font-bold text-indigo-950 truncate">Booking List</span>
+                    </div>
+                    <span class="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-white text-indigo-800 border border-indigo-200 shrink-0">
+                        {{ $allCustomerBookings->count() }}
+                    </span>
+                </div>
+
+                <div class="p-2 space-y-1.5 flex-1 overflow-y-auto crm-scroll max-h-[480px]">
+                    @foreach($allCustomerBookings as $bItem)
+                        @php
+                            $bTime = $bItem->label ?: \App\Models\BookingSlot::formatTimeLabel((string) $bItem->start_time, (string) $bItem->end_time);
+                            $bCar = $bItem->car_model ?: $panelCarModel;
+                            $bBadgeClass = match ($bItem->status) {
+                                'success' => 'bg-emerald-100 text-emerald-800 border-emerald-200',
+                                'cancelled' => 'bg-rose-100 text-rose-800 border-rose-200',
+                                default => 'bg-amber-100 text-amber-800 border-amber-200',
+                            };
+                        @endphp
+                        <div class="rounded-lg bg-white border border-indigo-100/90 px-2 py-1.5 text-[10.5px] space-y-1 shadow-2xs">
+                            <div class="flex items-start justify-between gap-1">
+                                <div class="font-bold text-ink leading-tight">
+                                    <div>{{ $bItem->slot_date?->format('d M Y') }}</div>
+                                    <div class="text-[10px] font-semibold text-indigo-700">{{ $bTime }}</div>
+                                </div>
+                                <span class="px-1.5 py-0.2 rounded border text-[9px] font-bold uppercase shrink-0 {{ $bBadgeClass }}">
+                                    {{ $bItem->status }}
+                                </span>
+                            </div>
+                            @if(!empty($bCar))
+                                <div class="text-[10px] font-semibold text-teal-800 truncate" title="{{ $bCar }}">
+                                    🚗 {{ $bCar }}
+                                </div>
+                            @endif
+                            @if($bItem->mrp !== null || $bItem->selling_price !== null)
+                                <div class="flex flex-wrap items-center justify-between gap-1 pt-0.5 border-t border-slate-100 text-[10px]">
+                                    @if($bItem->mrp !== null)
+                                        <span class="text-slate-500 font-semibold">MRP: <strong class="text-ink">₹{{ number_format((float) $bItem->mrp, 0) }}</strong></span>
+                                    @endif
+                                    @if($bItem->selling_price !== null)
+                                        <span class="text-emerald-700 font-semibold">Selling: <strong class="text-emerald-800">₹{{ number_format((float) $bItem->selling_price, 0) }}</strong></span>
+                                    @endif
+                                </div>
+                            @endif
+                        </div>
+                    @endforeach
+                </div>
+
+                {{-- Lifetime Total Amount Banner at Bottom --}}
+                <div class="shrink-0 mx-2 mb-2 mt-auto rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 text-white px-2.5 py-2 shadow-xs">
+                    <div class="flex items-center justify-between gap-2">
+                        <span class="text-[9.5px] font-bold uppercase tracking-wider text-emerald-100">Lifetime Total</span>
+                        <span class="text-[14px] font-extrabold leading-none">₹{{ number_format($lifetimeSellingTotal, 2) }}</span>
+                    </div>
+                    @if($lifetimeMrpTotal > 0)
+                        <div class="mt-1 pt-1 border-t border-white/20 flex items-center justify-between text-[10px] text-emerald-100">
+                            <span>Total MRP</span>
+                            <span class="font-bold text-white">₹{{ number_format($lifetimeMrpTotal, 2) }}</span>
+                        </div>
+                    @endif
+                </div>
+            </div>
+        @endif
     </div>
 
     {{-- Full-Width Bottom Section: 2 Recent Messages + View More Button (Soft Rose/Warm Slate Tint) --}}

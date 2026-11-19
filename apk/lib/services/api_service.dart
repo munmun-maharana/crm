@@ -351,6 +351,7 @@ class ApiService {
     int slotId, {
     required String customerName,
     int? customerId,
+    String? carModel,
     String? notes,
     double? mrp,
     double? sellingPrice,
@@ -358,6 +359,7 @@ class ApiService {
     return post('/booking-slots/$slotId/book', {
       'customer_name': customerName,
       'customer_id': customerId,
+      if (carModel != null && carModel.isNotEmpty) 'car_model': carModel,
       'notes': notes,
       if (mrp != null) 'mrp': mrp,
       if (sellingPrice != null) 'selling_price': sellingPrice,

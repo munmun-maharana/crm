@@ -61,10 +61,13 @@ class CustomerController extends Controller
 
         $base = Customer::query()->visibleTo($request->user())->inPipeline($pipeline);
 
+        $showProductsForPipeline = in_array($pipeline, ['call_crm', 'booking'], true);
         $allLeadsCount = (clone $base)->count();
-        $allActiveProducts = \App\Models\Product::active()->ordered()->get();
+        $allActiveProducts = $showProductsForPipeline
+            ? \App\Models\Product::active()->ordered()->get()
+            : collect();
         $productCards = [];
-        if ($allActiveProducts->isNotEmpty()) {
+        if ($showProductsForPipeline && $allActiveProducts->isNotEmpty()) {
             foreach ($allActiveProducts as $prod) {
                 $checkedCount = (clone $base)->where(function ($sub) use ($prod) {
                     $sub->whereHas('products', fn ($p) => $p->where('products.id', $prod->id))
@@ -225,7 +228,9 @@ class CustomerController extends Controller
             'update_fields' => $updateFields,
             'status_options' => $this->statusOptionsFor($pipeline),
             'wash_statuses' => $isOps ? ['Success', 'Cancelled', 'Pending'] : ($customer->isBooking() ? ['Success', 'Cancelled'] : []),
-            'available_products' => \App\Models\Product::active()->ordered()->get(['id', 'name', 'code', 'price', 'category', 'unit'])->values(),
+            'available_products' => ($customer->isCallCrm() || $customer->isBooking())
+                ? \App\Models\Product::active()->ordered()->get(['id', 'name', 'code', 'price', 'category', 'unit'])->values()
+                : [],
             'note_templates' => NoteTemplate::active()->ordered()->get(['id', 'title', 'body']),
             'activities' => $customer->activities->sortByDesc('id')->map(fn ($a) => $this->activityPayload($a))->values(),
             'operation_setting' => $isOps ? null : OperationSetting::current()->only(['status', 'title', 'body']),

@@ -63,6 +63,7 @@ class BookingSlotController extends Controller
         $data = $request->validate([
             'customer_name' => ['required', 'string', 'max:160'],
             'customer_id' => ['nullable', 'integer', 'exists:customers,id'],
+            'car_model' => ['nullable', 'string', 'max:160'],
             'notes' => ['nullable', 'string', 'max:500'],
             'mrp' => ['nullable', 'numeric', 'min:0'],
             'selling_price' => ['nullable', 'numeric', 'min:0'],
@@ -133,6 +134,9 @@ class BookingSlotController extends Controller
                 }
             }
 
+            $carModelVal = isset($data['car_model']) && trim((string) $data['car_model']) !== ''
+                ? trim((string) $data['car_model'])
+                : null;
             $mrpVal = array_key_exists('mrp', $data) && $data['mrp'] !== null && $data['mrp'] !== ''
                 ? round((float) $data['mrp'], 2)
                 : null;
@@ -143,6 +147,7 @@ class BookingSlotController extends Controller
             $locked->update([
                 'status' => BookingSlot::STATUS_BOOKED,
                 'customer_name' => $customerName,
+                'car_model' => $carModelVal,
                 'customer_id' => $customerId,
                 'booked_by' => $request->user()->id,
                 'booked_at' => now(),
@@ -164,6 +169,10 @@ class BookingSlotController extends Controller
                 $custMeta = is_array($matchedCustomer->meta) ? $matchedCustomer->meta : [];
                 $custMeta['booking_slot_time'] = $slotTimeLabel;
                 $custMeta['booking_time'] = $slotTimeLabel;
+                if ($carModelVal !== null) {
+                    $custMeta['car_model'] = $carModelVal;
+                    $custMeta['model'] = $carModelVal;
+                }
                 if ($mrpVal !== null) {
                     $custMeta['mrp'] = $mrpVal;
                 }
@@ -188,6 +197,10 @@ class BookingSlotController extends Controller
                     $opMeta['booking_slot_id'] = $locked->id;
                     $opMeta['booking_slot_time'] = $slotTimeLabel;
                     $opMeta['booking_time'] = $slotTimeLabel;
+                    if ($carModelVal !== null) {
+                        $opMeta['car_model'] = $carModelVal;
+                        $opMeta['model'] = $carModelVal;
+                    }
                     if ($mrpVal !== null) {
                         $opMeta['mrp'] = $mrpVal;
                     }
@@ -202,21 +215,24 @@ class BookingSlotController extends Controller
 
                     $opCopy = Customer::create($opAttrs);
 
-                    $priceParts = [];
+                    $extraParts = [];
+                    if ($carModelVal !== null) {
+                        $extraParts[] = 'Car Model: ' . $carModelVal;
+                    }
                     if ($mrpVal !== null) {
-                        $priceParts[] = 'MRP: ₹' . number_format($mrpVal, 2);
+                        $extraParts[] = 'MRP: ₹' . number_format($mrpVal, 2);
                     }
                     if ($sellingPriceVal !== null) {
-                        $priceParts[] = 'Business Selling Price: ₹' . number_format($sellingPriceVal, 2);
+                        $extraParts[] = 'Business Selling Price: ₹' . number_format($sellingPriceVal, 2);
                     }
-                    $priceNote = ! empty($priceParts) ? ' | ' . implode(' | ', $priceParts) : '';
+                    $extraNote = ! empty($extraParts) ? ' | ' . implode(' | ', $extraParts) : '';
 
                     CustomerActivity::create([
                         'customer_id' => $opCopy->id,
                         'user_id' => $request->user()->id,
                         'type' => 'system',
                         'title' => 'Received from CRM (Booking Slot)',
-                        'body' => "Assigned to Operation Team from CRM #{$matchedCustomer->id} for slot {$slotDateFormatted} ({$slotTimeLabel}){$priceNote}.",
+                        'body' => "Assigned to Operation Team from CRM #{$matchedCustomer->id} for slot {$slotDateFormatted} ({$slotTimeLabel}){$extraNote}.",
                     ]);
                 }
 
@@ -235,21 +251,25 @@ class BookingSlotController extends Controller
                 if (! str_contains($actBody, $slotDateFormatted) && ! str_contains($actBody, $locked->slot_date->toDateString())) {
                     $actBody .= "\nDate: {$slotDateFormatted} | Time: {$slotTimeLabel}";
                 }
-                if ($mrpVal !== null || $sellingPriceVal !== null) {
-                    $priceLine = [];
+                if ($carModelVal !== null || $mrpVal !== null || $sellingPriceVal !== null) {
+                    $detailLine = [];
+                    if ($carModelVal !== null) {
+                        $detailLine[] = 'Car Model: ' . $carModelVal;
+                    }
                     if ($mrpVal !== null) {
-                        $priceLine[] = 'MRP: ₹' . number_format($mrpVal, 2);
+                        $detailLine[] = 'MRP: ₹' . number_format($mrpVal, 2);
                     }
                     if ($sellingPriceVal !== null) {
-                        $priceLine[] = 'Business Selling Price: ₹' . number_format($sellingPriceVal, 2);
+                        $detailLine[] = 'Business Selling Price: ₹' . number_format($sellingPriceVal, 2);
                     }
-                    $actBody .= "\n" . implode(' | ', $priceLine);
+                    $actBody .= "\n" . implode(' | ', $detailLine);
                 }
 
                 $actMeta = [
                     'slot_id' => $locked->id,
                     'slot_date' => $locked->slot_date->toDateString(),
                     'slot_time' => $slotTimeLabel,
+                    'car_model' => $carModelVal,
                     'mrp' => $mrpVal,
                     'selling_price' => $sellingPriceVal,
                 ];
@@ -571,7 +591,7 @@ class BookingSlotController extends Controller
         };
 
         $customerPhone = $c?->phone ?: $pickMeta(['phone_no', 'phone', 'mobile', 'contact_no']);
-        $carModel = $pickMeta(['model', 'car_model', 'vehicle_model', 'vehicle_type']);
+        $carModel = $slot->car_model ?: $pickMeta(['car_model', 'model', 'vehicle_model', 'vehicle_type']);
         $serviceType = $pickMeta(['service_details', 'service_type', 'service', 'package']);
         $mrp = $slot->mrp !== null ? (string) $slot->mrp : $pickMeta(['mrp']);
         $sellingPrice = $slot->selling_price !== null

@@ -22,7 +22,7 @@
 @endphp
 
 <div class="h-full flex flex-col"
-     x-init="@if($openId) $nextTick(() => selectCustomer({{ (int) $openId }})) @endif @if(request('excel')) excelOpen = true; @endif">
+     x-init="@if($openId === 'first' && $customers->isNotEmpty()) $nextTick(() => selectCustomer({{ (int) $customers->first()->id }})) @elseif($openId && is_numeric($openId)) $nextTick(() => selectCustomer({{ (int) $openId }})) @endif @if(request('excel')) excelOpen = true; @endif">
 
     @php
         $topListRoute = $listRoute ?? (($pipeline ?? 'crm') === 'operations' ? 'operations.index' : 'customers.index');
@@ -670,6 +670,27 @@
                                 </button>
                             @endforeach
                         </div>
+                        @if($customers->hasPages())
+                            <div class="shrink-0 px-2.5 py-2 border-t border-line bg-white/95 flex items-center justify-between gap-1 text-[11px]">
+                                @if($customers->onFirstPage())
+                                    <span class="px-2 py-1 rounded border border-line text-slate-300 cursor-not-allowed font-semibold">‹ Prev</span>
+                                @else
+                                    <a href="{{ $customers->appends(['open' => 'first'])->previousPageUrl() }}"
+                                       class="px-2 py-1 rounded border border-line bg-white hover:bg-brand-soft hover:text-brand hover:border-brand/30 text-slate-700 font-semibold transition">‹ Prev</a>
+                                @endif
+
+                                <span class="text-[10.5px] font-bold text-slate-500 whitespace-nowrap">
+                                    {{ $customers->currentPage() }} / {{ $customers->lastPage() }}
+                                </span>
+
+                                @if($customers->hasMorePages())
+                                    <a href="{{ $customers->appends(['open' => 'first'])->nextPageUrl() }}"
+                                       class="px-2 py-1 rounded border border-line bg-white hover:bg-brand-soft hover:text-brand hover:border-brand/30 text-slate-700 font-semibold transition">Next ›</a>
+                                @else
+                                    <span class="px-2 py-1 rounded border border-line text-slate-300 cursor-not-allowed font-semibold">Next ›</span>
+                                @endif
+                            </div>
+                        @endif
                     </section>
 
                     <section class="flex-1 min-w-0 flex flex-col bg-slate-50/40 slide-read">
@@ -679,6 +700,15 @@
                                 <div class="text-[11px] text-violet-700/80 hidden sm:inline truncate">Chat, updates &amp; full details</div>
                             </div>
                             <div class="flex items-center gap-1.5 shrink-0">
+                                @if(auth()->user()->canEditCustomers())
+                                    <button type="button"
+                                            title="Edit Customer"
+                                            @click="const el = document.querySelector('[data-panel-edit-payload]'); if (el) { openEditForm(JSON.parse(el.dataset.panelEditPayload)); }"
+                                            class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-violet-300 bg-white hover:bg-brand-soft text-brand text-[11.5px] font-bold shadow-2xs transition">
+                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                                        <span>Edit</span>
+                                    </button>
+                                @endif
                                 <button type="button" @click="closeDesk()" class="w-7 h-7 rounded hover:bg-white/60 text-slate-600 transition hover:rotate-90 duration-200 text-xs" title="Close">✕</button>
                             </div>
                         </div>

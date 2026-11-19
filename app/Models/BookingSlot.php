@@ -27,6 +27,7 @@ class BookingSlot extends Model
         'label',
         'status',
         'customer_name',
+        'car_model',
         'customer_id',
         'booked_by',
         'booked_at',

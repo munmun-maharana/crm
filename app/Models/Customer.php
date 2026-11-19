@@ -282,6 +282,13 @@ class Customer extends Model
         return $this->belongsTo(self::class, 'source_customer_id');
     }
 
+    public function bookingSlots(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(BookingSlot::class, 'customer_id')
+            ->orderByDesc('slot_date')
+            ->orderByDesc('start_time');
+    }
+
     public function isOperations(): bool
     {
         return $this->pipeline === 'operations';
