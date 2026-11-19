@@ -104,9 +104,19 @@
     ], is_array($customer->meta) ? $customer->meta : []);
 @endphp
 @php
+    $isCallCrmPanel = $customer->isCallCrm();
+    $allCallCrmServices = $isCallCrmPanel
+        ? \App\Models\Customer::query()
+            ->where('pipeline', 'booking')
+            ->where('source_customer_id', $customer->id)
+            ->with('products')
+            ->latest('id')
+            ->get()
+        : collect();
     $hasBookingsCol = $allCustomerBookings->isNotEmpty();
-    $leftColSpan = $hasBookingsCol ? 'lg:col-span-3' : 'lg:col-span-4';
-    $midColSpan = $hasBookingsCol ? 'lg:col-span-6' : 'lg:col-span-8';
+    $hasRightCol = $hasBookingsCol || $isCallCrmPanel;
+    $leftColSpan = $hasRightCol ? 'lg:col-span-3' : 'lg:col-span-4';
+    $midColSpan = $hasRightCol ? 'lg:col-span-6' : 'lg:col-span-8';
 @endphp
 <div class="p-2.5 sm:p-3 space-y-2.5 w-full"
      data-panel-edit-payload='@json($panelEditPayload)'
@@ -1134,6 +1144,76 @@
                     <div class="mt-1 pt-1 border-t border-white/20 flex items-center justify-between text-[10px] text-emerald-100">
                         <span>Business Selling Price</span>
                         <span class="font-bold text-white">₹{{ number_format($lifetimeSellingTotal, 2) }}</span>
+                    </div>
+                </div>
+            </div>
+        @elseif($isCallCrmPanel)
+            @php
+                $callCrmLifetimeTotal = $allCallCrmServices->sum(fn ($s) => $s->products->sum(fn ($p) => (float) ($p->price ?? 0)));
+            @endphp
+            {{-- RIGHT COLUMN: Call CRM Booking / Assigned Service List + Lifetime Total --}}
+            <div class="lg:col-span-3 h-full flex flex-col rounded-xl border border-indigo-200/90 bg-indigo-50/50 shadow-xs overflow-hidden">
+                <div class="h-8 shrink-0 px-2.5 bg-indigo-100/80 border-b border-indigo-200/80 flex items-center justify-between gap-1.5">
+                    <div class="flex items-center gap-1.5 min-w-0">
+                        <span class="w-4 h-4 rounded bg-indigo-600 text-white inline-flex items-center justify-center shrink-0 text-[10px]">📅</span>
+                        <span class="text-[11.5px] font-bold text-indigo-950 truncate">Booking List</span>
+                    </div>
+                    <span class="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-white text-indigo-800 border border-indigo-200 shrink-0">
+                        {{ $allCallCrmServices->count() }}
+                    </span>
+                </div>
+
+                <div class="p-2 space-y-1.5 flex-1 overflow-y-auto crm-scroll max-h-[480px]">
+                    @forelse($allCallCrmServices as $svc)
+                        @php
+                            $svcDate = $svc->follow_up_at
+                                ? $svc->follow_up_at->format('d M Y')
+                                : ($svc->created_at ? $svc->created_at->format('d M Y') : '—');
+                            $svcTotal = $svc->products->sum(fn ($p) => (float) ($p->price ?? 0));
+                            $svcBadgeClass = match (strtolower((string) $svc->status)) {
+                                'success', 'completed', 'done' => 'bg-emerald-100 text-emerald-800 border-emerald-200',
+                                'cancelled', 'lost' => 'bg-rose-100 text-rose-800 border-rose-200',
+                                default => 'bg-amber-100 text-amber-800 border-amber-200',
+                            };
+                        @endphp
+                        <div class="rounded-lg bg-white border border-indigo-100/90 px-2 py-1.5 text-[10.5px] space-y-1 shadow-2xs">
+                            <div class="flex items-center justify-between gap-1">
+                                <div class="font-bold text-ink leading-tight">
+                                    <span class="text-indigo-700">#{{ $svc->id }}</span>
+                                    <span class="ml-1 text-slate-600 font-semibold">{{ $svcDate }}</span>
+                                </div>
+                                <span class="px-1.5 py-0.2 rounded border text-[9px] font-bold uppercase {{ $svcBadgeClass }}">
+                                    {{ $svc->status ?: 'Pending' }}
+                                </span>
+                            </div>
+                            @if($svc->products->isNotEmpty())
+                                <div class="flex flex-wrap gap-1 pt-0.5">
+                                    @foreach($svc->products as $sp)
+                                        <span class="inline-flex items-center gap-1 px-1.5 py-0.2 rounded bg-cyan-50 text-cyan-900 border border-cyan-200 text-[9.5px] font-semibold">
+                                            <span>{{ $sp->name }}</span>
+                                            @if((float) ($sp->price ?? 0) > 0)
+                                                <span class="font-bold text-emerald-700">₹{{ number_format((float) $sp->price, 0) }}</span>
+                                            @endif
+                                        </span>
+                                    @endforeach
+                                </div>
+                            @endif
+                            <div class="flex items-center justify-between pt-0.5 border-t border-slate-100 text-[10px]">
+                                <span class="text-slate-500">Service Total</span>
+                                <span class="font-extrabold text-emerald-700">₹{{ number_format($svcTotal, 2) }}</span>
+                            </div>
+                        </div>
+                    @empty
+                        <div class="rounded-lg border border-dashed border-indigo-200 bg-white/70 p-4 text-center text-[11px] text-slate-500">
+                            No services assigned yet.
+                        </div>
+                    @endforelse
+                </div>
+
+                <div class="shrink-0 mx-2 mb-2 mt-auto rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 text-white px-2.5 py-2 shadow-xs">
+                    <div class="flex items-center justify-between gap-2">
+                        <span class="text-[9.5px] font-bold uppercase tracking-wider text-emerald-100">Lifetime Total</span>
+                        <span class="text-[14px] font-extrabold leading-none">₹{{ number_format($callCrmLifetimeTotal, 2) }}</span>
                     </div>
                 </div>
             </div>

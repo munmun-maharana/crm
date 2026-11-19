@@ -142,11 +142,18 @@
                             $canAccess = $navUser->isAdmin();
                             $route = 'users.index';
                             break;
+                        case 'analytics':
+                            $canAccess = $navUser->isAdmin();
+                            $route = 'analytics.index';
+                            break;
                     }
 
                     if ($canAccess && $route) {
                         $links[] = [$route, $m->label];
                     }
+                }
+                if ($navUser->isAdmin() && !collect($links)->contains(fn($l) => $l[0] === 'analytics.index')) {
+                    $links[] = ['analytics.index', 'Analytics'];
                 }
             @endphp
             <div class="px-2 pt-1 pb-1.5 text-[11px] font-semibold text-indigo-500">Favorites</div>
@@ -157,6 +164,57 @@
                 </a>
             @endforeach
         </nav>
+        @if(! auth()->user()->isAdmin())
+            @php
+                $openWorkSession = \App\Models\UserWorkSession::query()
+                    ->where('user_id', auth()->id())
+                    ->whereIn('status', ['active', 'on_break'])
+                    ->latest('id')
+                    ->first();
+                $initialWorkSession = \App\Http\Controllers\AnalyticsController::formatSessionPayload($openWorkSession);
+            @endphp
+            <div id="crm-work-session-box" class="mx-2 mb-1.5 rounded-xl border border-indigo-200/90 bg-white/95 p-2 shadow-2xs text-[10.5px]">
+                <div class="flex items-center justify-between gap-1 mb-1">
+                    <span id="ws-status-badge" class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9.5px] font-bold bg-slate-100 text-slate-600">
+                        <span id="ws-status-dot" class="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+                        <span id="ws-status-text">Not Started</span>
+                    </span>
+                    <span id="ws-shift-timer" class="font-mono font-extrabold text-indigo-900 text-[10.5px]">00:00:00</span>
+                </div>
+                <div class="grid grid-cols-3 gap-1 text-center mb-1.5">
+                    <div class="rounded-md bg-emerald-50 border border-emerald-100 py-0.5 px-0.5">
+                        <div class="text-[8.5px] font-bold uppercase text-emerald-600 leading-tight">Desk</div>
+                        <div id="ws-desk-timer" class="font-bold text-emerald-900 text-[9.5px] whitespace-nowrap leading-tight">0s</div>
+                    </div>
+                    <div class="rounded-md bg-amber-50 border border-amber-100 py-0.5 px-0.5">
+                        <div class="text-[8.5px] font-bold uppercase text-amber-600 leading-tight">Break</div>
+                        <div id="ws-break-timer" class="font-bold text-amber-900 text-[9.5px] whitespace-nowrap leading-tight">0s</div>
+                    </div>
+                    <div class="rounded-md bg-rose-50 border border-rose-100 py-0.5 px-0.5">
+                        <div class="text-[8.5px] font-bold uppercase text-rose-600 leading-tight">Waste</div>
+                        <div id="ws-waste-timer" class="font-bold text-rose-900 text-[9.5px] whitespace-nowrap leading-tight">0s</div>
+                    </div>
+                </div>
+                <div class="flex items-center gap-1">
+                    <button type="button" id="ws-btn-start"
+                            class="flex-1 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-1 text-[10.5px] transition">
+                        Start
+                    </button>
+                    <button type="button" id="ws-btn-break-on" style="display:none;"
+                            class="flex-1 rounded-md bg-amber-500 hover:bg-amber-600 text-white font-bold py-1 text-[10.5px] transition">
+                        Break On
+                    </button>
+                    <button type="button" id="ws-btn-break-off" style="display:none;"
+                            class="flex-1 rounded-md bg-sky-600 hover:bg-sky-700 text-white font-bold py-1 text-[10.5px] transition">
+                        Break Off
+                    </button>
+                    <button type="button" id="ws-btn-end" style="display:none;"
+                            class="flex-1 rounded-md bg-rose-600 hover:bg-rose-700 text-white font-bold py-1 text-[10.5px] transition">
+                        End
+                    </button>
+                </div>
+            </div>
+        @endif
         <div class="p-3 border-t border-line bg-teal-100/60 text-[12px]">
             <div class="flex items-center justify-between gap-2">
                 <div class="font-semibold truncate min-w-0 text-teal-950">{{ auth()->user()->name }}</div>
@@ -962,6 +1020,14 @@
                 </div>
             </div>
 
+            {{-- Follow-up Date (defaults to Today) --}}
+            <div class="rounded-xl border border-indigo-200/80 bg-indigo-50/50 px-3 py-2 flex items-center justify-between gap-3">
+                <label class="text-[11.5px] font-bold uppercase tracking-wide text-indigo-950 shrink-0">Follow-up Date</label>
+                <input type="date"
+                       x-model="assignServiceDate"
+                       class="h-8 px-2.5 rounded-lg border border-indigo-200 bg-white text-[12px] font-semibold text-ink outline-none focus:border-indigo-500">
+            </div>
+
             {{-- All Products Checkbox Section --}}
             <div class="rounded-xl border border-cyan-200/90 bg-cyan-50/60 p-3 space-y-2.5">
                 <div class="flex flex-wrap items-center justify-between gap-2">
@@ -1195,6 +1261,7 @@ function crmShell() {
         assignServiceAllProducts: @json($globalAssignProducts),
         assignServiceAssignedIds: [],
         assignServiceProductIds: [],
+        assignServiceDate: '',
         assignServiceError: '',
         assignServiceFilteredProducts() {
             if (!this.assignServiceSearch.trim()) return this.assignServiceAllProducts;
@@ -1241,6 +1308,11 @@ function crmShell() {
             this.assignServiceCustomerId = customerId;
             this.assignServiceError = '';
             this.assignServiceSearch = '';
+            const now = new Date();
+            const yyyy = now.getFullYear();
+            const mm = String(now.getMonth() + 1).padStart(2, '0');
+            const dd = String(now.getDate()).padStart(2, '0');
+            this.assignServiceDate = `${yyyy}-${mm}-${dd}`;
             const form = document.querySelector(`form[action*="/customers/${customerId}/activity"]`);
             const prodBox = form ? form.querySelector('[data-assigned-product-ids]') : document.querySelector('[data-assigned-product-ids]');
 
@@ -1274,7 +1346,8 @@ function crmShell() {
                         'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content
                     },
                     body: JSON.stringify({
-                        product_ids: this.assignServiceProductIds
+                        product_ids: this.assignServiceProductIds,
+                        follow_up_date: this.assignServiceDate
                     })
                 });
                 const data = await res.json().catch(() => ({}));
@@ -2816,6 +2889,363 @@ async function copyHtmlTableToClipboard(htmlString, plainString) {
     return copied;
 }
 </script>
+@if(auth()->check() && ! auth()->user()->isAdmin())
+<script>
+(function () {
+    const eventUrl = @json(route('activity-track.event'));
+    const durationUrl = @json(route('activity-track.duration'));
+    const wsStartUrl = @json(route('work-session.start'));
+    const wsBreakOnUrl = @json(route('work-session.break-on'));
+    const wsBreakOffUrl = @json(route('work-session.break-off'));
+    const wsEndUrl = @json(route('work-session.end'));
+    const csrfToken = @json(csrf_token());
+    const pagePath = window.location.pathname || '/';
+    const pageTitle = document.title || pagePath;
+
+    let workSession = @json($initialWorkSession ?? null);
+    let pageLogId = null;
+    let totalSeconds = 0;
+    let wasteSeconds = 0;
+    let lastTick = Date.now();
+    let lastInteractionAt = Date.now();
+    let lastSentTotal = 0;
+    let lastSentWaste = 0;
+    const IDLE_THRESHOLD_MS = 30000;
+
+    function formatHms(sec) {
+        sec = Math.max(0, Math.floor(sec || 0));
+        const h = String(Math.floor(sec / 3600)).padStart(2, '0');
+        const m = String(Math.floor((sec % 3600) / 60)).padStart(2, '0');
+        const s = String(sec % 60).padStart(2, '0');
+        return h + ':' + m + ':' + s;
+    }
+
+    function renderWorkSessionUI() {
+        const badge = document.getElementById('ws-status-badge');
+        const dot = document.getElementById('ws-status-dot');
+        const statusText = document.getElementById('ws-status-text');
+        const shiftEl = document.getElementById('ws-shift-timer');
+        const deskEl = document.getElementById('ws-desk-timer');
+        const breakEl = document.getElementById('ws-break-timer');
+        const wasteEl = document.getElementById('ws-waste-timer');
+        const btnStart = document.getElementById('ws-btn-start');
+        const btnBreakOn = document.getElementById('ws-btn-break-on');
+        const btnBreakOff = document.getElementById('ws-btn-break-off');
+        const btnEnd = document.getElementById('ws-btn-end');
+        if (!badge || !btnStart) return;
+
+        if (!workSession) {
+            badge.className = 'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600';
+            dot.className = 'w-1.5 h-1.5 rounded-full bg-slate-400';
+            statusText.textContent = 'Not Started';
+            shiftEl.textContent = '00:00:00';
+            deskEl.textContent = '0s';
+            breakEl.textContent = '0s';
+            wasteEl.textContent = '0s';
+            btnStart.style.display = '';
+            btnBreakOn.style.display = 'none';
+            btnBreakOff.style.display = 'none';
+            btnEnd.style.display = 'none';
+            return;
+        }
+
+        const tot = Math.max(0, workSession.total_seconds || 0);
+        const brk = Math.max(0, workSession.total_break_seconds || 0);
+        const wst = Math.max(0, workSession.total_waste_seconds || 0);
+        const dsk = Math.max(0, tot - brk - wst);
+
+        shiftEl.textContent = formatHms(tot);
+        deskEl.textContent = formatSec(dsk);
+        breakEl.textContent = formatSec(brk);
+        wasteEl.textContent = formatSec(wst);
+
+        btnStart.style.display = 'none';
+        btnEnd.style.display = '';
+
+        if (workSession.status === 'on_break') {
+            badge.className = 'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800';
+            dot.className = 'w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse';
+            statusText.textContent = 'On Break';
+            btnBreakOn.style.display = 'none';
+            btnBreakOff.style.display = '';
+        } else {
+            badge.className = 'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800';
+            dot.className = 'w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse';
+            statusText.textContent = 'Working';
+            btnBreakOn.style.display = '';
+            btnBreakOff.style.display = 'none';
+        }
+    }
+
+    // Wire up Start / Break On / Break Off / End buttons
+    (function initWorkSessionButtons() {
+        const btnStart = document.getElementById('ws-btn-start');
+        const btnBreakOn = document.getElementById('ws-btn-break-on');
+        const btnBreakOff = document.getElementById('ws-btn-break-off');
+        const btnEnd = document.getElementById('ws-btn-end');
+
+        if (btnStart) {
+            btnStart.addEventListener('click', function () {
+                btnStart.disabled = true;
+                postJson(wsStartUrl, {}, false).then(res => {
+                    btnStart.disabled = false;
+                    if (res && res.session) {
+                        workSession = res.session;
+                        lastInteractionAt = Date.now();
+                        lastTick = Date.now();
+                        renderWorkSessionUI();
+                    }
+                });
+            });
+        }
+        if (btnBreakOn) {
+            btnBreakOn.addEventListener('click', function () {
+                flushDuration(false);
+                btnBreakOn.disabled = true;
+                postJson(wsBreakOnUrl, {}, false).then(res => {
+                    btnBreakOn.disabled = false;
+                    if (res && res.session) {
+                        workSession = res.session;
+                        hideIdleAlert();
+                        renderWorkSessionUI();
+                    }
+                });
+            });
+        }
+        if (btnBreakOff) {
+            btnBreakOff.addEventListener('click', function () {
+                btnBreakOff.disabled = true;
+                postJson(wsBreakOffUrl, {}, false).then(res => {
+                    btnBreakOff.disabled = false;
+                    if (res && res.session) {
+                        workSession = res.session;
+                        lastInteractionAt = Date.now();
+                        lastTick = Date.now();
+                        hideIdleAlert();
+                        renderWorkSessionUI();
+                    }
+                });
+            });
+        }
+        if (btnEnd) {
+            btnEnd.addEventListener('click', function () {
+                if (!confirm('End work session now?')) return;
+                flushDuration(false);
+                btnEnd.disabled = true;
+                postJson(wsEndUrl, {}, false).then(res => {
+                    btnEnd.disabled = false;
+                    workSession = null;
+                    hideIdleAlert();
+                    renderWorkSessionUI();
+                });
+            });
+        }
+        renderWorkSessionUI();
+    })();
+
+    function formatSec(sec) {
+        const m = Math.floor(sec / 60);
+        const s = sec % 60;
+        return m > 0 ? (m + 'm ' + s + 's') : (s + 's');
+    }
+
+    function showIdleAlert() {}
+    function hideIdleAlert() {}
+
+    function markActive() {
+        lastInteractionAt = Date.now();
+    }
+
+    // Only real interactive actions count (typing, selecting, submitting, or clicking an actual button/link/control — NOT blank clicks or mouse move/scroll)
+    ['keydown', 'input', 'change', 'submit'].forEach(function (evt) {
+        document.addEventListener(evt, markActive, { passive: true, capture: true });
+    });
+    document.addEventListener('click', function (e) {
+        if (e.target && e.target.closest('button, a, [role="button"], [data-slide-item], input, select, textarea, label')) {
+            markActive();
+        }
+    }, { passive: true, capture: true });
+
+    function postJson(url, payload, useBeacon) {
+        const data = Object.assign({ _token: csrfToken }, payload);
+        if (useBeacon && navigator.sendBeacon) {
+            const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
+            navigator.sendBeacon(url, blob);
+            return Promise.resolve(null);
+        }
+        return fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': csrfToken,
+                'Accept': 'application/json'
+            },
+            credentials: 'same-origin',
+            keepalive: !!useBeacon,
+            body: JSON.stringify(data)
+        }).then(r => r.ok ? r.json() : null).catch(() => null);
+    }
+
+    function tickTime() {
+        const now = Date.now();
+        const elapsed = Math.max(0, Math.floor((now - lastTick) / 1000));
+        if (elapsed <= 0) return;
+        lastTick = now;
+        totalSeconds += elapsed;
+
+        if (workSession && workSession.status === 'on_break') {
+            workSession.total_seconds = (workSession.total_seconds || 0) + elapsed;
+            workSession.total_break_seconds = (workSession.total_break_seconds || 0) + elapsed;
+            hideIdleAlert();
+            renderWorkSessionUI();
+            return;
+        }
+
+        if (workSession && workSession.status === 'active') {
+            workSession.total_seconds = (workSession.total_seconds || 0) + elapsed;
+            const isIdle = document.visibilityState !== 'visible' || (now - lastInteractionAt) >= IDLE_THRESHOLD_MS;
+            if (isIdle) {
+                wasteSeconds += elapsed;
+                workSession.total_waste_seconds = (workSession.total_waste_seconds || 0) + elapsed;
+                showIdleAlert();
+            } else {
+                hideIdleAlert();
+            }
+            renderWorkSessionUI();
+            return;
+        }
+
+        hideIdleAlert();
+    }
+
+    function flushDuration(useBeacon) {
+        tickTime();
+        if (totalSeconds <= lastSentTotal && wasteSeconds <= lastSentWaste) return;
+        lastSentTotal = totalSeconds;
+        lastSentWaste = wasteSeconds;
+        postJson(durationUrl, {
+            log_id: pageLogId,
+            page_path: pagePath,
+            page_title: pageTitle,
+            duration_seconds: totalSeconds,
+            waste_seconds: wasteSeconds
+        }, useBeacon);
+    }
+
+    function getElementLabel(el) {
+        if (!el) return '';
+        const text = (el.getAttribute('aria-label') || el.getAttribute('title') || el.innerText || el.value || el.name || el.id || '').replace(/\s+/g, ' ').trim();
+        return text.slice(0, 200);
+    }
+
+    function getFieldLabel(el) {
+        if (!el) return '';
+        if (el.id) {
+            const lbl = document.querySelector('label[for="' + CSS.escape(el.id) + '"]');
+            if (lbl && lbl.innerText) return lbl.innerText.replace(/\s+/g, ' ').trim().slice(0, 150);
+        }
+        const parentLbl = el.closest('label');
+        if (parentLbl && parentLbl.innerText) {
+            return parentLbl.innerText.replace(/\s+/g, ' ').trim().slice(0, 150);
+        }
+        return (el.getAttribute('aria-label') || el.getAttribute('placeholder') || el.name || el.id || el.tagName).toString().slice(0, 150);
+    }
+
+    // Track initial page view
+    postJson(eventUrl, {
+        event_type: 'page_view',
+        page_path: pagePath,
+        page_title: pageTitle,
+        target_label: pageTitle
+    }, false).then(res => {
+        if (res && res.log_id) {
+            pageLogId = res.log_id;
+        }
+    });
+
+    // Check idle/waste status every 1 second and update floating alert
+    setInterval(tickTime, 1000);
+
+    // Heartbeat every 15 seconds while visible
+    setInterval(function () {
+        if (document.visibilityState === 'visible') {
+            flushDuration(false);
+        }
+    }, 15000);
+
+    document.addEventListener('visibilitychange', function () {
+        if (document.visibilityState === 'hidden') {
+            flushDuration(true);
+        } else {
+            lastTick = Date.now();
+        }
+    });
+
+    window.addEventListener('pagehide', function () {
+        flushDuration(true);
+    });
+
+    window.addEventListener('beforeunload', function () {
+        flushDuration(true);
+    });
+
+    // Track clicks on buttons, links, tabs, interactive items
+    document.addEventListener('click', function (e) {
+        const target = e.target.closest('button, a, [role="button"], [data-slide-item]');
+        if (!target) return;
+        const label = getElementLabel(target);
+        if (!label) return;
+        const href = target.getAttribute('href') || '';
+        postJson(eventUrl, {
+            event_type: 'click',
+            page_path: pagePath,
+            page_title: pageTitle,
+            target_label: label,
+            target_value: href && !href.startsWith('javascript:') ? href.slice(0, 200) : ''
+        }, false);
+    }, true);
+
+    // Track dropdown / checkbox / radio selections
+    document.addEventListener('change', function (e) {
+        const el = e.target;
+        if (!el || !el.matches('select, input[type="checkbox"], input[type="radio"]')) return;
+        const label = getFieldLabel(el);
+        let value = '';
+        if (el.tagName === 'SELECT') {
+            const opt = el.options && el.selectedIndex >= 0 ? el.options[el.selectedIndex] : null;
+            value = opt ? (opt.text || opt.value || '').trim() : (el.value || '');
+        } else if (el.type === 'checkbox') {
+            value = el.checked ? ('Checked' + (el.value && el.value !== 'on' ? ': ' + el.value : '')) : 'Unchecked';
+        } else if (el.type === 'radio') {
+            value = (el.value || 'Selected');
+        }
+        postJson(eventUrl, {
+            event_type: 'select',
+            page_path: pagePath,
+            page_title: pageTitle,
+            target_label: label || el.tagName,
+            target_value: value.toString().slice(0, 200)
+        }, false);
+    }, true);
+
+    // Track form submissions
+    document.addEventListener('submit', function (e) {
+        const form = e.target;
+        if (!form || form.tagName !== 'FORM') return;
+        const action = form.getAttribute('action') || pagePath;
+        const submitBtn = form.querySelector('button[type="submit"], input[type="submit"]');
+        const label = submitBtn ? getElementLabel(submitBtn) : 'Form Submit';
+        postJson(eventUrl, {
+            event_type: 'submit',
+            page_path: pagePath,
+            page_title: pageTitle,
+            target_label: label || 'Form Submit',
+            target_value: action.slice(0, 200)
+        }, true);
+    }, true);
+})();
+</script>
+@endif
 @stack('scripts')
 </body>
 </html>

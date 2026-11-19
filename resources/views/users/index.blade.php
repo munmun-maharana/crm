@@ -63,21 +63,21 @@
         }
      }">
 
-    <div class="grid grid-cols-1 xl:grid-cols-3 gap-4">
-        <div class="rounded-2xl border border-sky-200/80 bg-sky-50/75 p-4 h-fit">
-            <div class="flex items-center justify-between gap-2 mb-3">
-                <h3 class="text-sm font-extrabold text-sky-950">Create user</h3>
+    <div class="grid grid-cols-1 xl:grid-cols-12 gap-3">
+        <div class="xl:col-span-3 rounded-xl border border-sky-200/80 bg-sky-50/75 p-3 h-fit">
+            <div class="flex items-center justify-between gap-2 mb-2">
+                <h3 class="text-[13px] font-extrabold text-sky-950">Create user</h3>
                 <a href="{{ route('settings.index', ['tab' => 'user-fields']) }}" class="text-[11px] font-semibold text-brand hover:underline">Manage fields</a>
             </div>
-            <form method="POST" action="{{ route('users.store') }}" class="space-y-2.5">
+            <form method="POST" action="{{ route('users.store') }}" class="space-y-1.5">
                 @csrf
                 @forelse($formFields as $field)
                     @if($field->key === 'password')
                         <input name="password" type="password" @required($field->required)
                                placeholder="{{ $field->label }}{{ $field->required ? ' *' : '' }}"
-                               class="w-full rounded-xl border border-line px-3 py-2 text-[13px]">
+                               class="w-full rounded-lg border border-line bg-white px-2.5 py-1.5 text-[12px]">
                     @elseif($field->key === 'role' || $field->type === 'select')
-                        <select name="{{ $field->key }}" @required($field->required) class="w-full rounded-xl border border-line px-3 py-2 text-[13px]">
+                        <select name="{{ $field->key }}" @required($field->required) class="w-full rounded-lg border border-line bg-white px-2.5 py-1.5 text-[12px]">
                             <option value="">{{ $field->label }}{{ $field->required ? ' *' : '' }}</option>
                             @if($field->key === 'role')
                                 @foreach($roleLabels as $value => $label)
@@ -92,103 +92,109 @@
                     @elseif($field->type === 'textarea')
                         <textarea name="{{ $field->key }}" rows="2" @required($field->required)
                                   placeholder="{{ $field->label }}{{ $field->required ? ' *' : '' }}"
-                                  class="w-full rounded-xl border border-line px-3 py-2 text-[13px]"></textarea>
+                                  class="w-full rounded-lg border border-line bg-white px-2.5 py-1.5 text-[12px]"></textarea>
                     @elseif($field->type === 'phone')
                         <input name="{{ $field->key }}" type="tel" inputmode="tel" pattern="[0-9+\-\s()]*"
                                oninput="this.value = this.value.replace(/[^0-9+\-\s()]/g, '')"
                                @required($field->required)
                                placeholder="{{ $field->label }}{{ $field->required ? ' *' : '' }}"
-                               class="w-full rounded-xl border border-line px-3 py-2 text-[13px]">
+                               class="w-full rounded-lg border border-line bg-white px-2.5 py-1.5 text-[12px]">
                     @elseif($field->type === 'number')
                         <input name="{{ $field->key }}" type="number" step="any" inputmode="decimal"
                                oninput="this.value = this.value.replace(/[^0-9.\-]/g, '')"
                                @required($field->required)
                                placeholder="{{ $field->label }}{{ $field->required ? ' *' : '' }}"
-                               class="w-full rounded-xl border border-line px-3 py-2 text-[13px]">
+                               class="w-full rounded-lg border border-line bg-white px-2.5 py-1.5 text-[12px]">
                     @elseif($field->type === 'date')
                         <div>
-                            <label class="block text-[11px] font-bold text-slate-500 mb-0.5">{{ $field->label }}{{ $field->required ? ' *' : '' }}</label>
+                            <label class="block text-[10px] font-bold text-slate-500 mb-0.5">{{ $field->label }}{{ $field->required ? ' *' : '' }}</label>
                             <input name="{{ $field->key }}" type="date" @required($field->required)
-                                   class="w-full rounded-xl border border-line px-3 py-2 text-[13px]">
+                                   class="w-full rounded-lg border border-line bg-white px-2.5 py-1.5 text-[12px]">
                         </div>
                     @elseif($field->type === 'time')
                         <div>
-                            <label class="block text-[11px] font-bold text-slate-500 mb-0.5">{{ $field->label }}{{ $field->required ? ' *' : '' }}</label>
+                            <label class="block text-[10px] font-bold text-slate-500 mb-0.5">{{ $field->label }}{{ $field->required ? ' *' : '' }}</label>
                             <input name="{{ $field->key }}" type="time" @required($field->required)
-                                   class="w-full rounded-xl border border-line px-3 py-2 text-[13px]">
+                                   class="w-full rounded-lg border border-line bg-white px-2.5 py-1.5 text-[12px]">
                         </div>
                     @else
                         <input name="{{ $field->key }}"
                                type="{{ $field->type === 'email' ? 'email' : 'text' }}"
                                @required($field->required)
                                placeholder="{{ $field->label }}{{ $field->required ? ' *' : '' }}"
-                               class="w-full rounded-xl border border-line px-3 py-2 text-[13px]">
+                               class="w-full rounded-lg border border-line bg-white px-2.5 py-1.5 text-[12px]">
                     @endif
                 @empty
-                    <p class="text-[12px] text-slate-400">No form fields. Add them in Setting → User Fields.</p>
+                    <p class="text-[11px] text-slate-400">No form fields. Add them in Setting → User Fields.</p>
                 @endforelse
 
-                <div class="rounded-xl border border-sky-300/80 bg-white/90 p-3 space-y-1.5 shadow-2xs">
-                    <div class="text-[11px] font-bold uppercase tracking-wide text-slate-600">Account status</div>
-                    <div class="flex items-center gap-4 text-[13px] font-semibold text-ink pt-0.5">
-                        <label class="inline-flex items-center gap-1.5 cursor-pointer">
+                <div class="rounded-lg border border-sky-300/80 bg-white/90 px-2.5 py-1.5 flex items-center justify-between gap-2 shadow-2xs">
+                    <div class="text-[10px] font-bold uppercase tracking-wide text-slate-600">Status</div>
+                    <div class="flex items-center gap-3 text-[12px] font-semibold text-ink">
+                        <label class="inline-flex items-center gap-1 cursor-pointer">
                             <input type="radio" name="is_active" value="1" class="text-emerald-600 focus:ring-emerald-500" @checked(old('is_active', '1') == '1')>
                             <span class="inline-flex items-center gap-1 text-emerald-700">
-                                <span class="w-2 h-2 rounded-full bg-emerald-500"></span> Active
+                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Active
                             </span>
                         </label>
-                        <label class="inline-flex items-center gap-1.5 cursor-pointer">
+                        <label class="inline-flex items-center gap-1 cursor-pointer">
                             <input type="radio" name="is_active" value="0" class="text-rose-600 focus:ring-rose-500" @checked(old('is_active') === '0')>
                             <span class="inline-flex items-center gap-1 text-rose-700">
-                                <span class="w-2 h-2 rounded-full bg-rose-500"></span> Deactive
+                                <span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span> Deactive
                             </span>
                         </label>
                     </div>
                 </div>
 
-                <div class="rounded-xl bg-indigo-100/60 p-3 space-y-2">
-                    <div class="text-[11px] font-bold uppercase tracking-wide text-indigo-900">App access level</div>
-                    <p class="text-[11px] text-indigo-700/80">Dashboard always on · tick tabs for mobile app</p>
-                    <label class="flex items-center gap-2 text-[13px] font-semibold text-ink">
-                        <input type="checkbox" name="access_crm" value="1" class="rounded border-line text-brand"
-                               @checked(old('access_crm'))>
-                        CRM
-                    </label>
-                    <label class="flex items-center gap-2 text-[13px] font-semibold text-ink">
-                        <input type="checkbox" name="access_call_crm" value="1" class="rounded border-line text-brand"
-                               @checked(old('access_call_crm', true))>
-                        CALL CRM
-                    </label>
-                    <label class="flex items-center gap-2 text-[13px] font-semibold text-ink">
-                        <input type="checkbox" name="access_operations" value="1" class="rounded border-line text-brand"
-                               @checked(old('access_operations'))>
-                        Operation
-                    </label>
-                    <label class="flex items-center gap-2 text-[13px] font-semibold text-ink">
-                        <input type="checkbox" name="access_pincodes" value="1" class="rounded border-line text-brand"
-                               @checked(old('access_pincodes', true))>
-                        Pincode Manager
-                    </label>
-                    <div class="pt-2 border-t border-indigo-200/60 text-[11px] font-bold uppercase tracking-wide text-indigo-900">Record Actions</div>
-                    <label class="flex items-center gap-2 text-[13px] font-semibold text-ink">
-                        <input type="checkbox" name="can_edit" value="1" class="rounded border-line text-brand"
-                               @checked(old('can_edit'))>
-                        Allow Edit Customers
-                    </label>
-                    <label class="flex items-center gap-2 text-[13px] font-semibold text-ink">
-                        <input type="checkbox" name="can_delete" value="1" class="rounded border-line text-brand"
-                               @checked(old('can_delete'))>
-                        Allow Delete Customers
-                    </label>
+                <div class="rounded-lg bg-indigo-100/60 p-2 space-y-1.5">
+                    <div class="flex items-center justify-between gap-1">
+                        <span class="text-[10px] font-bold uppercase tracking-wide text-indigo-900">App access</span>
+                        <span class="text-[10px] text-indigo-700/80">Mobile tabs</span>
+                    </div>
+                    <div class="grid grid-cols-2 gap-x-2 gap-y-1">
+                        <label class="flex items-center gap-1.5 text-[11px] font-semibold text-ink">
+                            <input type="checkbox" name="access_crm" value="1" class="rounded border-line text-brand"
+                                   @checked(old('access_crm'))>
+                            CRM
+                        </label>
+                        <label class="flex items-center gap-1.5 text-[11px] font-semibold text-ink">
+                            <input type="checkbox" name="access_call_crm" value="1" class="rounded border-line text-brand"
+                                   @checked(old('access_call_crm', true))>
+                            CALL CRM
+                        </label>
+                        <label class="flex items-center gap-1.5 text-[11px] font-semibold text-ink">
+                            <input type="checkbox" name="access_operations" value="1" class="rounded border-line text-brand"
+                                   @checked(old('access_operations'))>
+                            Operation
+                        </label>
+                        <label class="flex items-center gap-1.5 text-[11px] font-semibold text-ink">
+                            <input type="checkbox" name="access_pincodes" value="1" class="rounded border-line text-brand"
+                                   @checked(old('access_pincodes', true))>
+                            Pincode
+                        </label>
+                    </div>
+                    <div class="pt-1.5 border-t border-indigo-200/60 text-[10px] font-bold uppercase tracking-wide text-indigo-900">Record Actions</div>
+                    <div class="grid grid-cols-2 gap-x-2 gap-y-1">
+                        <label class="flex items-center gap-1.5 text-[11px] font-semibold text-ink">
+                            <input type="checkbox" name="can_edit" value="1" class="rounded border-line text-brand"
+                                   @checked(old('can_edit'))>
+                            Edit Cust.
+                        </label>
+                        <label class="flex items-center gap-1.5 text-[11px] font-semibold text-ink">
+                            <input type="checkbox" name="can_delete" value="1" class="rounded border-line text-brand"
+                                   @checked(old('can_delete'))>
+                            Delete Cust.
+                        </label>
+                    </div>
                 </div>
 
                 @if($formFields->isNotEmpty())
-                    <button type="submit" class="w-full rounded-xl bg-brand text-white font-bold py-2.5 text-[13px]">Create</button>
+                    <button type="submit" class="w-full rounded-lg bg-brand text-white font-bold py-1.5 text-[12px] hover:opacity-95 transition">Create</button>
                 @endif
             </form>
         </div>
 
-        <div class="xl:col-span-2 rounded-2xl border border-emerald-200/80 bg-emerald-50/50 overflow-hidden">
+        <div class="xl:col-span-9 rounded-xl border border-emerald-200/80 bg-emerald-50/50 overflow-hidden">
             <div class="overflow-x-auto">
                 <table class="w-full text-[13px]">
                     <thead class="bg-emerald-100/75 text-emerald-950 text-[11px] uppercase tracking-wide border-b border-emerald-200/80">
@@ -264,6 +270,14 @@
                                 </td>
                                 <td class="px-4 py-2.5 text-right">
                                     <div class="inline-flex items-center gap-1.5 justify-end">
+                                        @if(! $u->isAdmin())
+                                            <a href="{{ route('analytics.index', ['user_id' => $u->id]) }}"
+                                               title="View User Analytics"
+                                               class="px-2.5 h-8 inline-flex items-center gap-1 rounded-lg border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition text-xs font-semibold">
+                                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+                                                Analytics
+                                            </a>
+                                        @endif
                                         <button type="button" title="Edit"
                                                 @click="openEdit(@js($usersJson[$loop->index]))"
                                                 class="w-8 h-8 inline-flex items-center justify-center rounded-lg border border-line text-brand hover:bg-brand-soft transition">

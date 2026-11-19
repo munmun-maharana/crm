@@ -14,6 +14,10 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->web(append: [
             \App\Http\Middleware\EnsureUserIsActive::class,
+            \App\Http\Middleware\TrackUserActivity::class,
+        ]);
+        $middleware->api(append: [
+            \App\Http\Middleware\TrackUserActivity::class,
         ]);
         $middleware->alias([
             'admin' => \App\Http\Middleware\EnsureAdmin::class,

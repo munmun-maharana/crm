@@ -1256,10 +1256,22 @@ class CustomerController extends Controller
         $isFirstAssign = $existingBookingCount === 0;
 
         // Always create a NEW DB row in Assign Service (booking pipeline) for every assignment
+        $followUpInput = trim((string) $request->input('follow_up_date', ''));
+        try {
+            $followUpDate = $followUpInput !== ''
+                ? \Carbon\Carbon::parse($followUpInput)->startOfDay()
+                : now()->startOfDay();
+        } catch (\Throwable) {
+            $followUpDate = now()->startOfDay();
+        }
+
         $attrs = $customer->mappedBookingAttributes();
         $copyMeta = $attrs['meta'] ?? [];
         $copyMeta['product_ids'] = $pids;
         $attrs['meta'] = $copyMeta;
+        $attrs['follow_up'] = true;
+        $attrs['follow_up_at'] = $followUpDate;
+        $attrs['follow_up_has_time'] = false;
         $copy = Customer::create($attrs);
         $copy->products()->sync($pids);
 

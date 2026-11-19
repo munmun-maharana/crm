@@ -36,12 +36,12 @@
                 @csrf
                 <div>
                     <label class="block text-[12px] font-bold text-slate-500 mb-1.5">Username</label>
-                    <input type="text" name="username" value="{{ old('username', 'admin') }}" required autofocus
+                    <input type="text" name="username" value="{{ old('username') }}" placeholder="Enter username" autocomplete="username" required autofocus
                            class="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand">
                 </div>
                 <div>
                     <label class="block text-[12px] font-bold text-slate-500 mb-1.5">Password</label>
-                    <input type="password" name="password" value="admin123" required
+                    <input type="password" name="password" value="" placeholder="Enter password" autocomplete="current-password" required
                            class="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand">
                 </div>
                 <label class="flex items-center gap-2 text-[12px] text-slate-500">
@@ -52,7 +52,7 @@
                     Enter CRM
                 </button>
             </form>
-            <p class="mt-4 text-center text-[11px] text-slate-400">Demo: <span class="font-semibold text-slate-600">admin / admin123</span></p>
+            <p class="mt-4 text-center text-[11px] text-slate-400">Any query? Call <a href="tel:+918338011114" class="font-semibold text-slate-600 hover:text-brand">+91 83380 11114</a></p>
         </div>
     </div>
 </div>

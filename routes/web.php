@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\ActivationRequestController;
+use App\Http\Controllers\AnalyticsController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BookingSlotController;
 use App\Http\Controllers\CustomerController;
@@ -81,7 +82,17 @@ Route::middleware('auth')->group(function () {
     Route::get('/upload/export', [UploadController::class, 'export'])->name('upload.export');
     Route::post('/upload', [UploadController::class, 'store'])->name('upload.store');
 
+    Route::post('/activity-track/event', [AnalyticsController::class, 'trackEvent'])->name('activity-track.event');
+    Route::post('/activity-track/duration', [AnalyticsController::class, 'trackDuration'])->name('activity-track.duration');
+
+    Route::get('/work-session/status', [AnalyticsController::class, 'workSessionStatus'])->name('work-session.status');
+    Route::post('/work-session/start', [AnalyticsController::class, 'workSessionStart'])->name('work-session.start');
+    Route::post('/work-session/break-on', [AnalyticsController::class, 'workSessionBreakOn'])->name('work-session.break-on');
+    Route::post('/work-session/break-off', [AnalyticsController::class, 'workSessionBreakOff'])->name('work-session.break-off');
+    Route::post('/work-session/end', [AnalyticsController::class, 'workSessionEnd'])->name('work-session.end');
+
     Route::middleware('admin')->group(function () {
+        Route::get('/analytics', [AnalyticsController::class, 'index'])->name('analytics.index');
         Route::get('/crm-setting', [SettingsController::class, 'index'])->name('settings.index');
         Route::get('/setting', fn () => redirect()->route('settings.index'))->name('setting');
 

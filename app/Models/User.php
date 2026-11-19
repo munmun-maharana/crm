@@ -90,10 +90,16 @@ class User extends Authenticatable
 
     public function roleLabel(): string
     {
+        return self::roleLabelFor($this->role);
+    }
+
+    public static function roleLabelFor(?string $role): string
+    {
+        $key = (string) $role;
         $options = self::roleOptions();
 
-        return $options[$this->role]
-            ?? (self::ROLES[$this->role] ?? ucfirst(str_replace('_', ' ', (string) $this->role)));
+        return $options[$key]
+            ?? (self::ROLES[$key] ?? ucfirst(str_replace('_', ' ', $key)));
     }
 
     public function isAdmin(): bool
