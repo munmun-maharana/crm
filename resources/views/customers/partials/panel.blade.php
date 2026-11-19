@@ -1096,11 +1096,11 @@
                             @endif
                             @if($bItem->mrp !== null || $bItem->selling_price !== null)
                                 <div class="flex flex-wrap items-center justify-between gap-1 pt-0.5 border-t border-slate-100 text-[10px]">
-                                    @if($bItem->mrp !== null)
-                                        <span class="text-slate-500 font-semibold">MRP: <strong class="text-ink">₹{{ number_format((float) $bItem->mrp, 0) }}</strong></span>
-                                    @endif
                                     @if($bItem->selling_price !== null)
-                                        <span class="text-emerald-700 font-semibold">Selling: <strong class="text-emerald-800">₹{{ number_format((float) $bItem->selling_price, 0) }}</strong></span>
+                                        <span class="text-emerald-700 font-semibold">Business Selling Price: <strong class="text-emerald-800">₹{{ number_format((float) $bItem->selling_price, 0) }}</strong></span>
+                                    @endif
+                                    @if($bItem->mrp !== null)
+                                        <span class="ml-auto text-slate-800 font-extrabold text-[10.5px]">MRP: ₹{{ number_format((float) $bItem->mrp, 0) }}</span>
                                     @endif
                                 </div>
                             @endif
@@ -1108,18 +1108,16 @@
                     @endforeach
                 </div>
 
-                {{-- Lifetime Total Amount Banner at Bottom --}}
+                {{-- Lifetime Total Amount Banner at Bottom (MRP primary & bold on right, Business Selling Price below) --}}
                 <div class="shrink-0 mx-2 mb-2 mt-auto rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 text-white px-2.5 py-2 shadow-xs">
                     <div class="flex items-center justify-between gap-2">
-                        <span class="text-[9.5px] font-bold uppercase tracking-wider text-emerald-100">Lifetime Total</span>
-                        <span class="text-[14px] font-extrabold leading-none">₹{{ number_format($lifetimeSellingTotal, 2) }}</span>
+                        <span class="text-[9.5px] font-bold uppercase tracking-wider text-emerald-100">Lifetime Total (MRP)</span>
+                        <span class="text-[14px] font-extrabold leading-none">₹{{ number_format($lifetimeMrpTotal, 2) }}</span>
                     </div>
-                    @if($lifetimeMrpTotal > 0)
-                        <div class="mt-1 pt-1 border-t border-white/20 flex items-center justify-between text-[10px] text-emerald-100">
-                            <span>Total MRP</span>
-                            <span class="font-bold text-white">₹{{ number_format($lifetimeMrpTotal, 2) }}</span>
-                        </div>
-                    @endif
+                    <div class="mt-1 pt-1 border-t border-white/20 flex items-center justify-between text-[10px] text-emerald-100">
+                        <span>Business Selling Price</span>
+                        <span class="font-bold text-white">₹{{ number_format($lifetimeSellingTotal, 2) }}</span>
+                    </div>
                 </div>
             </div>
         @endif
