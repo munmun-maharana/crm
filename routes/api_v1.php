@@ -69,6 +69,7 @@ Route::middleware(['api.token', 'api.mobile_json'])->group(function () {
     // Booking Slots
     Route::get('/booking-slots', [BookingSlotController::class, 'index']);
     Route::post('/booking-slots/{bookingSlot}/book', [BookingSlotController::class, 'book']);
+    Route::post('/booking-slots/{bookingSlot}/details', [BookingSlotController::class, 'updateDetails']);
 
     // Excel import / export / demo
     Route::get('/upload/demo', [UploadController::class, 'demo']);

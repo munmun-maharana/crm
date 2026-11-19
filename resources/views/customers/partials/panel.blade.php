@@ -1078,6 +1078,14 @@
                                 'cancelled' => 'bg-rose-100 text-rose-800 border-rose-200',
                                 default => 'bg-amber-100 text-amber-800 border-amber-200',
                             };
+                            $bEditPayload = [
+                                'id' => $bItem->id,
+                                'date' => $bItem->slot_date?->format('d M Y'),
+                                'time' => $bTime,
+                                'car_model' => $bCar ?? '',
+                                'mrp' => $bItem->mrp !== null ? (string) $bItem->mrp : '',
+                                'selling_price' => $bItem->selling_price !== null ? (string) $bItem->selling_price : '',
+                            ];
                         @endphp
                         <div class="rounded-lg bg-white border border-indigo-100/90 px-2 py-1.5 text-[10.5px] space-y-1 shadow-2xs">
                             <div class="flex items-start justify-between gap-1">
@@ -1085,9 +1093,18 @@
                                     <div>{{ $bItem->slot_date?->format('d M Y') }}</div>
                                     <div class="text-[10px] font-semibold text-indigo-700">{{ $bTime }}</div>
                                 </div>
-                                <span class="px-1.5 py-0.2 rounded border text-[9px] font-bold uppercase shrink-0 {{ $bBadgeClass }}">
-                                    {{ $bItem->status }}
-                                </span>
+                                <div class="flex items-center gap-1 shrink-0">
+                                    <span class="px-1.5 py-0.2 rounded border text-[9px] font-bold uppercase {{ $bBadgeClass }}">
+                                        {{ $bItem->status }}
+                                    </span>
+                                    <button type="button"
+                                            title="Edit Car Model, MRP & Business Selling Price"
+                                            data-booking-edit='@json($bEditPayload)'
+                                            onclick="Alpine.$data(document.body).openEditBookingModal(JSON.parse(this.dataset.bookingEdit))"
+                                            class="w-5 h-5 rounded border border-indigo-200 bg-indigo-50/70 hover:bg-indigo-600 hover:text-white text-indigo-700 inline-flex items-center justify-center transition">
+                                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                                    </button>
+                                </div>
                             </div>
                             @if(!empty($bCar))
                                 <div class="text-[10px] font-semibold text-teal-800 truncate" title="{{ $bCar }}">

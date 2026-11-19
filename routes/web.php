@@ -55,6 +55,7 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/booking-slots', [BookingSlotController::class, 'index'])->name('booking-slots.index');
     Route::post('/booking-slots/{bookingSlot}/book', [BookingSlotController::class, 'book'])->name('booking-slots.book');
+    Route::post('/booking-slots/{bookingSlot}/details', [BookingSlotController::class, 'updateDetails'])->name('booking-slots.update-details');
 
     Route::get('/pincodes', [PincodeController::class, 'index'])->name('pincodes.index');
     Route::post('/pincodes', [PincodeController::class, 'store'])->name('pincodes.store');

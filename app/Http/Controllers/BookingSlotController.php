@@ -566,6 +566,67 @@ class BookingSlotController extends Controller
         ])->with('success', "Deleted {$deleted} slot(s) for {$dateStr}.");
     }
 
+    /**
+     * Update Car Model, MRP, and Business Selling Price on a booked slot (and sync to linked Team Ops row).
+     */
+    public function updateDetails(Request $request, BookingSlot $bookingSlot): JsonResponse
+    {
+        $data = $request->validate([
+            'car_model' => ['nullable', 'string', 'max:160'],
+            'mrp' => ['nullable', 'numeric', 'min:0'],
+            'selling_price' => ['nullable', 'numeric', 'min:0'],
+        ]);
+
+        $carModelVal = array_key_exists('car_model', $data) && trim((string) $data['car_model']) !== ''
+            ? trim((string) $data['car_model'])
+            : null;
+        $mrpVal = array_key_exists('mrp', $data) && $data['mrp'] !== null && $data['mrp'] !== ''
+            ? round((float) $data['mrp'], 2)
+            : null;
+        $sellingPriceVal = array_key_exists('selling_price', $data) && $data['selling_price'] !== null && $data['selling_price'] !== ''
+            ? round((float) $data['selling_price'], 2)
+            : null;
+
+        $bookingSlot->update([
+            'car_model' => $carModelVal,
+            'mrp' => $mrpVal,
+            'selling_price' => $sellingPriceVal,
+        ]);
+
+        // Sync changes to any linked Team Ops record created from this booking slot
+        $linkedOps = Customer::query()
+            ->where('pipeline', 'operations')
+            ->whereJsonContains('meta->booking_slot_id', $bookingSlot->id)
+            ->get();
+
+        foreach ($linkedOps as $opRow) {
+            $opMeta = is_array($opRow->meta) ? $opRow->meta : [];
+            if ($carModelVal !== null) {
+                $opMeta['car_model'] = $carModelVal;
+                $opMeta['model'] = $carModelVal;
+            } else {
+                unset($opMeta['car_model'], $opMeta['model']);
+            }
+            if ($mrpVal !== null) {
+                $opMeta['mrp'] = $mrpVal;
+            } else {
+                unset($opMeta['mrp']);
+            }
+            if ($sellingPriceVal !== null) {
+                $opMeta['selling_price'] = $sellingPriceVal;
+            } else {
+                unset($opMeta['selling_price']);
+            }
+            $opRow->update(['meta' => $opMeta ?: null]);
+        }
+
+        return response()->json([
+            'ok' => true,
+            'message' => 'Booking details updated.',
+            'slot' => $this->serializeSlot($bookingSlot->fresh()),
+        ]);
+    }
+
     private function serializeSlot(BookingSlot $slot): array
     {
         $c = $slot->relationLoaded('customer') ? $slot->customer : $slot->customer()->first();

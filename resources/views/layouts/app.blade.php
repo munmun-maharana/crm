@@ -741,6 +741,82 @@
     </div>
 </div>
 
+{{-- Edit Booking Details Modal (Car Model, MRP, Business Selling Price) --}}
+<div class="fixed inset-0 z-[86] flex items-center justify-center p-4"
+     x-show="editBookingModalOpen"
+     x-cloak
+     @keydown.escape.window="if (editBookingModalOpen && !editBookingSubmitting) editBookingModalOpen = false">
+    <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs"
+         @click="if (!editBookingSubmitting) editBookingModalOpen = false"></div>
+
+    <div class="relative w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden border border-line z-10" @click.stop>
+        <div class="px-5 py-3.5 border-b border-indigo-100 flex items-center justify-between bg-indigo-50/80">
+            <div class="flex items-center gap-2.5">
+                <div class="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                </div>
+                <div>
+                    <h3 class="text-sm font-bold text-indigo-950">Edit Booking Details</h3>
+                    <p class="text-[11px] text-indigo-700/80" x-text="(editBookingDate || '') + (editBookingTime ? ' · ' + editBookingTime : '')"></p>
+                </div>
+            </div>
+            <button type="button" @click="if (!editBookingSubmitting) editBookingModalOpen = false"
+                    class="w-7 h-7 rounded-lg hover:bg-indigo-100 text-slate-400 hover:text-slate-700 flex items-center justify-center text-sm font-bold">✕</button>
+        </div>
+
+        <div class="p-5 space-y-3.5">
+            <div x-show="editBookingError" x-cloak class="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-[12px] text-rose-700 font-semibold" x-text="editBookingError"></div>
+
+            <div>
+                <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">Car Model</label>
+                <input type="text"
+                       x-model="editBookingCarModel"
+                       @keydown.enter.prevent="saveEditBookingDetails()"
+                       placeholder="Enter car model…"
+                       class="w-full rounded-xl border border-line bg-white px-3.5 py-2.5 text-[13px] text-ink focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500">
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">MRP (₹)</label>
+                    <input type="number"
+                           step="0.01"
+                           min="0"
+                           x-model="editBookingMrp"
+                           @keydown.enter.prevent="saveEditBookingDetails()"
+                           placeholder="Enter MRP…"
+                           class="w-full rounded-xl border border-line bg-white px-3.5 py-2.5 text-[13px] text-ink focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">Business Selling Price (₹)</label>
+                    <input type="number"
+                           step="0.01"
+                           min="0"
+                           x-model="editBookingSellingPrice"
+                           @keydown.enter.prevent="saveEditBookingDetails()"
+                           placeholder="Selling price…"
+                           class="w-full rounded-xl border border-line bg-white px-3.5 py-2.5 text-[13px] text-ink focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500">
+                </div>
+            </div>
+
+            <div class="pt-2 flex items-center justify-end gap-2 border-t border-line">
+                <button type="button"
+                        @click="editBookingModalOpen = false"
+                        :disabled="editBookingSubmitting"
+                        class="px-4 py-2 rounded-xl border border-line text-slate-600 hover:bg-slate-100 text-[12.5px] font-semibold transition">
+                    Cancel
+                </button>
+                <button type="button"
+                        @click="saveEditBookingDetails()"
+                        :disabled="editBookingSubmitting"
+                        class="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-[12.5px] font-bold transition shadow-sm shadow-indigo-600/20 disabled:opacity-60">
+                    <span x-text="editBookingSubmitting ? 'Saving…' : 'Save Changes'"></span>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 {{-- Confirm Post Update Modal --}}
 <div x-show="postUpdateModalOpen" x-cloak
      @keydown.escape.window="if (postUpdateModalOpen && !postUpdateSubmitting) postUpdateModalOpen = false"
@@ -1050,6 +1126,63 @@ function crmShell() {
         bookingCustomersList: @json($globalBookingCustomers),
         bookingModalSubmitting: false,
         bookingModalError: '',
+        editBookingModalOpen: false,
+        editBookingSubmitting: false,
+        editBookingSlotId: null,
+        editBookingDate: '',
+        editBookingTime: '',
+        editBookingCarModel: '',
+        editBookingMrp: '',
+        editBookingSellingPrice: '',
+        editBookingError: '',
+        openEditBookingModal(info) {
+            if (!info || !info.id) return;
+            this.editBookingSlotId = info.id;
+            this.editBookingDate = info.date || '';
+            this.editBookingTime = info.time || '';
+            this.editBookingCarModel = info.car_model || '';
+            this.editBookingMrp = info.mrp ?? '';
+            this.editBookingSellingPrice = info.selling_price ?? '';
+            this.editBookingError = '';
+            this.editBookingModalOpen = true;
+        },
+        async saveEditBookingDetails() {
+            if (!this.editBookingSlotId || this.editBookingSubmitting) return;
+            this.editBookingSubmitting = true;
+            this.editBookingError = '';
+            try {
+                const res = await fetch(`{{ url('/booking-slots') }}/${this.editBookingSlotId}/details`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content
+                    },
+                    body: JSON.stringify({
+                        car_model: (this.editBookingCarModel || '').trim() || null,
+                        mrp: this.editBookingMrp !== '' ? this.editBookingMrp : null,
+                        selling_price: this.editBookingSellingPrice !== '' ? this.editBookingSellingPrice : null
+                    })
+                });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) {
+                    this.editBookingError = data.message || 'Could not update booking details.';
+                    return;
+                }
+                this.editBookingModalOpen = false;
+                if (this.selectedId) {
+                    await this.selectCustomer(this.selectedId);
+                }
+                if (this.bookingSlotsOpen) {
+                    await this.loadBookingSlots(this.bookingSlotsDate);
+                }
+            } catch (e) {
+                this.editBookingError = 'Network error while updating booking details.';
+            } finally {
+                this.editBookingSubmitting = false;
+            }
+        },
         postUpdateModalOpen: false,
         postUpdateSubmitting: false,
         postUpdateFormEl: null,
