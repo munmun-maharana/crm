@@ -25,6 +25,14 @@ return new class extends Migration
                 $table->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete();
                 $table->timestamps();
             });
+        } else {
+            Schema::table('products', function (Blueprint $table) {
+                if (! Schema::hasColumn('products', 'code')) $table->string('code', 60)->nullable()->index();
+                if (! Schema::hasColumn('products', 'category')) $table->string('category', 100)->nullable()->index();
+                if (! Schema::hasColumn('products', 'unit')) $table->string('unit', 50)->nullable();
+                if (! Schema::hasColumn('products', 'is_active')) $table->boolean('is_active')->default(true)->index();
+                if (! Schema::hasColumn('products', 'sort_order')) $table->integer('sort_order')->default(0);
+            });
         }
 
         if (! Schema::hasTable('customer_product')) {

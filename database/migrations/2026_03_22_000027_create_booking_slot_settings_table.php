@@ -8,13 +8,15 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('booking_slot_settings', function (Blueprint $table) {
-            $table->id();
-            $table->string('status', 60)->default('confirmed');
-            $table->string('title', 160)->default('Slot Booked');
-            $table->text('body')->nullable();
-            $table->timestamps();
-        });
+        if (! Schema::hasTable('booking_slot_settings')) {
+            Schema::create('booking_slot_settings', function (Blueprint $table) {
+                $table->id();
+                $table->string('status', 60)->default('confirmed');
+                $table->string('title', 160)->default('Slot Booked');
+                $table->text('body')->nullable();
+                $table->timestamps();
+            });
+        }
     }
 
     public function down(): void
