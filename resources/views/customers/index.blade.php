@@ -8,13 +8,17 @@
     $statusTone = [
         'new' => 'text-sky-700 bg-sky-50',
         'pending' => 'text-amber-800 bg-amber-100',
+        'engaged' => 'text-purple-700 bg-purple-100',
+        'booked' => 'text-purple-700 bg-purple-100',
         'no answer' => 'text-slate-700 bg-slate-100',
         'follow-up' => 'text-amber-800 bg-amber-100',
         'interested' => 'text-teal-700 bg-teal-50',
         'contacted' => 'text-blue-700 bg-blue-50',
         'converted' => 'text-emerald-700 bg-emerald-50',
+        'existing' => 'text-emerald-800 bg-emerald-100',
         'success' => 'text-emerald-700 bg-emerald-50',
         'cancelled' => 'text-rose-700 bg-rose-50',
+        'rescheduled' => 'text-amber-800 bg-amber-100',
         'lost' => 'text-rose-700 bg-rose-50',
         'confirmed' => 'text-emerald-700 bg-emerald-50',
         'request' => 'text-amber-800 bg-amber-50',
@@ -536,7 +540,9 @@
                                             @endphp
                                             <span class="text-slate-600">
                                                 @if($strVal !== '')
-                                                    @if($isMapCol || $isUrlCol)
+                                                    @if($field->key === 'mrp')
+                                                        <span class="font-extrabold text-emerald-700">₹{{ is_numeric($strVal) ? number_format((float) $strVal, 0) : $strVal }}</span>
+                                                    @elseif($isMapCol || $isUrlCol)
                                                         @php
                                                             $colHref = $isUrlCol
                                                                 ? $strVal

@@ -63,11 +63,30 @@
             ?? ($customer->follow_up_has_time ? $customer->follow_up_at->format('h:i A') : null);
         $actionDateVal = $customer->follow_up_at->format('d M Y') . ($slotTime ? ' · ' . $slotTime : '');
     }
-    $activitiesCount = $customer->activities->count();
+    $relatedCustomerIds = [$customer->id];
+    if ($customer->source_customer_id) {
+        $relatedCustomerIds[] = (int) $customer->source_customer_id;
+    }
+    if ($customer->isCallCrm()) {
+        $bookingCustomerIds = \App\Models\Customer::where('pipeline', 'booking')
+            ->where('source_customer_id', $customer->id)
+            ->pluck('id')
+            ->map(fn($id) => (int)$id)
+            ->all();
+        $relatedCustomerIds = array_merge($relatedCustomerIds, $bookingCustomerIds);
+    }
+    $relatedCustomerIds = array_values(array_unique(array_filter($relatedCustomerIds)));
+
+    $activitiesList = \App\Models\CustomerActivity::whereIn('customer_id', $relatedCustomerIds)
+        ->with('user')
+        ->orderByDesc('created_at')
+        ->orderByDesc('id')
+        ->get();
+    $activitiesCount = $activitiesList->count();
 @endphp
 
 @php
-    $panelMrp = $customer->fieldValue('mrp');
+    $panelMrp = $customer->fieldValue('mrp') ?? $customer->fieldValue('mrp_price');
     $panelSellingPrice = $customer->fieldValue('selling_price') ?? $customer->fieldValue('seal_price') ?? $customer->fieldValue('sale_price');
     $panelCarModel = $customer->fieldValue('car_model') ?? $customer->fieldValue('model') ?? $customer->fieldValue('vehicle_model') ?? $customer->fieldValue('vehicle_type');
     if (is_array($panelCarModel)) {
@@ -105,16 +124,48 @@
 @endphp
 @php
     $isCallCrmPanel = $customer->isCallCrm();
-    $allCallCrmServices = $isCallCrmPanel
+    $isBookingPanel = $customer->isBooking();
+
+    // Find all related booking services for this customer across Call CRM or Booking
+    $sourceCustId = $isCallCrmPanel
+        ? $customer->id
+        : ($customer->source_customer_id ?: null);
+
+    $allRelatedServices = ($isCallCrmPanel || $isBookingPanel)
         ? \App\Models\Customer::query()
             ->where('pipeline', 'booking')
-            ->where('source_customer_id', $customer->id)
+            ->where(function ($q) use ($sourceCustId, $customer) {
+                $matched = false;
+                if ($sourceCustId) {
+                    $q->where('source_customer_id', $sourceCustId);
+                    $matched = true;
+                }
+                if (!empty($customer->phone)) {
+                    $cleanPhone = \App\Models\Customer::normalizePhoneTo10Digits($customer->phone);
+                    if ($cleanPhone) {
+                        if ($matched) {
+                            $q->orWhere('phone', 'like', "%{$cleanPhone}%");
+                        } else {
+                            $q->where('phone', 'like', "%{$cleanPhone}%");
+                            $matched = true;
+                        }
+                    }
+                }
+                if ($matched) {
+                    $q->orWhere('id', $customer->id);
+                } else {
+                    $q->where('id', $customer->id);
+                }
+            })
             ->with('products')
             ->latest('id')
             ->get()
         : collect();
+
+    $allCallCrmServices = $allRelatedServices;
     $hasBookingsCol = $allCustomerBookings->isNotEmpty();
-    $hasRightCol = $hasBookingsCol || $isCallCrmPanel;
+    $hasServicesCol = $allRelatedServices->isNotEmpty();
+    $hasRightCol = $hasBookingsCol || $hasServicesCol || $isCallCrmPanel || $isBookingPanel;
     $leftColSpan = $hasRightCol ? 'lg:col-span-3' : 'lg:col-span-4';
     $midColSpan = $hasRightCol ? 'lg:col-span-6' : 'lg:col-span-8';
 @endphp
@@ -202,11 +253,6 @@
                                   class="h-7 inline-flex items-center justify-center px-2 rounded-md bg-emerald-100/90 text-emerald-800 text-[10px] font-bold whitespace-nowrap">
                                 Assigned to Service
                             </span>
-                        @else
-                            <button type="button" title="Assign Service" data-cid="{{ $customer->id }}" onclick="assignToBooking(this.dataset.cid)"
-                                    class="h-7 inline-flex items-center justify-center px-2 rounded-md bg-indigo-600 text-white text-[10px] font-bold hover:bg-indigo-700 transition whitespace-nowrap">
-                                Assign Service
-                            </button>
                         @endif
                     @endif
                     @if($customer->isBooking() && $customer->source_customer_id)
@@ -572,10 +618,357 @@
                         </div>
                     </div>
                 </form>
+            @elseif($customer->isBooking())
+                {{-- ASSIGN SERVICE COMPACT ACTION FORM: 3 Buttons with Inline Forms --}}
+                <form action="{{ route('customers.activities', $customer) }}"
+                      enctype="multipart/form-data"
+                      data-customer-name="{{ $customer->name }}"
+                      data-pipeline="booking"
+                      data-is-call-crm="0"
+                      class="h-full flex flex-col rounded-xl border border-indigo-200/90 bg-indigo-50/55 shadow-xs overflow-hidden"
+                      x-data="{
+                          curStatus: '{{ strtolower(trim((string) $customer->status)) }}',
+                          activeAction: null,
+                          successMrp: '{{ $panelMrp !== null && $panelMrp !== '' ? $panelMrp : '' }}',
+                          successNote: '',
+                          screenshotPreview: null,
+                          cancelReason: '',
+                          rescheduleDate: '{{ $customer->follow_up_at ? $customer->follow_up_at->format('Y-m-d') : now()->addDay()->format('Y-m-d') }}',
+                          rescheduleTime: '{{ ($customer->follow_up_has_time && $customer->follow_up_at) ? $customer->follow_up_at->format('H:i') : '10:00' }}',
+                          rescheduleNote: '',
+                          submitting: false,
+
+                          toggleAction(action) {
+                              if (this.activeAction === action) {
+                                  this.activeAction = null;
+                              } else {
+                                  this.activeAction = action;
+                              }
+                          },
+
+                          cancelForm() {
+                              this.activeAction = null;
+                              this.screenshotPreview = null;
+                          },
+
+                          submitSuccess() {
+                              if (this.submitting) return;
+                              this.submitting = true;
+                              const f = $el.closest('form');
+                              f.querySelector('[name=status_change]').value = 'Success';
+                              f.querySelector('[name=type]').value = 'status';
+                              f.querySelector('[name=follow_up]').value = '0';
+                              f.querySelector('[name=body]').value = this.successNote.trim() || 'Service completed successfully.';
+                              const mrpEl = f.querySelector('[name=mrp]');
+                              if (mrpEl) mrpEl.value = this.successMrp;
+                              Alpine.$data(document.body).postActivity(f)
+                                  .then(() => { this.activeAction = null; })
+                                  .finally(() => { this.submitting = false; });
+                          },
+
+                          submitCancel() {
+                              if (!this.cancelReason.trim()) {
+                                  alert('Please enter why this service is being cancelled.');
+                                  return;
+                              }
+                              if (this.submitting) return;
+                              this.submitting = true;
+                              const f = $el.closest('form');
+                              f.querySelector('[name=status_change]').value = 'Cancelled';
+                              f.querySelector('[name=type]').value = 'status';
+                              f.querySelector('[name=follow_up]').value = '0';
+                              f.querySelector('[name=body]').value = this.cancelReason.trim();
+                              Alpine.$data(document.body).postActivity(f)
+                                  .then(() => { this.activeAction = null; })
+                                  .finally(() => { this.submitting = false; });
+                          },
+
+                          submitReschedule() {
+                              if (!this.rescheduleDate) {
+                                  alert('Please select a follow-up date.');
+                                  return;
+                              }
+                              if (this.submitting) return;
+                              this.submitting = true;
+                              const f = $el.closest('form');
+                              f.querySelector('[name=status_change]').value = 'Follow Up';
+                              f.querySelector('[name=type]').value = 'status';
+                              f.querySelector('[name=follow_up]').value = '1';
+                              f.querySelector('[name=follow_up_date]').value = this.rescheduleDate;
+                              f.querySelector('[name=follow_up_time_on]').value = this.rescheduleTime ? '1' : '0';
+                              f.querySelector('[name=follow_up_time]').value = this.rescheduleTime || '';
+                              const bodyVal = this.rescheduleNote.trim() !== '' ? this.rescheduleNote.trim() : ('Rescheduled follow-up to ' + this.rescheduleDate + (this.rescheduleTime ? ' at ' + this.rescheduleTime : ''));
+                              f.querySelector('[name=body]').value = bodyVal;
+                              Alpine.$data(document.body).postActivity(f)
+                                  .then(() => { this.activeAction = null; })
+                                  .finally(() => { this.submitting = false; });
+                          }
+                      }">
+                    @csrf
+                    <input type="hidden" name="type" value="status">
+                    <input type="hidden" name="status_change" value="">
+                    <input type="hidden" name="body" value="">
+                    <input type="hidden" name="mrp" value="">
+                    <input type="hidden" name="follow_up" value="0">
+                    <input type="hidden" name="follow_up_date" value="">
+                    <input type="hidden" name="follow_up_time_on" value="0">
+                    <input type="hidden" name="follow_up_time" value="">
+
+                    {{-- Card Header --}}
+                    <div class="h-8 shrink-0 px-2.5 flex items-center justify-between gap-1.5 bg-indigo-100/80 border-b border-indigo-200/80">
+                        <div class="flex items-center gap-1.5 min-w-0">
+                            <span class="w-4 h-4 rounded bg-indigo-600 text-white inline-flex items-center justify-center shrink-0">
+                                <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                            </span>
+                            <span class="text-[11.5px] font-bold text-indigo-950">Update Form</span>
+                        </div>
+                        <span class="text-[10px] font-bold px-2 py-0.5 rounded-full capitalize"
+                              :class="{
+                                  'bg-emerald-100 text-emerald-800 border border-emerald-200': curStatus === 'success',
+                                  'bg-rose-100 text-rose-800 border border-rose-200': curStatus === 'cancelled' || curStatus === 'cancel',
+                                  'bg-amber-100 text-amber-800 border border-amber-200': curStatus === 'follow up' || curStatus === 'follow-up' || curStatus === 'rescheduled',
+                                  'bg-purple-100 text-purple-800 border border-purple-200': curStatus === 'engaged' || curStatus === 'booked',
+                                  'bg-sky-100 text-sky-800 border border-sky-200': curStatus !== 'success' && curStatus !== 'cancelled' && curStatus !== 'follow up' && curStatus !== 'follow-up' && curStatus !== 'engaged' && curStatus !== 'booked'
+                              }"
+                              x-text="'Status: ' + ('{{ $customer->status }}' || 'New')">
+                        </span>
+                    </div>
+
+                    <div class="flex-1 flex flex-col p-3 space-y-3">
+                        {{-- 3 Buttons in 1 Row --}}
+                        <div class="grid grid-cols-3 gap-2">
+                            {{-- 1. Success Button --}}
+                            <button type="button"
+                                    @click="toggleAction('success')"
+                                    :disabled="submitting"
+                                    :class="activeAction === 'success' || (activeAction === null && curStatus === 'success')
+                                        ? 'bg-emerald-600 text-white ring-2 ring-emerald-500/40 shadow-sm'
+                                        : 'bg-emerald-50 hover:bg-emerald-600 hover:text-white text-emerald-800 border border-emerald-300 hover:border-emerald-600'"
+                                    class="h-12 flex flex-col items-center justify-center rounded-xl font-bold text-[12.5px] transition shadow-2xs group cursor-pointer">
+                                <span class="flex items-center gap-1.5">
+                                    <svg class="w-4 h-4 text-emerald-600 group-hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                                    <span>Success</span>
+                                </span>
+                                <span class="text-[9.5px] opacity-75 font-normal">Complete service</span>
+                            </button>
+
+                            {{-- 2. Cancel Button --}}
+                            <button type="button"
+                                    @click="toggleAction('cancel')"
+                                    :disabled="submitting"
+                                    :class="activeAction === 'cancel' || (activeAction === null && (curStatus === 'cancelled' || curStatus === 'cancel'))
+                                        ? 'bg-rose-600 text-white ring-2 ring-rose-500/40 shadow-sm'
+                                        : 'bg-rose-50 hover:bg-rose-600 hover:text-white text-rose-800 border border-rose-300 hover:border-rose-600'"
+                                    class="h-12 flex flex-col items-center justify-center rounded-xl font-bold text-[12.5px] transition shadow-2xs group cursor-pointer">
+                                <span class="flex items-center gap-1.5">
+                                    <svg class="w-4 h-4 text-rose-600 group-hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
+                                    <span>Cancel</span>
+                                </span>
+                                <span class="text-[9.5px] opacity-75 font-normal">Cancel service</span>
+                            </button>
+
+                            {{-- 3. Reschedule Button --}}
+                            <button type="button"
+                                    @click="toggleAction('reschedule')"
+                                    :disabled="submitting"
+                                    :class="activeAction === 'reschedule' || (activeAction === null && (curStatus === 'follow up' || curStatus === 'follow-up' || curStatus === 'rescheduled'))
+                                        ? 'bg-amber-600 text-white ring-2 ring-amber-500/40 shadow-sm'
+                                        : 'bg-amber-50 hover:bg-amber-600 hover:text-white text-amber-900 border border-amber-300 hover:border-amber-600'"
+                                    class="h-12 flex flex-col items-center justify-center rounded-xl font-bold text-[12.5px] transition shadow-2xs group cursor-pointer">
+                                <span class="flex items-center gap-1.5">
+                                    <svg class="w-4 h-4 text-amber-600 group-hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                                    <span>Reschedule</span>
+                                </span>
+                                <span class="text-[9.5px] opacity-75 font-normal">Follow-up date</span>
+                            </button>
+                        </div>
+
+                        {{-- INLINE FORM 1: SUCCESS FORM --}}
+                        <div x-show="activeAction === 'success'" x-cloak
+                             x-transition:enter="transition ease-out duration-150"
+                             x-transition:enter-start="opacity-0 -translate-y-2"
+                             x-transition:enter-end="opacity-100 translate-y-0"
+                             class="rounded-xl bg-emerald-50/90 border border-emerald-300 p-3 space-y-3 shadow-xs">
+                            <div class="flex items-center justify-between">
+                                <span class="text-[12px] font-bold text-emerald-950 flex items-center gap-1.5">
+                                    <svg class="w-4 h-4 text-emerald-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                                    <span>Complete Service (Success)</span>
+                                </span>
+                                <button type="button" @click="cancelForm()" class="text-[11px] font-semibold text-emerald-800 hover:underline cursor-pointer">Close ✕</button>
+                            </div>
+
+                            {{-- MRP Field --}}
+                            <div class="space-y-1">
+                                <label class="block text-[10.5px] font-bold text-slate-700 uppercase tracking-wide">
+                                    Service MRP (₹) <span class="text-emerald-600">*</span>
+                                </label>
+                                <div class="relative">
+                                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-[13px]">₹</span>
+                                    <input type="number" step="0.01" min="0" x-model="successMrp"
+                                           placeholder="Enter MRP amount..."
+                                           class="w-full pl-7 pr-3 py-1.5 rounded-lg border border-slate-300 bg-white text-slate-900 text-[13px] font-bold outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 shadow-2xs">
+                                </div>
+                            </div>
+
+                            {{-- Upload Screenshot --}}
+                            <div class="space-y-1">
+                                <label class="block text-[10.5px] font-bold text-slate-700 uppercase tracking-wide">
+                                    Upload Screenshot / Work Proof
+                                </label>
+                                <div class="relative border border-dashed border-emerald-400 hover:border-emerald-600 rounded-lg p-2.5 bg-white text-center transition">
+                                    <input type="file" name="screenshot" accept="image/*"
+                                           @change="const file = $event.target.files[0]; if (file) { const reader = new FileReader(); reader.onload = (e) => screenshotPreview = e.target.result; reader.readAsDataURL(file); }"
+                                           class="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10">
+                                    <template x-if="!screenshotPreview">
+                                        <div class="flex items-center justify-center gap-2 text-slate-600 py-1">
+                                            <svg class="w-5 h-5 text-emerald-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                                            <span class="text-[11.5px] font-semibold">Choose screenshot or work proof</span>
+                                        </div>
+                                    </template>
+                                    <template x-if="screenshotPreview">
+                                        <div class="flex items-center gap-2">
+                                            <img :src="screenshotPreview" class="w-10 h-10 object-cover rounded border border-slate-200">
+                                            <div class="text-left text-[11px] font-bold text-emerald-700 flex-1 truncate">Screenshot attached ✓</div>
+                                            <button type="button" @click.stop="screenshotPreview = null; $el.closest('div').parentElement.querySelector('input[type=file]').value = ''" class="text-rose-600 hover:underline text-[10.5px] font-semibold z-20">Remove</button>
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
+
+                            {{-- Note / Remarks --}}
+                            <div class="space-y-1">
+                                <label class="block text-[10.5px] font-bold text-slate-700 uppercase tracking-wide">
+                                    Note / Remarks
+                                </label>
+                                <input type="text" x-model="successNote" placeholder="e.g. Completed car wash, customer satisfied..."
+                                       class="w-full px-2.5 py-1.5 text-[12px] rounded-lg border border-slate-300 bg-white outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 shadow-2xs">
+                            </div>
+
+                            {{-- Submit & Cancel Buttons --}}
+                            <div class="flex items-center justify-end gap-2 pt-1 border-t border-emerald-200/80">
+                                <button type="button" @click="cancelForm()" :disabled="submitting"
+                                        class="px-3.5 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 font-semibold text-[12px] transition cursor-pointer">
+                                    Cancel
+                                </button>
+                                <button type="button" @click="submitSuccess()" :disabled="submitting"
+                                        class="px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[12px] transition shadow-xs flex items-center gap-1.5 disabled:opacity-60 cursor-pointer">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                                    <span x-text="submitting ? 'Submitting…' : 'Submit Success'"></span>
+                                </button>
+                            </div>
+                        </div>
+
+                        {{-- INLINE FORM 2: CANCEL FORM --}}
+                        <div x-show="activeAction === 'cancel'" x-cloak
+                             x-transition:enter="transition ease-out duration-150"
+                             x-transition:enter-start="opacity-0 -translate-y-2"
+                             x-transition:enter-end="opacity-100 translate-y-0"
+                             class="rounded-xl bg-rose-50/90 border border-rose-300 p-3 space-y-3 shadow-xs">
+                            <div class="flex items-center justify-between">
+                                <span class="text-[12px] font-bold text-rose-950 flex items-center gap-1.5">
+                                    <svg class="w-4 h-4 text-rose-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
+                                    <span>Cancel Service</span>
+                                </span>
+                                <button type="button" @click="cancelForm()" class="text-[11px] font-semibold text-rose-800 hover:underline cursor-pointer">Close ✕</button>
+                            </div>
+
+                            <div class="space-y-1">
+                                <label class="block text-[10.5px] font-bold text-slate-700 uppercase tracking-wide">
+                                    Why Cancel / Reason <span class="text-rose-600">*</span>
+                                </label>
+                                <textarea x-model="cancelReason" rows="2" placeholder="e.g. Customer cancelled, vehicle sold, price dispute..."
+                                          class="w-full px-2.5 py-1.5 text-[12px] rounded-lg border border-rose-300 bg-white outline-none focus:ring-2 focus:ring-rose-500 focus:border-rose-500 shadow-2xs resize-none"></textarea>
+                            </div>
+
+                            {{-- Submit & Cancel Buttons --}}
+                            <div class="flex items-center justify-end gap-2 pt-1 border-t border-rose-200/80">
+                                <button type="button" @click="cancelForm()" :disabled="submitting"
+                                        class="px-3.5 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 font-semibold text-[12px] transition cursor-pointer">
+                                    Cancel
+                                </button>
+                                <button type="button" @click="submitCancel()" :disabled="submitting"
+                                        class="px-4 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-bold text-[12px] transition shadow-xs flex items-center gap-1.5 disabled:opacity-60 cursor-pointer">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
+                                    <span x-text="submitting ? 'Cancelling…' : 'Submit Cancellation'"></span>
+                                </button>
+                            </div>
+                        </div>
+
+                        {{-- INLINE FORM 3: RESCHEDULE FORM --}}
+                        <div x-show="activeAction === 'reschedule'" x-cloak
+                             x-transition:enter="transition ease-out duration-150"
+                             x-transition:enter-start="opacity-0 -translate-y-2"
+                             x-transition:enter-end="opacity-100 translate-y-0"
+                             class="rounded-xl bg-amber-50/90 border border-amber-300 p-3 space-y-3 shadow-xs">
+                            <div class="flex items-center justify-between">
+                                <span class="text-[12px] font-bold text-amber-950 flex items-center gap-1.5">
+                                    <svg class="w-4 h-4 text-amber-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                                    <span>Reschedule Service (Follow Up)</span>
+                                </span>
+                                <button type="button" @click="cancelForm()" class="text-[11px] font-semibold text-amber-800 hover:underline cursor-pointer">Close ✕</button>
+                            </div>
+
+                            <div class="grid grid-cols-2 gap-2">
+                                {{-- Follow-up Date --}}
+                                <div class="space-y-1">
+                                    <label class="block text-[10.5px] font-bold text-slate-700 uppercase tracking-wide">
+                                        Follow-up Date <span class="text-amber-600">*</span>
+                                    </label>
+                                    <div class="flex items-center rounded-lg border border-amber-300 bg-white overflow-hidden shadow-2xs">
+                                        <button type="button"
+                                                @click="const d = new Date(rescheduleDate || Date.now()); d.setDate(d.getDate() - 1); rescheduleDate = d.toISOString().split('T')[0];"
+                                                class="px-2 py-1.5 bg-amber-100/70 hover:bg-amber-200 text-amber-900 font-bold text-xs border-r border-amber-200 transition">‹</button>
+                                        <input type="date" x-model="rescheduleDate"
+                                               class="flex-1 min-w-0 px-2 py-1 text-[12px] font-bold text-slate-800 outline-none">
+                                        <button type="button"
+                                                @click="const d = new Date(rescheduleDate || Date.now()); d.setDate(d.getDate() + 1); rescheduleDate = d.toISOString().split('T')[0];"
+                                                class="px-2 py-1.5 bg-amber-100/70 hover:bg-amber-200 text-amber-900 font-bold text-xs border-l border-amber-200 transition">›</button>
+                                    </div>
+                                </div>
+
+                                {{-- Follow-up Time --}}
+                                <div class="space-y-1">
+                                    <label class="block text-[10.5px] font-bold text-slate-700 uppercase tracking-wide">
+                                        Time
+                                    </label>
+                                    <div class="flex items-center rounded-lg border border-amber-300 bg-white overflow-hidden shadow-2xs">
+                                        <input type="time" x-model="rescheduleTime"
+                                               class="w-full px-2 py-1 text-[12px] font-bold text-slate-800 outline-none">
+                                    </div>
+                                </div>
+                            </div>
+
+                            {{-- Note / Reason --}}
+                            <div class="space-y-1">
+                                <label class="block text-[10.5px] font-bold text-slate-700 uppercase tracking-wide">
+                                    Note / Reason
+                                </label>
+                                <input type="text" x-model="rescheduleNote" placeholder="e.g. Customer requested evening slot..."
+                                       class="w-full px-2.5 py-1.5 text-[12px] rounded-lg border border-slate-300 bg-white outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 shadow-2xs">
+                            </div>
+
+                            {{-- Submit & Cancel Buttons --}}
+                            <div class="flex items-center justify-end gap-2 pt-1 border-t border-amber-200/80">
+                                <button type="button" @click="cancelForm()" :disabled="submitting"
+                                        class="px-3.5 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 font-semibold text-[12px] transition cursor-pointer">
+                                    Cancel
+                                </button>
+                                <button type="button" @click="submitReschedule()" :disabled="submitting"
+                                        class="px-4 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-bold text-[12px] transition shadow-xs flex items-center gap-1.5 disabled:opacity-60 cursor-pointer">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                    <span x-text="submitting ? 'Rescheduling…' : 'Submit Reschedule'"></span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </form>
             @else
                 <form action="{{ route('customers.activities', $customer) }}"
                       enctype="multipart/form-data"
                       data-customer-name="{{ $customer->name }}"
+                      data-customer-mrp="{{ $panelMrp !== null && $panelMrp !== '' ? $panelMrp : '' }}"
+                      data-pipeline="{{ $customer->pipeline }}"
+                      data-is-call-crm="{{ $customer->isCallCrm() ? '1' : '0' }}"
                       data-initial-status="{{ $customer->status }}"
                       data-initial-fu="{{ $customer->follow_up ? '1' : '0' }}"
                       data-initial-fu-date="{{ $customer->follow_up_at?->format('Y-m-d') }}"
@@ -583,32 +976,24 @@
                       class="h-full flex flex-col rounded-xl border border-indigo-200/90 bg-indigo-50/55 shadow-xs overflow-hidden"
                       onsubmit="event.preventDefault(); Alpine.$data(document.body).openPostUpdateConfirm(this)">
                     @csrf
-                    <div class="h-9 shrink-0 px-3 flex items-center justify-between gap-2 bg-indigo-100/80 border-b border-indigo-200/80">
+                    <div class="h-8 shrink-0 px-2.5 flex items-center justify-between gap-1.5 bg-indigo-100/80 border-b border-indigo-200/80">
                         <div class="flex items-center gap-1.5 min-w-0">
-                            <span class="w-5 h-5 rounded bg-indigo-600 text-white inline-flex items-center justify-center shrink-0">
-                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                            <span class="w-4 h-4 rounded bg-indigo-600 text-white inline-flex items-center justify-center shrink-0">
+                                <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                             </span>
-                            <span class="text-[12px] font-bold text-indigo-950">Update Form</span>
+                            <span class="text-[11.5px] font-bold text-indigo-950">Update Form</span>
                         </div>
-                        @if($customer->isCallCrm())
+                        @if($customer->isCallCrm() && $customer->bookingCopy)
                             <div class="inline-flex items-center gap-1.5">
-                                @if($customer->bookingCopy)
-                                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10.5px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
-                                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                                        <span>Assigned to Service</span>
-                                    </span>
-                                @else
-                                    <button type="button" title="Assign Service" data-cid="{{ $customer->id }}" onclick="assignToBooking(this.dataset.cid)"
-                                            class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-bold shadow-xs transition whitespace-nowrap">
-                                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
-                                        <span>Assign Service</span>
-                                    </button>
-                                @endif
+                                <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                    <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                    <span>Assigned to Service</span>
+                                </span>
                             </div>
                         @endif
                     </div>
 
-                    <div class="flex-1 flex flex-col p-3 space-y-2.5">
+                    <div class="flex-1 flex flex-col p-2 space-y-1.5">
                         <input type="hidden" name="type" value="note">
                         @if($customer->isBooking())
                             @php
@@ -620,13 +1005,13 @@
                                 };
                             @endphp
                             <input type="hidden" name="wash_action" value="0" id="bookingActionFlag-{{ $customer->id }}">
-                            <div class="grid grid-cols-2 gap-2" x-data="{ bookState: '{{ $activeBookingState }}' }">
+                            <div class="grid grid-cols-2 gap-1.5" x-data="{ bookState: '{{ $activeBookingState }}' }">
                                 <button type="button"
                                         @click="bookState = 'success'; const f = $el.closest('form'); f.querySelector('[name=type]').value = 'status'; const wf = f.querySelector('[name=wash_action]'); if (wf) wf.value = '1'; const sel = f.querySelector('[name=status_change]'); if (sel) { if (!Array.from(sel.options).some(o => o.value === 'Success')) { sel.add(new Option('Success', 'Success')); } sel.value = 'Success'; } Alpine.$data(document.body).postActivity(f);"
                                         :class="bookState === 'success'
                                             ? 'border-emerald-600 bg-emerald-600 text-white ring-2 ring-emerald-600/25'
                                             : 'border-emerald-200 bg-emerald-50/80 text-emerald-800 hover:bg-emerald-100'"
-                                        class="inline-flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-[12px] font-bold transition shadow-2xs">
+                                        class="inline-flex items-center justify-center gap-1 rounded-md border px-2.5 py-1.5 text-[11px] font-bold transition shadow-2xs">
                                     <span>✓</span>
                                     <span>Success</span>
                                 </button>
@@ -636,20 +1021,20 @@
                                         :class="bookState === 'cancelled'
                                             ? 'border-rose-600 bg-rose-600 text-white ring-2 ring-rose-600/25'
                                             : 'border-rose-200 bg-rose-50/80 text-rose-800 hover:bg-rose-100'"
-                                        class="inline-flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-[12px] font-bold transition shadow-2xs">
+                                        class="inline-flex items-center justify-center gap-1 rounded-md border px-2.5 py-1.5 text-[11px] font-bold transition shadow-2xs">
                                     <span>✕</span>
                                     <span>Cancel</span>
                                 </button>
                             </div>
                         @endif
                         {{-- Section 1: Status + Internal Message + Note (Soft Violet Tint) --}}
-                        <div class="rounded-lg bg-violet-50/60 p-2.5 space-y-2">
-                            <div class="flex items-center gap-2">
+                        <div class="rounded-lg bg-violet-50/60 p-2 space-y-1.5">
+                            <div class="flex items-center gap-1.5">
                                 <div class="relative shrink-0">
                                     <select name="status_change"
                                             data-cid="{{ $customer->id }}"
                                             onchange="handleStatusChangeFollowUp(this.dataset.cid, this.value)"
-                                            class="h-8 appearance-none rounded-lg border border-violet-200 bg-white hover:bg-white focus:bg-white focus:border-brand focus:ring-2 focus:ring-brand/20 pl-2.5 pr-7 text-[12px] font-medium text-ink outline-none transition">
+                                            class="h-7 appearance-none rounded-md border border-violet-200 bg-white hover:bg-white focus:bg-white focus:border-brand focus:ring-2 focus:ring-brand/20 pl-2 pr-6 text-[11.5px] font-medium text-ink outline-none transition">
                                         <option value="">Status</option>
                                         @php $matchedExisting = false; @endphp
                                         @foreach($statusOptions as $s)
@@ -663,29 +1048,29 @@
                                             <option value="{{ $customer->status }}" selected>{{ ucfirst($customer->status) }}</option>
                                         @endif
                                     </select>
-                                    <svg class="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                                    <svg class="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                                 </div>
 
                                 <input name="title" placeholder="Internal message / short title…"
-                                       class="h-8 flex-1 min-w-0 rounded-lg border border-violet-200 bg-white px-3 text-[12px] outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 transition">
+                                       class="h-7 flex-1 min-w-0 rounded-md border border-violet-200 bg-white px-2.5 text-[11.5px] outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 transition">
                             </div>
 
                             <textarea name="body" id="activityBody-{{ $customer->id }}" rows="2" placeholder="What happened / note…"
                                       @keydown.enter.exact="if(!$event.shiftKey) { $event.preventDefault(); $el.closest('form').requestSubmit(); }"
-                                      class="w-full rounded-lg border border-violet-200 bg-white px-3 py-2 text-[12px] leading-snug outline-none resize-y min-h-[60px]
+                                      class="w-full rounded-md border border-violet-200 bg-white px-2.5 py-1 text-[11.5px] leading-snug outline-none resize-y min-h-[46px]
                                              focus:bg-white focus:border-brand focus:ring-2 focus:ring-brand/20 transition"></textarea>
 
                             @php $noteTemplates = $noteTemplates ?? collect(); @endphp
                             @if($noteTemplates->isNotEmpty())
-                                <div class="flex flex-wrap items-center gap-1">
-                                    <span class="text-[10px] font-bold uppercase tracking-wide text-violet-500 mr-1">Quick notes:</span>
+                                <div class="flex items-center gap-1 overflow-x-auto whitespace-nowrap crm-scroll py-0.5 max-w-full">
+                                    <span class="shrink-0 text-[9px] font-extrabold uppercase tracking-wider text-violet-500 mr-0.5">Quick notes:</span>
                                     @foreach($noteTemplates as $tpl)
                                         <button type="button"
                                                 title="{{ $tpl->body }}"
                                                 data-tpl-title="{{ $tpl->title }}"
                                                 data-tpl-body="{{ $tpl->body }}"
                                                 onclick="applyNoteTemplate(this.closest('form'), this.dataset.tplTitle, this.dataset.tplBody)"
-                                                class="inline-flex items-center max-w-full rounded-full border border-violet-200 bg-white hover:border-brand hover:bg-brand-soft hover:text-brand px-2.5 py-0.5 text-[10.5px] font-semibold text-slate-600 transition truncate">
+                                                class="shrink-0 inline-flex items-center rounded-full border border-violet-200 bg-white hover:border-brand hover:bg-brand-soft hover:text-brand px-2 py-0.5 text-[10px] font-medium text-slate-600 transition">
                                             {{ $tpl->title }}
                                         </button>
                                     @endforeach
@@ -695,7 +1080,7 @@
 
                         {{-- Section 2: Update Fields in a Clean 2-Column Grid (Soft Emerald Tint) --}}
                         @if($updateFields->isNotEmpty())
-                            <div class="rounded-lg bg-emerald-50/50 p-2.5 grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                            <div class="rounded-lg bg-emerald-50/50 p-2 grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                                 @foreach($updateFields as $uf)
                                     @php
                                         $rawInitVal = $customer->fieldValue($uf->key);
@@ -709,7 +1094,7 @@
                                         }
                                     @endphp
                                     <div>
-                                        <label class="block text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1">{{ $uf->label }}</label>
+                                        <label class="block text-[9.5px] font-bold uppercase tracking-wider text-slate-500 mb-0.5">{{ $uf->label }}</label>
                                         @if($uf->type === 'select')
                                             <div class="relative">
                                                 <select name="update_fields[{{ $uf->key }}]"
@@ -890,10 +1275,9 @@
                             ])->values();
                         @endphp
                         @if($showProductSelector && $availableProducts->isNotEmpty())
-                            <div class="rounded-lg border border-cyan-200/90 bg-cyan-50/60 p-2.5 space-y-2"
+                            <div class="rounded-lg border border-cyan-200/80 bg-cyan-50/50 p-1.5 space-y-1"
                                  data-assigned-product-ids='@json($assignedBookingProductIds)'
                                  x-data="{
-                                     search: '',
                                      assignedIds: @js($assignedBookingProductIds),
                                      products: @js($availableProductsForJs),
                                      selected: @js($initialSelectedProductIds),
@@ -904,49 +1288,20 @@
                                          } else {
                                              this.selected.push(id);
                                          }
-                                     },
-                                     selectAll() {
-                                         this.selected = this.filtered().map(p => p.id);
-                                     },
-                                     clearAll() {
-                                         this.selected = [];
-                                     },
-                                     filtered() {
-                                         if (!this.search.trim()) return this.products;
-                                         const s = this.search.toLowerCase();
-                                         return this.products.filter(p =>
-                                             (p.name || '').toLowerCase().includes(s) ||
-                                             (p.code || '').toLowerCase().includes(s) ||
-                                             (p.category || '').toLowerCase().includes(s)
-                                         );
                                      }
                                  }">
-                                <div class="flex flex-wrap items-center justify-between gap-1.5">
-                                    <div class="flex items-center gap-1.5">
-                                        <span class="w-4 h-4 rounded bg-cyan-600 text-white inline-flex items-center justify-center shrink-0 text-[10px]">📦</span>
-                                        <span class="text-[11.5px] font-bold uppercase tracking-wide text-cyan-950">Select Products</span>
-                                        <span class="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-cyan-200 text-cyan-900"
-                                              x-text="selected.length + ' selected'"></span>
-                                    </div>
-                                    <div class="flex items-center gap-2 text-[10.5px]">
-                                        <template x-if="products.length > 4">
-                                            <input type="text"
-                                                   x-model="search"
-                                                   placeholder="Search product…"
-                                                   class="h-6 px-2 rounded border border-cyan-300 bg-white text-[11px] outline-none focus:border-cyan-600">
-                                        </template>
-                                        <button type="button" @click="selectAll()" class="font-bold text-cyan-700 hover:text-cyan-950 hover:underline">Select All</button>
-                                        <span class="text-cyan-300">·</span>
-                                        <button type="button" @click="clearAll()" class="text-slate-400 hover:text-slate-600 hover:underline">Clear</button>
-                                    </div>
+                                <div class="flex items-center justify-between gap-1.5 px-0.5">
+                                    <span class="text-[9.5px] font-bold uppercase tracking-wider text-cyan-950">Select Products</span>
+                                    <span class="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-cyan-200/80 text-cyan-900"
+                                          x-text="selected.length + ' selected'"></span>
                                 </div>
 
-                                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-1.5 max-h-48 overflow-y-auto crm-scroll p-0.5">
-                                    <template x-for="p in filtered()" :key="p.id">
-                                        <label class="relative flex items-start gap-2 p-2 rounded-lg border cursor-pointer select-none transition"
+                                <div class="grid grid-cols-2 sm:grid-cols-3 gap-1 max-h-36 overflow-y-auto crm-scroll p-0.5">
+                                    <template x-for="p in products" :key="p.id">
+                                        <label class="relative flex items-center gap-1.5 px-2 py-1 rounded-md border cursor-pointer select-none transition min-w-0"
                                                :class="selected.includes(p.id)
-                                                    ? 'border-cyan-500 bg-cyan-100/90 shadow-2xs'
-                                                    : 'border-slate-200 bg-white/95 hover:border-cyan-300 hover:bg-white'">
+                                                    ? 'border-cyan-500 bg-cyan-100/90 text-cyan-950 shadow-2xs ring-1 ring-cyan-500/20'
+                                                    : 'border-slate-200/90 bg-white hover:border-cyan-300 hover:bg-cyan-50/30 text-slate-700'">
                                             <input type="checkbox"
                                                    name="product_ids[]"
                                                    :value="p.id"
@@ -954,24 +1309,17 @@
                                                    :data-already-assigned="p.already_assigned ? '1' : '0'"
                                                    :checked="selected.includes(p.id)"
                                                    @change="toggle(p.id)"
-                                                   class="mt-0.5 rounded border-slate-300 text-cyan-600 focus:ring-cyan-500/20">
-                                            <div class="min-w-0 flex-1 leading-tight">
-                                                <div class="flex items-center justify-between gap-1">
-                                                    <div class="font-bold text-[12px] text-ink truncate" x-text="p.name"></div>
-                                                    @if($customer->isCallCrm())
-                                                        <template x-if="p.already_assigned">
-                                                            <span class="shrink-0 px-1 py-0.2 rounded bg-emerald-100 text-emerald-800 border border-emerald-200 text-[9px] font-bold" title="Already assigned to Service">✓ Assigned</span>
-                                                        </template>
-                                                    @endif
-                                                </div>
-                                                <div class="flex items-center gap-1.5 mt-0.5 text-[10.5px]">
-                                                    <template x-if="p.price > 0">
-                                                        <span class="font-extrabold text-emerald-700" x-text="p.formatted_price"></span>
+                                                   class="w-3.5 h-3.5 rounded border-slate-300 text-cyan-600 focus:ring-cyan-500/20 shrink-0">
+                                            <div class="min-w-0 flex-1 flex items-center justify-between gap-1">
+                                                <span class="font-bold text-[11px] truncate" x-text="p.name"></span>
+                                                <template x-if="p.price > 0">
+                                                    <span class="font-extrabold text-[9.5px] text-emerald-700 shrink-0" x-text="p.formatted_price"></span>
+                                                </template>
+                                                @if($customer->isCallCrm())
+                                                    <template x-if="p.already_assigned">
+                                                        <span class="shrink-0 px-1 py-0.2 rounded bg-emerald-100 text-emerald-800 text-[8.5px] font-bold" title="Already assigned to Service">✓</span>
                                                     </template>
-                                                    <template x-if="p.code">
-                                                        <span class="text-slate-400 font-mono text-[10px]" x-text="'#' + p.code"></span>
-                                                    </template>
-                                                </div>
+                                                @endif
                                             </div>
                                         </label>
                                     </template>
@@ -980,13 +1328,13 @@
                         @endif
 
                         {{-- Section 3: Bottom Footer Bar: Left = Follow up controls | Right = Post Update button (Soft Amber Tint) --}}
-                        <div class="mt-auto rounded-lg bg-amber-50/60 p-2 flex items-center justify-between gap-2 flex-wrap">
-                            <div class="inline-flex flex-wrap items-center gap-1.5 rounded-lg bg-white/90 p-1 max-w-full">
-                                <label class="inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[11.5px] font-semibold cursor-pointer transition
+                        <div class="mt-auto rounded-lg bg-amber-50/60 p-1.5 flex items-center justify-between gap-1.5 flex-wrap">
+                            <div class="inline-flex flex-wrap items-center gap-1 rounded-lg bg-white/90 p-0.5 max-w-full">
+                                <label class="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10.5px] font-semibold cursor-pointer transition
                                               has-[:checked]:bg-amber-100 has-[:checked]:text-amber-900 text-slate-600 hover:bg-white">
                                     <input type="checkbox" name="follow_up" value="1" id="followUpCheck-{{ $customer->id }}"
                                            data-cid="{{ $customer->id }}"
-                                           class="rounded border-line text-amber-600 focus:ring-amber-500/30"
+                                           class="w-3.5 h-3.5 rounded border-line text-amber-600 focus:ring-amber-500/30"
                                            @checked($customer->follow_up)
                                            onchange="toggleFollowUpFields(this.dataset.cid, this.checked)">
                                     Follow up
@@ -999,22 +1347,22 @@
                                                 data-cid="{{ $customer->id }}"
                                                 onclick="shiftFollowUpDate(this.dataset.cid, -1)"
                                                 title="Previous day"
-                                                class="px-2 py-0.5 bg-mist/60 hover:bg-brand-soft hover:text-brand text-slate-700 font-bold text-[12px] border-r border-line transition">‹</button>
+                                                class="px-1.5 py-0.5 bg-mist/60 hover:bg-brand-soft hover:text-brand text-slate-700 font-bold text-[11px] border-r border-line transition">‹</button>
                                         <input type="date" name="follow_up_date" id="followUpDate-{{ $customer->id }}"
                                                value="{{ $customer->follow_up && $customer->follow_up_at ? $customer->follow_up_at->format('Y-m-d') : ($customer->follow_up_at?->format('Y-m-d') ?: now()->addDay()->format('Y-m-d')) }}"
                                                title="Follow-up date"
-                                               class="bg-white px-2 py-0.5 text-[11px] outline-none focus:bg-brand-soft/20">
+                                               class="bg-white px-1.5 py-0.5 text-[10.5px] outline-none focus:bg-brand-soft/20">
                                         <button type="button"
                                                 data-cid="{{ $customer->id }}"
                                                 onclick="shiftFollowUpDate(this.dataset.cid, 1)"
                                                 title="Next day"
-                                                class="px-2 py-0.5 bg-mist/60 hover:bg-brand-soft hover:text-brand text-slate-700 font-bold text-[12px] border-l border-line transition">›</button>
+                                                class="px-1.5 py-0.5 bg-mist/60 hover:bg-brand-soft hover:text-brand text-slate-700 font-bold text-[11px] border-l border-line transition">›</button>
                                     </div>
-                                    <label class="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-semibold cursor-pointer transition
+                                    <label class="inline-flex items-center gap-1 rounded px-1 py-0.5 text-[10.5px] font-semibold cursor-pointer transition
                                                   has-[:checked]:bg-brand-soft has-[:checked]:text-brand text-slate-600 hover:bg-white">
                                         <input type="checkbox" name="follow_up_time_on" value="1" id="followUpTimeOn-{{ $customer->id }}"
                                                data-cid="{{ $customer->id }}"
-                                               class="rounded border-line text-brand focus:ring-brand/30"
+                                               class="w-3.5 h-3.5 rounded border-line text-brand focus:ring-brand/30"
                                                @checked($customer->follow_up && $customer->follow_up_has_time)
                                                onchange="toggleFollowUpTime(this.dataset.cid, this.checked)">
                                         Time
@@ -1026,33 +1374,25 @@
                                                 data-cid="{{ $customer->id }}"
                                                 onclick="shiftFollowUpTime(this.dataset.cid, -30)"
                                                 title="Previous 30 min"
-                                                class="px-2 py-0.5 bg-mist/60 hover:bg-brand-soft hover:text-brand text-slate-700 font-bold text-[12px] border-r border-line transition">‹</button>
+                                                class="px-1.5 py-0.5 bg-mist/60 hover:bg-brand-soft hover:text-brand text-slate-700 font-bold text-[11px] border-r border-line transition">‹</button>
                                         <input type="time" name="follow_up_time" id="followUpTime-{{ $customer->id }}"
                                                value="{{ ($customer->follow_up && $customer->follow_up_has_time) ? $customer->follow_up_at?->format('H:i') : '' }}"
                                                title="Follow-up time"
-                                               class="bg-white px-2 py-0.5 text-[11px] outline-none focus:bg-brand-soft/20">
+                                               class="bg-white px-1.5 py-0.5 text-[10.5px] outline-none focus:bg-brand-soft/20">
                                         <button type="button"
                                                 data-cid="{{ $customer->id }}"
                                                 onclick="shiftFollowUpTime(this.dataset.cid, 30)"
                                                 title="Next 30 min"
-                                                class="px-2 py-0.5 bg-mist/60 hover:bg-brand-soft hover:text-brand text-slate-700 font-bold text-[12px] border-l border-line transition">›</button>
+                                                class="px-1.5 py-0.5 bg-mist/60 hover:bg-brand-soft hover:text-brand text-slate-700 font-bold text-[11px] border-l border-line transition">›</button>
                                     </div>
                                 </div>
                             </div>
 
-                            <div class="w-full sm:w-auto ml-auto inline-flex items-center gap-2 flex-wrap justify-end">
-                                @if($customer->isCallCrm())
-                                    <button type="button" title="Assign Service" data-cid="{{ $customer->id }}" onclick="assignToBooking(this.dataset.cid)"
-                                            class="h-9 inline-flex items-center justify-center gap-1.5 px-3.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-[12px] font-bold shadow-xs transition whitespace-nowrap">
-                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
-                                        <span>Assign Service</span>
-                                    </button>
-                                @endif
-
+                            <div class="w-full sm:w-auto ml-auto inline-flex items-center gap-1.5 flex-wrap justify-end">
                                 <button type="submit"
-                                        class="h-9 inline-flex items-center justify-center gap-1.5 rounded-lg bg-brand hover:bg-brand-dark text-white text-[12.5px] font-semibold px-4 shadow-xs transition whitespace-nowrap">
-                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
-                                    Post Update
+                                        class="h-9 inline-flex items-center justify-center gap-2 rounded-xl bg-brand hover:bg-brand-dark text-white text-[13px] font-bold px-5 shadow-sm shadow-brand/20 transition whitespace-nowrap">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
+                                    <span>Post Update</span>
                                 </button>
                             </div>
                         </div>
@@ -1147,16 +1487,19 @@
                     </div>
                 </div>
             </div>
-        @elseif($isCallCrmPanel)
+        @elseif($isCallCrmPanel || $isBookingPanel || $hasServicesCol)
             @php
-                $callCrmLifetimeTotal = $allCallCrmServices->sum(fn ($s) => $s->products->sum(fn ($p) => (float) ($p->price ?? 0)));
+                $callCrmLifetimeTotal = $allCallCrmServices->sum(function ($s) {
+                    $m = $s->fieldValue('mrp');
+                    return ($m !== null && $m !== '') ? (float) $m : (float) $s->products->sum(fn ($p) => (float) ($p->price ?? 0));
+                });
             @endphp
-            {{-- RIGHT COLUMN: Call CRM Booking / Assigned Service List + Lifetime Total --}}
+            {{-- RIGHT COLUMN: Customer All Bookings / Assigned Services List + Lifetime Total --}}
             <div class="lg:col-span-3 h-full flex flex-col rounded-xl border border-indigo-200/90 bg-indigo-50/50 shadow-xs overflow-hidden">
                 <div class="h-8 shrink-0 px-2.5 bg-indigo-100/80 border-b border-indigo-200/80 flex items-center justify-between gap-1.5">
                     <div class="flex items-center gap-1.5 min-w-0">
                         <span class="w-4 h-4 rounded bg-indigo-600 text-white inline-flex items-center justify-center shrink-0 text-[10px]">📅</span>
-                        <span class="text-[11.5px] font-bold text-indigo-950 truncate">Booking List</span>
+                        <span class="text-[11.5px] font-bold text-indigo-950 truncate">Customer Bookings</span>
                     </div>
                     <span class="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-white text-indigo-800 border border-indigo-200 shrink-0">
                         {{ $allCallCrmServices->count() }}
@@ -1166,25 +1509,46 @@
                 <div class="p-2 space-y-1.5 flex-1 overflow-y-auto crm-scroll max-h-[480px]">
                     @forelse($allCallCrmServices as $svc)
                         @php
+                            $isCurrentSvc = ($svc->id === $customer->id);
                             $svcDate = $svc->follow_up_at
                                 ? $svc->follow_up_at->format('d M Y')
                                 : ($svc->created_at ? $svc->created_at->format('d M Y') : '—');
+                            $svcTime = ($svc->follow_up_has_time && $svc->follow_up_at) ? $svc->follow_up_at->format('h:i A') : '';
                             $svcTotal = $svc->products->sum(fn ($p) => (float) ($p->price ?? 0));
                             $svcBadgeClass = match (strtolower((string) $svc->status)) {
                                 'success', 'completed', 'done' => 'bg-emerald-100 text-emerald-800 border-emerald-200',
-                                'cancelled', 'lost' => 'bg-rose-100 text-rose-800 border-rose-200',
-                                default => 'bg-amber-100 text-amber-800 border-amber-200',
+                                'cancelled', 'cancel', 'lost' => 'bg-rose-100 text-rose-800 border-rose-200',
+                                'rescheduled' => 'bg-amber-100 text-amber-800 border-amber-200',
+                                'engaged', 'booked' => 'bg-purple-100 text-purple-800 border-purple-200',
+                                default => 'bg-sky-100 text-sky-800 border-sky-200',
                             };
                         @endphp
-                        <div class="rounded-lg bg-white border border-indigo-100/90 px-2 py-1.5 text-[10.5px] space-y-1 shadow-2xs">
+                        <div class="rounded-lg {{ $isCurrentSvc ? 'bg-indigo-50/90 border-2 border-indigo-500 shadow-sm' : 'bg-white border border-indigo-100/90 hover:border-indigo-300' }} px-2 py-1.5 text-[10.5px] space-y-1 shadow-2xs transition">
                             <div class="flex items-center justify-between gap-1">
-                                <div class="font-bold text-ink leading-tight">
-                                    <span class="text-indigo-700">#{{ $svc->id }}</span>
-                                    <span class="ml-1 text-slate-600 font-semibold">{{ $svcDate }}</span>
+                                <div class="font-bold text-ink leading-tight flex items-center gap-1 min-w-0">
+                                    <span class="text-indigo-700 shrink-0">#{{ $svc->id }}</span>
+                                    <span class="text-slate-600 font-semibold truncate">{{ $svcDate }}</span>
+                                    @if($svcTime)
+                                        <span class="text-[9.5px] font-bold text-indigo-600 shrink-0">({{ $svcTime }})</span>
+                                    @endif
                                 </div>
-                                <span class="px-1.5 py-0.2 rounded border text-[9px] font-bold uppercase {{ $svcBadgeClass }}">
-                                    {{ $svc->status ?: 'Pending' }}
-                                </span>
+                                <div class="flex items-center gap-1 shrink-0">
+                                    <span class="px-1.5 py-0.2 rounded border text-[9px] font-bold uppercase {{ $svcBadgeClass }}">
+                                        {{ $svc->status ?: 'Pending' }}
+                                    </span>
+                                    @if($isCurrentSvc)
+                                        <span class="text-[9px] font-extrabold text-indigo-700 bg-white px-1.5 py-0.2 rounded border border-indigo-200">
+                                            Active
+                                        </span>
+                                    @else
+                                        <button type="button"
+                                                onclick="selectCustomer({{ $svc->id }})"
+                                                class="px-1.5 py-0.2 rounded text-[9.5px] font-bold bg-indigo-100 hover:bg-brand hover:text-white text-indigo-800 border border-indigo-200 transition"
+                                                title="View this booking">
+                                            View →
+                                        </button>
+                                    @endif
+                                </div>
                             </div>
                             @if($svc->products->isNotEmpty())
                                 <div class="flex flex-wrap gap-1 pt-0.5">
@@ -1198,9 +1562,18 @@
                                     @endforeach
                                 </div>
                             @endif
+                            @php
+                                $svcMrp = $svc->fieldValue('mrp');
+                            @endphp
                             <div class="flex items-center justify-between pt-0.5 border-t border-slate-100 text-[10px]">
-                                <span class="text-slate-500">Service Total</span>
-                                <span class="font-extrabold text-emerald-700">₹{{ number_format($svcTotal, 2) }}</span>
+                                <span class="text-slate-500">Service MRP</span>
+                                <span class="font-extrabold text-emerald-700">
+                                    @if($svcMrp !== null && $svcMrp !== '')
+                                        ₹{{ number_format((float) $svcMrp, 2) }}
+                                    @else
+                                        ₹{{ number_format($svcTotal, 2) }}
+                                    @endif
+                                </span>
                             </div>
                         </div>
                     @empty
@@ -1212,7 +1585,7 @@
 
                 <div class="shrink-0 mx-2 mb-2 mt-auto rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 text-white px-2.5 py-2 shadow-xs">
                     <div class="flex items-center justify-between gap-2">
-                        <span class="text-[9.5px] font-bold uppercase tracking-wider text-emerald-100">Lifetime Total</span>
+                        <span class="text-[9.5px] font-bold uppercase tracking-wider text-emerald-100">Total Bookings MRP</span>
                         <span class="text-[14px] font-extrabold leading-none">₹{{ number_format($callCrmLifetimeTotal, 2) }}</span>
                     </div>
                 </div>
@@ -1231,11 +1604,20 @@
         </div>
 
         <div class="divide-y divide-line">
-            @forelse($customer->activities as $a)
+            @forelse($activitiesList as $a)
                 <div @if($loop->index >= 2) data-more-msg="{{ $customer->id }}" @endif
                      class="{{ $loop->index >= 2 ? 'hidden ' : '' }}px-3.5 py-2.5 hover:bg-mist/40">
                     <div class="flex items-center gap-1.5 mb-0.5 flex-wrap">
                         <span class="inline-flex px-1.5 py-0.2 rounded text-[9.5px] font-bold uppercase {{ $typeColor[$a->type] ?? 'bg-mist text-slate-500' }}">{{ $a->type }}</span>
+                        @if($customer->isBooking() && $customer->source_customer_id && (int) $a->customer_id === (int) $customer->source_customer_id)
+                            <span class="inline-flex px-1.5 py-0.2 rounded text-[9.5px] font-bold uppercase bg-blue-100 text-blue-800 border border-blue-200">
+                                Call CRM History
+                            </span>
+                        @elseif($customer->isCallCrm() && (int) $a->customer_id !== (int) $customer->id)
+                            <span class="inline-flex px-1.5 py-0.2 rounded text-[9.5px] font-bold uppercase bg-indigo-100 text-indigo-800 border border-indigo-200">
+                                Service #{{ $a->customer_id }}
+                            </span>
+                        @endif
                         @if(!empty($a->meta['status_to']))
                             <span class="inline-flex px-1.5 py-0.2 rounded text-[9.5px] font-bold uppercase bg-rose-100 text-rose-700">
                                 {{ $a->meta['status_to'] }}

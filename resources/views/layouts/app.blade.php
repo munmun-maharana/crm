@@ -878,7 +878,7 @@
 {{-- Confirm Post Update Modal --}}
 <div x-show="postUpdateModalOpen" x-cloak
      @keydown.escape.window="if (postUpdateModalOpen && !postUpdateSubmitting) postUpdateModalOpen = false"
-     @keydown.enter.window.prevent="if (postUpdateModalOpen && !postUpdateSubmitting) confirmPostUpdate()"
+     @keydown.enter.window.prevent="if (postUpdateModalOpen && !postUpdateSubmitting) confirmPostUpdate(false)"
      class="fixed inset-0 z-[75] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
     <div @click.outside="if (!postUpdateSubmitting) postUpdateModalOpen = false"
          class="w-full max-w-md rounded-2xl bg-white shadow-2xl border border-line overflow-hidden">
@@ -926,21 +926,75 @@
             </div>
         </div>
 
-        <div class="px-5 py-3 bg-mist/40 border-t border-line flex items-center justify-end gap-2">
-            <button type="button"
-                    @click="postUpdateModalOpen = false"
-                    :disabled="postUpdateSubmitting"
-                    class="px-4 py-2 rounded-xl border border-line bg-white hover:bg-mist text-slate-700 text-[12.5px] font-semibold transition disabled:opacity-50">
-                Cancel
-            </button>
-            <button type="button"
-                    x-ref="confirmPostUpdateBtn"
-                    @click="confirmPostUpdate()"
-                    :disabled="postUpdateSubmitting"
-                    class="inline-flex items-center gap-1.5 px-5 py-2 rounded-xl bg-brand hover:bg-brand-dark text-white text-[12.5px] font-bold transition shadow-sm shadow-brand/20 disabled:opacity-60 focus:ring-2 focus:ring-brand focus:outline-none">
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
-                <span x-text="postUpdateSubmitting ? 'Posting…' : 'Confirm & Post Update'"></span>
-            </button>
+        <div class="px-5 py-3 bg-mist/40 border-t border-line">
+            {{-- When postUpdateShowMrp is true: Show MRP input and Submit Assignment / Back buttons --}}
+            <div x-show="postUpdateShowMrp" x-cloak class="space-y-3">
+                <div class="p-3 bg-red-50/80 border border-red-200/90 rounded-xl space-y-1.5">
+                    <div class="flex items-center justify-between">
+                        <label class="text-[12px] font-bold text-red-950 flex items-center gap-1.5">
+                            <span>💰</span>
+                            <span>Enter Service MRP (₹)</span>
+                        </label>
+                        <template x-if="postUpdateCallCrmMrp">
+                            <span class="text-[11px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded" x-text="'Call CRM MRP: ₹' + postUpdateCallCrmMrp"></span>
+                        </template>
+                        <template x-if="!postUpdateCallCrmMrp && postUpdateSuggestedMrp > 0">
+                            <span class="text-[11px] font-extrabold text-emerald-700" x-text="'Product Total: ₹' + postUpdateSuggestedMrp"></span>
+                        </template>
+                    </div>
+                    <div class="relative">
+                        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-[14px]">₹</span>
+                        <input type="number"
+                               step="0.01"
+                               min="0"
+                               x-model="postUpdateMrp"
+                               x-ref="postUpdateMrpInput"
+                               placeholder="Enter MRP amount..."
+                               @keydown.enter.prevent.stop="confirmPostUpdate(true)"
+                               class="w-full pl-8 pr-3 py-2 rounded-lg border border-red-300 bg-white text-slate-900 text-[14px] font-bold outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 shadow-2xs">
+                    </div>
+                    <div class="text-[10.5px] text-slate-500">This MRP will be saved and displayed in the Assign Service page.</div>
+                </div>
+
+                <div class="w-full grid grid-cols-2 gap-2.5">
+                    <button type="button"
+                            @click="postUpdateShowMrp = false"
+                            :disabled="postUpdateSubmitting"
+                            class="w-full inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl border border-line bg-white hover:bg-mist text-slate-700 text-[13px] font-bold transition disabled:opacity-50">
+                        ← Back
+                    </button>
+                    <button type="button"
+                            @click="confirmPostUpdate(true)"
+                            :disabled="postUpdateSubmitting"
+                            class="w-full inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-[13px] font-bold transition shadow-sm shadow-red-200 disabled:opacity-60 focus:ring-2 focus:ring-red-500 focus:outline-none">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                        <span x-text="postUpdateSubmitting ? 'Submitting…' : 'Submit & Assign'"></span>
+                    </button>
+                </div>
+            </div>
+
+            {{-- Default view: 2 buttons in 1 row --}}
+            <div x-show="!postUpdateShowMrp" class="w-full grid gap-2.5" :class="postUpdateCanAssignService ? 'grid-cols-2' : 'grid-cols-1'">
+                {{-- Left Side: Red color Assign Service button --}}
+                <button type="button"
+                        x-show="postUpdateCanAssignService"
+                        @click="startAssignService()"
+                        :disabled="postUpdateSubmitting"
+                        class="w-full inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-[13px] font-bold transition shadow-sm shadow-red-200 disabled:opacity-60 focus:ring-2 focus:ring-red-500 focus:outline-none">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                    <span>Assign Service</span>
+                </button>
+
+                {{-- Right Side: Post CRM --}}
+                <button type="button"
+                        x-ref="confirmPostUpdateBtn"
+                        @click="confirmPostUpdate(false)"
+                        :disabled="postUpdateSubmitting"
+                        class="w-full inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-brand hover:bg-brand-dark text-white text-[13px] font-bold transition shadow-sm shadow-brand/20 disabled:opacity-60 focus:ring-2 focus:ring-brand focus:outline-none">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                    <span x-text="postUpdateSubmitting && !postUpdateAssigning ? 'Posting…' : 'Post CRM'"></span>
+                </button>
+            </div>
         </div>
     </div>
 </div>
@@ -1251,6 +1305,12 @@ function crmShell() {
         },
         postUpdateModalOpen: false,
         postUpdateSubmitting: false,
+        postUpdateAssigning: false,
+        postUpdateCanAssignService: false,
+        postUpdateShowMrp: false,
+        postUpdateMrp: '',
+        postUpdateCallCrmMrp: '',
+        postUpdateSuggestedMrp: 0,
         postUpdateFormEl: null,
         postUpdateCustomerName: '',
         postUpdateChanges: [],
@@ -2101,6 +2161,15 @@ function crmShell() {
             }
         },
         openPostUpdateConfirm(form) {
+            const productCheckboxes = form.querySelectorAll('input[name="product_ids[]"]');
+            if (productCheckboxes.length > 0) {
+                const checkedCount = form.querySelectorAll('input[name="product_ids[]"]:checked').length;
+                if (checkedCount === 0) {
+                    alert('Please select at least 1 product.');
+                    return;
+                }
+            }
+
             const followCheck = form.querySelector('[name="follow_up"]');
             const followDate = form.querySelector('[name="follow_up_date"]');
             const timeOn = form.querySelector('[name="follow_up_time_on"]');
@@ -2170,7 +2239,7 @@ function crmShell() {
             }
 
             const checkedProducts = Array.from(form.querySelectorAll('input[name="product_ids[]"]:checked'))
-                .map(cb => cb.closest('label')?.querySelector('.text-ink')?.textContent?.trim() || cb.value);
+                .map(cb => cb.dataset.productLabel || cb.closest('label')?.querySelector('.truncate')?.textContent?.trim() || cb.closest('label')?.querySelector('.text-ink')?.textContent?.trim() || cb.value);
             if (checkedProducts.length > 0) {
                 changes.push({
                     label: 'Products Selected',
@@ -2234,26 +2303,97 @@ function crmShell() {
                 }
             }
 
+            this.postUpdateShowMrp = false;
+            this.postUpdateMrp = '';
+            this.postUpdateCallCrmMrp = '';
+
+            // Detect if Call CRM has an MRP field value (from form input, customer dataset, or panel dataset)
+            let callCrmMrp = '';
+            const mrpFieldInput = form.querySelector('input[name="update_fields[mrp]"], input[name="update_fields[mrp_price]"], input[name="mrp"]');
+            if (mrpFieldInput && mrpFieldInput.value && mrpFieldInput.value.trim() !== '') {
+                callCrmMrp = mrpFieldInput.value.trim();
+            } else if (form.dataset.customerMrp && form.dataset.customerMrp.trim() !== '') {
+                callCrmMrp = form.dataset.customerMrp.trim();
+            } else {
+                const panelRoot = form.closest('[data-panel-mrp]') || document.querySelector('[data-panel-mrp]');
+                if (panelRoot && panelRoot.dataset.panelMrp && panelRoot.dataset.panelMrp.trim() !== '') {
+                    callCrmMrp = panelRoot.dataset.panelMrp.trim();
+                }
+            }
+
+            // Extract numeric value from callCrmMrp if formatted
+            let parsedCallCrmMrp = '';
+            if (callCrmMrp !== '') {
+                const cleaned = callCrmMrp.replace(/[^0-9.]/g, '');
+                if (cleaned !== '' && !isNaN(parseFloat(cleaned))) {
+                    parsedCallCrmMrp = cleaned;
+                } else {
+                    parsedCallCrmMrp = callCrmMrp;
+                }
+            }
+
+            let totalProductPrice = 0;
+            const checkedBoxes = form.querySelectorAll('input[name="product_ids[]"]:checked');
+            checkedBoxes.forEach(cb => {
+                const label = cb.closest('label');
+                const priceEl = label ? label.querySelector('.text-emerald-700') : null;
+                if (priceEl) {
+                    const pText = priceEl.textContent.replace(/[^\d.]/g, '');
+                    const pVal = parseFloat(pText);
+                    if (!isNaN(pVal)) totalProductPrice += pVal;
+                }
+            });
+
+            // If Call CRM MRP is available, auto fill it with high priority; otherwise fallback to product total
+            if (parsedCallCrmMrp !== '') {
+                this.postUpdateCallCrmMrp = parsedCallCrmMrp;
+                this.postUpdateMrp = parsedCallCrmMrp;
+                this.postUpdateSuggestedMrp = parseFloat(parsedCallCrmMrp) || (totalProductPrice > 0 ? totalProductPrice : '');
+            } else {
+                this.postUpdateCallCrmMrp = '';
+                this.postUpdateSuggestedMrp = totalProductPrice;
+                this.postUpdateMrp = totalProductPrice > 0 ? totalProductPrice : '';
+            }
+
             this.postUpdateFormEl = form;
             this.postUpdateCustomerName = form.dataset.customerName || this.title || 'Customer';
             this.postUpdateChanges = changes;
+            this.postUpdateCanAssignService = (form.dataset.isCallCrm === '1' || form.dataset.pipeline === 'call_crm');
             this.postUpdateModalOpen = true;
             this.$nextTick(() => {
                 this.$refs.confirmPostUpdateBtn?.focus();
             });
         },
-        async confirmPostUpdate() {
+        startAssignService() {
+            this.postUpdateShowMrp = true;
+            this.$nextTick(() => {
+                this.$refs.postUpdateMrpInput?.focus();
+                this.$refs.postUpdateMrpInput?.select();
+            });
+        },
+        async confirmPostUpdate(assignService = false) {
             if (!this.postUpdateFormEl || this.postUpdateSubmitting) return;
             this.postUpdateSubmitting = true;
+            this.postUpdateAssigning = !!assignService;
             try {
-                await this.postActivity(this.postUpdateFormEl);
+                await this.postActivity(this.postUpdateFormEl, assignService, this.postUpdateMrp);
                 this.postUpdateModalOpen = false;
+                this.postUpdateShowMrp = false;
                 this.postUpdateFormEl = null;
             } finally {
                 this.postUpdateSubmitting = false;
+                this.postUpdateAssigning = false;
             }
         },
-        async postActivity(form) {
+        async postActivity(form, assignService = false, mrp = '') {
+            const productCheckboxes = form.querySelectorAll('input[name="product_ids[]"]');
+            if (productCheckboxes.length > 0) {
+                const checkedCount = form.querySelectorAll('input[name="product_ids[]"]:checked').length;
+                if (checkedCount === 0) {
+                    alert('Please select at least 1 product.');
+                    return;
+                }
+            }
             const followCheck = form.querySelector('[name="follow_up"]');
             const followDate = form.querySelector('[name="follow_up_date"]');
             const timeOn = form.querySelector('[name="follow_up_time_on"]');
@@ -2269,6 +2409,12 @@ function crmShell() {
                 return;
             }
             const fd = new FormData(form);
+            if (assignService) {
+                fd.append('assign_service', '1');
+                if (mrp !== null && mrp !== undefined && mrp !== '') {
+                    fd.append('mrp', mrp);
+                }
+            }
             const res = await fetch(form.action, {
                 method: 'POST',
                 headers: {

@@ -478,7 +478,7 @@ class Customer extends Model
             'pipeline' => 'booking',
             'source_customer_id' => $this->id,
         ];
-        $meta = [];
+        $meta = is_array($this->meta) ? $this->meta : [];
 
         $bookingFields = CrmField::inPipeline('booking')->active()->ordered()->get();
         if ($bookingFields->isEmpty()) {
@@ -514,6 +514,9 @@ class Customer extends Model
         }
         if (empty($core['city'])) {
             $core['city'] = $this->city;
+        }
+        if (empty($core['notes']) && ! empty($this->notes)) {
+            $core['notes'] = $this->notes;
         }
         $core['status'] = 'Pending';
         if (array_key_exists('assigned_to', $core)) {

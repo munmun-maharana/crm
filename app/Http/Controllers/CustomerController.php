@@ -530,6 +530,8 @@ class CustomerController extends Controller
             'status_change' => ['nullable', 'string', 'max:100'],
             'title' => ['nullable', 'string', 'max:120'],
             'body' => ['nullable', 'string'],
+            'mrp' => ['nullable'],
+            'screenshot' => ['nullable', 'image', 'max:10240'],
             'follow_up' => ['nullable', 'boolean'],
             'follow_up_date' => ['nullable', 'date'],
             'follow_up_time_on' => ['nullable', 'boolean'],
@@ -543,12 +545,19 @@ class CustomerController extends Controller
         $body = trim((string) ($data['body'] ?? ''));
 
         $uploadedImages = [];
+        $filesToUpload = [];
         if ($request->hasFile('images')) {
+            $filesToUpload = array_merge($filesToUpload, (array) $request->file('images'));
+        }
+        if ($request->hasFile('screenshot')) {
+            $filesToUpload[] = $request->file('screenshot');
+        }
+        if (! empty($filesToUpload)) {
             $uploadDir = public_path('uploads/activities/'.$customer->id);
             if (! is_dir($uploadDir)) {
                 @mkdir($uploadDir, 0755, true);
             }
-            foreach ((array) $request->file('images') as $imgFile) {
+            foreach ($filesToUpload as $imgFile) {
                 if (! $imgFile || ! $imgFile->isValid()) {
                     continue;
                 }
@@ -573,6 +582,8 @@ class CustomerController extends Controller
                 $targetStatus = 'Success';
             } elseif (($customer->isOperations() || $customer->isBooking()) && in_array($lowerVal, ['cancel', 'cancelled', 'canceled'], true)) {
                 $targetStatus = 'Cancelled';
+            } elseif (($customer->isOperations() || $customer->isBooking()) && in_array($lowerVal, ['rescheduled', 'reschedule'], true)) {
+                $targetStatus = 'Rescheduled';
             } elseif (($customer->isOperations() || $customer->isBooking()) && $lowerVal === 'pending') {
                 $targetStatus = 'Pending';
             } else {
@@ -677,9 +688,10 @@ class CustomerController extends Controller
         }
 
         $selectedProductNames = [];
+        $inputProdIds = [];
         if ($request->has('product_ids') || $request->has('products')) {
-            $inputProdIds = $request->input('product_ids', $request->input('products', []));
-            $inputProdIds = is_array($inputProdIds) ? array_values(array_filter(array_map('intval', $inputProdIds))) : [];
+            $rawInput = $request->input('product_ids', $request->input('products', []));
+            $inputProdIds = is_array($rawInput) ? array_values(array_filter(array_map('intval', $rawInput))) : [];
             if (! empty($inputProdIds)) {
                 $customer->products()->syncWithoutDetaching($inputProdIds);
                 $existingMetaIds = (array) ($currentMeta['product_ids'] ?? []);
@@ -689,6 +701,17 @@ class CustomerController extends Controller
                 $currentMeta['products'] = $selectedProds->toArray();
                 $selectedProductNames = \App\Models\Product::whereIn('id', $inputProdIds)->pluck('name')->all();
             }
+        }
+
+        $isCallCrm = $customer->isCallCrm();
+        $isAssignServiceRequested = $request->boolean('assign_service') || $request->boolean('assign_to_booking');
+
+        // Requirement: in Call CRM, at least 1 product must be selected before posting update
+        if ($isCallCrm && empty($inputProdIds)) {
+            $msg = 'Please select at least 1 product.';
+            return $request->wantsJson()
+                ? response()->json(['ok' => false, 'code' => 'min_product', 'message' => $msg], 422)
+                : back()->withErrors(['product_ids' => $msg]);
         }
 
         if ($body === '' || strtolower($body) === 'null') {
@@ -730,6 +753,13 @@ class CustomerController extends Controller
             $followUpHasTime = (bool) $customer->follow_up_has_time;
         }
 
+        if ($request->filled('mrp')) {
+            $rawMrp = preg_replace('/[^0-9.]/', '', (string) $request->input('mrp'));
+            if ($rawMrp !== '') {
+                $currentMeta['mrp'] = round((float) $rawMrp, 2);
+            }
+        }
+
         $customerData = array_merge($coreFieldUpdates, [
             'last_contact_at' => now(),
             'follow_up' => $followUp,
@@ -737,6 +767,17 @@ class CustomerController extends Controller
             'follow_up_has_time' => $followUpHasTime,
             'meta' => $currentMeta ?: null,
         ]);
+
+        if ($isCallCrm && $isAssignServiceRequested) {
+            if (! $statusChanged || $targetStatus === null || strtolower((string)$targetStatus) === strtolower((string)$oldStatus)) {
+                $targetStatus = 'Engaged';
+                $statusChanged = true;
+                $customerData['status'] = 'Engaged';
+                if ($title === '') {
+                    $title = 'Assigned to Service · '.$oldStatus.' → Engaged';
+                }
+            }
+        }
 
         if ($statusChanged) {
             $customerData['status'] = $targetStatus;
@@ -871,61 +912,135 @@ class CustomerController extends Controller
             }
         }
 
-        // If this is a CALL CRM record and status changed to 'Booked', auto-assign a new DB row in Booking for any newly selected products
-        if ($customer->isCallCrm() && $statusChanged && in_array(strtolower(trim((string) $targetStatus)), ['booked', 'booking'], true)) {
-            $alreadyAssignedIds = $customer->assignedBookingProductIds();
-            $newBookingPids = ! empty($inputProdIds ?? [])
-                ? array_values(array_diff($inputProdIds, $alreadyAssignedIds))
-                : [];
-            if (! empty($newBookingPids) || ! Customer::where('pipeline', 'booking')->where('source_customer_id', $customer->id)->exists()) {
-                $pidsForCopy = ! empty($newBookingPids) ? $newBookingPids : $customer->products()->pluck('products.id')->map(fn ($id) => (int) $id)->all();
-                $attrs = $customer->mappedBookingAttributes();
-                $copyMeta = $attrs['meta'] ?? [];
-                $copyMeta['product_ids'] = $pidsForCopy;
-                $attrs['meta'] = $copyMeta;
-                $copy = Customer::create($attrs);
-                if (! empty($pidsForCopy)) {
-                    $copy->products()->sync($pidsForCopy);
+        // If this is an ASSIGN SERVICE (booking) record, synchronize with main Call CRM lead
+        if ($customer->isBooking() && $customer->source_customer_id) {
+            $mainCallCrmCustomer = Customer::find($customer->source_customer_id);
+            if ($mainCallCrmCustomer && $mainCallCrmCustomer->isCallCrm()) {
+                $lowerTarget = strtolower(trim((string) $targetStatus));
+                if (in_array($lowerTarget, ['success', 'completed', 'done'], true)) {
+                    // Success -> Call CRM status becomes 'Existing'
+                    $mainCallCrmCustomer->update([
+                        'status' => 'Existing',
+                        'last_contact_at' => now(),
+                    ]);
+                    CustomerActivity::create([
+                        'customer_id' => $mainCallCrmCustomer->id,
+                        'user_id' => $request->user()->id,
+                        'type' => 'status',
+                        'title' => 'Service Completed · Status → Existing',
+                        'body' => 'Service #' . $customer->id . ' completed successfully. Call CRM status updated to Existing.',
+                        'meta' => [
+                            'status_from' => $mainCallCrmCustomer->status,
+                            'status_to' => 'Existing',
+                            'service_id' => $customer->id,
+                        ],
+                    ]);
+                } elseif (in_array($lowerTarget, ['cancelled', 'cancel', 'lost'], true)) {
+                    // Cancelled -> Call CRM status reverts to 'Pending'
+                    $mainCallCrmCustomer->update([
+                        'status' => 'Pending',
+                        'last_contact_at' => now(),
+                    ]);
+                    CustomerActivity::create([
+                        'customer_id' => $mainCallCrmCustomer->id,
+                        'user_id' => $request->user()->id,
+                        'type' => 'status',
+                        'title' => 'Service Cancelled · Status → Pending',
+                        'body' => 'Service #' . $customer->id . ' was cancelled. Reason: ' . ($body ?: 'No reason provided') . '. Call CRM status reverted to Pending.',
+                        'meta' => [
+                            'status_from' => $mainCallCrmCustomer->status,
+                            'status_to' => 'Pending',
+                            'service_id' => $customer->id,
+                        ],
+                    ]);
                 }
-                CustomerActivity::create([
-                    'customer_id' => $copy->id,
-                    'user_id' => $request->user()->id,
-                    'type' => 'system',
-                    'title' => 'Received from Call CRM',
-                    'body' => 'Auto-assigned to Assign Service from Call CRM #'.$customer->id.' upon status update to Booked.',
-                ]);
+                // Reschedule / Follow Up: Call CRM status is kept unchanged!
             }
         }
 
-        // If this is a BOOKING (Assign Service) record, sync status updates to source Call CRM customer
-        if ($customer->isBooking()) {
-            $sourceCustomer = $customer->source_customer_id
-                ? Customer::find($customer->source_customer_id)
-                : null;
+        // If this is a CALL CRM record and user clicked Assign Service OR status changed to 'Engaged'/'Booked', assign a new DB row in Booking
+        if ($customer->isCallCrm() && ($isAssignServiceRequested || ($statusChanged && in_array(strtolower(trim((string) $targetStatus)), ['engaged', 'booked', 'booking'], true)))) {
+            $pidsForCopy = ! empty($inputProdIds)
+                ? $inputProdIds
+                : $customer->products()->pluck('products.id')->map(fn ($id) => (int) $id)->all();
 
-            if ($sourceCustomer) {
-                $srcCore = [];
-                if ($statusChanged && $targetStatus !== null) {
-                    $srcCore['status'] = $targetStatus;
-                    $srcCore['last_contact_at'] = now();
-                    if (in_array(strtolower((string) $targetStatus), ['success', 'cancelled', 'cancel', 'canceled'], true)) {
-                        $srcCore['follow_up'] = false;
-                        $srcCore['follow_up_at'] = null;
-                        $srcCore['follow_up_has_time'] = false;
+            $selectedProducts = \App\Models\Product::whereIn('id', $pidsForCopy)->get();
+            $productNamesList = $selectedProducts->map(fn ($p) => $p->name . ($p->code ? " (#{$p->code})" : ''))->all();
+            $productNamesStr = implode(', ', $productNamesList);
+
+            // Determine follow up date for the booking
+            $bookingFollowUpDate = $followUpAt
+                ? \Carbon\Carbon::parse($followUpAt)->startOfDay()
+                : now()->startOfDay();
+
+            $mrpInput = $request->input('mrp');
+            $mrpVal = ($mrpInput !== null && $mrpInput !== '') ? round((float) $mrpInput, 2) : null;
+            if ($mrpVal === null) {
+                $existingCustomerMrp = $customer->fieldValue('mrp') ?? $customer->fieldValue('mrp_price');
+                if ($existingCustomerMrp !== null && $existingCustomerMrp !== '') {
+                    $cleanVal = preg_replace('/[^0-9.]/', '', (string) $existingCustomerMrp);
+                    if ($cleanVal !== '') {
+                        $mrpVal = round((float) $cleanVal, 2);
                     }
                 }
-                if (! empty($srcCore)) {
-                    $sourceCustomer->update($srcCore);
-                }
-                CustomerActivity::create([
-                    'customer_id' => $sourceCustomer->id,
-                    'user_id' => $request->user()->id,
-                    'type' => $activityType,
-                    'title' => "Assign Service · {$title}",
-                    'body' => $body,
-                    'meta' => $meta ?: null,
-                ]);
             }
+
+            $attrs = $customer->mappedBookingAttributes();
+            $copyMeta = $attrs['meta'] ?? [];
+            $copyMeta['product_ids'] = $pidsForCopy;
+            if ($mrpVal !== null) {
+                $copyMeta['mrp'] = $mrpVal;
+            }
+            $attrs['meta'] = $copyMeta;
+            $attrs['follow_up'] = true;
+            $attrs['follow_up_at'] = $bookingFollowUpDate;
+            $attrs['follow_up_has_time'] = (bool) $hasTime;
+            $attrs['status'] = 'New';
+            $attrs['source_customer_id'] = $customer->id;
+
+            $copy = Customer::create($attrs);
+            if (! empty($pidsForCopy)) {
+                $copy->products()->sync($pidsForCopy);
+            }
+
+            if ($mrpVal !== null) {
+                $cMeta = is_array($customer->meta) ? $customer->meta : [];
+                $cMeta['mrp'] = $mrpVal;
+                $customer->update(['meta' => $cMeta]);
+            }
+
+            $metaProductsPayload = $selectedProducts->map(fn ($p) => [
+                'id' => $p->id,
+                'name' => $p->name,
+                'code' => $p->code,
+                'price' => (float) $p->price,
+            ])->values()->all();
+
+            $mrpText = $mrpVal !== null ? " · MRP: ₹" . number_format($mrpVal, 2) : "";
+
+            CustomerActivity::create([
+                'customer_id' => $customer->id,
+                'user_id' => $request->user()->id,
+                'type' => 'status',
+                'title' => 'Assigned to Service',
+                'body' => "Assigned to Service (#{$copy->id}) with product(s): {$productNamesStr}{$mrpText}." . ($statusChanged ? " Status: {$targetStatus}." : ''),
+                'meta' => [
+                    'products' => $metaProductsPayload,
+                    'mrp' => $mrpVal,
+                ],
+            ]);
+
+            CustomerActivity::create([
+                'customer_id' => $copy->id,
+                'user_id' => $request->user()->id,
+                'type' => 'system',
+                'title' => 'Received from Call CRM',
+                'body' => "Assigned from Call CRM #{$customer->id} with product(s): {$productNamesStr}{$mrpText}.",
+                'meta' => [
+                    'products' => $metaProductsPayload,
+                    'mrp' => $mrpVal,
+                ],
+            ]);
         }
 
         if ($request->wantsJson()) {
@@ -961,6 +1076,8 @@ class CustomerController extends Controller
             $toneMap = [
                 'new' => 'text-sky-700 bg-sky-50',
                 'pending' => 'text-amber-800 bg-amber-100',
+                'engaged' => 'text-purple-700 bg-purple-100',
+                'booked' => 'text-purple-700 bg-purple-100',
                 'no answer' => 'text-slate-700 bg-slate-100',
                 'follow-up' => 'text-amber-800 bg-amber-100',
                 'interested' => 'text-teal-700 bg-teal-50',
@@ -1277,7 +1394,7 @@ class CustomerController extends Controller
 
         $oldStatus = $customer->status;
         $customer->update([
-            'status' => 'Booked',
+            'status' => 'Engaged',
             'meta' => $cMeta,
             'last_contact_at' => now(),
         ]);
@@ -1294,7 +1411,7 @@ class CustomerController extends Controller
             'user_id' => $request->user()->id,
             'type' => 'status',
             'title' => $isFirstAssign ? 'Assigned to Service' : 'Multi-Assigned to Service',
-            'body' => "Assigned to Service (#{$copy->id}) with product(s): {$productNamesStr}. Status: Booked.",
+            'body' => "Assigned to Service (#{$copy->id}) with product(s): {$productNamesStr}. Status: Engaged.",
             'meta' => ['products' => $metaProductsPayload],
         ]);
 
