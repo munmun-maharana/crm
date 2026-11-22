@@ -87,7 +87,20 @@
 
 @php
     $panelMrp = $customer->fieldValue('mrp') ?? $customer->fieldValue('mrp_price');
-    $panelSellingPrice = $customer->fieldValue('selling_price') ?? $customer->fieldValue('seal_price') ?? $customer->fieldValue('sale_price');
+    $panelSellingPrice = $customer->fieldValue('business_selling_price')
+        ?? $customer->fieldValue('business_sale_price')
+        ?? $customer->fieldValue('selling_price')
+        ?? $customer->fieldValue('seal_price')
+        ?? $customer->fieldValue('sale_price');
+    if ($panelSellingPrice === null || $panelSellingPrice === '') {
+        foreach ((array) ($customer->meta ?? []) as $mk => $mv) {
+            $mkl = strtolower((string) $mk);
+            if ((str_contains($mkl, 'selling') || str_contains($mkl, 'seal_price') || str_contains($mkl, 'sale_price')) && $mv !== null && $mv !== '') {
+                $panelSellingPrice = $mv;
+                break;
+            }
+        }
+    }
     $panelCarModel = $customer->fieldValue('car_model') ?? $customer->fieldValue('model') ?? $customer->fieldValue('vehicle_model') ?? $customer->fieldValue('vehicle_type');
     if (is_array($panelCarModel)) {
         $panelCarModel = implode(', ', $panelCarModel);

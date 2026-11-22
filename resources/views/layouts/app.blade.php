@@ -1185,9 +1185,20 @@
                     ?? $c->fieldValue('vehicle_type')
                     ?? '';
                 $mrp = $c->fieldValue('mrp');
-                $sellingPrice = $c->fieldValue('selling_price')
+                $sellingPrice = $c->fieldValue('business_selling_price')
+                    ?? $c->fieldValue('business_sale_price')
+                    ?? $c->fieldValue('selling_price')
                     ?? $c->fieldValue('seal_price')
                     ?? $c->fieldValue('sale_price');
+                if ($sellingPrice === null || $sellingPrice === '') {
+                    foreach ((array) ($c->meta ?? []) as $mk => $mv) {
+                        $mkl = strtolower((string) $mk);
+                        if ((str_contains($mkl, 'selling') || str_contains($mkl, 'seal_price') || str_contains($mkl, 'sale_price')) && $mv !== null && $mv !== '') {
+                            $sellingPrice = $mv;
+                            break;
+                        }
+                    }
+                }
                 return [
                     'id' => (int) $c->id,
                     'name' => (string) $c->name,
@@ -1504,9 +1515,10 @@ function crmShell() {
             this.bookingModalCustomerId = this.selectedId || null;
             this.bookingModalCustomerName = this.title || '';
             const panelPriceEl = document.querySelector('[data-panel-mrp]');
-            this.bookingModalCarModel = panelPriceEl?.dataset?.panelCarModel || '';
-            this.bookingModalMrp = panelPriceEl?.dataset?.panelMrp || '';
-            this.bookingModalSellingPrice = panelPriceEl?.dataset?.panelSellingPrice || '';
+            const matchedCust = this.selectedId ? (this.bookingCustomersList || []).find(c => Number(c.id) === Number(this.selectedId)) : null;
+            this.bookingModalCarModel = panelPriceEl?.dataset?.panelCarModel || matchedCust?.car_model || '';
+            this.bookingModalMrp = panelPriceEl?.dataset?.panelMrp || matchedCust?.mrp || '';
+            this.bookingModalSellingPrice = panelPriceEl?.dataset?.panelSellingPrice || matchedCust?.selling_price || '';
             this.bookingCustomerDropdownOpen = false;
             this.bookingModalStep = 1;
             this.bookingModalError = '';

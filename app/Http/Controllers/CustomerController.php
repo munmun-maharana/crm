@@ -1248,6 +1248,38 @@ class CustomerController extends Controller
     {
         abort_unless($request->user()->canDeleteCustomers(), 403);
         $this->authorizeMapped($request, $customer);
+
+        // Release / delete any BookingSlot linked to this customer or Team Ops record
+        $slotMetaId = (int) data_get($customer->meta, 'booking_slot_id', 0);
+        if ($slotMetaId > 0) {
+            \App\Models\BookingSlot::where('id', $slotMetaId)->delete();
+        }
+
+        if ($customer->isOperations()) {
+            $slotQuery = \App\Models\BookingSlot::query()->where(function ($q) use ($customer) {
+                $ids = array_values(array_filter([$customer->id, $customer->source_customer_id]));
+                if (! empty($ids)) {
+                    $q->whereIn('customer_id', $ids);
+                }
+                if (trim((string) $customer->name) !== '') {
+                    $q->orWhereRaw('LOWER(customer_name) = ?', [strtolower(trim((string) $customer->name))]);
+                }
+            });
+
+            if ($customer->follow_up_at) {
+                $deleted = (clone $slotQuery)
+                    ->whereDate('slot_date', $customer->follow_up_at->toDateString())
+                    ->delete();
+                if ($deleted === 0) {
+                    $slotQuery->latest('slot_date')->limit(1)->delete();
+                }
+            } else {
+                $slotQuery->delete();
+            }
+        } else {
+            \App\Models\BookingSlot::where('customer_id', $customer->id)->delete();
+        }
+
         $customer->delete();
 
         return back()->with('success', 'Customer deleted.');
