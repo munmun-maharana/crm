@@ -1,7 +1,7 @@
 @extends('layouts.app')
 
-@section('title', 'Dashboard')
-@section('heading', 'Dashboard')
+@section('title', \App\Models\MenuSetting::getLabel('dashboard', 'Dashboard'))
+@section('heading', \App\Models\MenuSetting::getLabel('dashboard', 'Dashboard'))
 @section('subheading', auth()->user()->canSeeAllRecords()
     ? (auth()->user()->isOperation() ? 'All Operations data' : 'All mapped CRM data')
     : (auth()->user()->isOperation() ? 'Operations queue' : 'Only leads mapped to you'))

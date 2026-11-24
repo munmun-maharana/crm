@@ -1,7 +1,7 @@
 @extends('layouts.app')
 
-@section('title', 'Pincode Manager')
-@section('heading', 'Pincode Manager')
+@section('title', \App\Models\MenuSetting::getLabel('pincodes', 'Pincode Manager'))
+@section('heading', \App\Models\MenuSetting::getLabel('pincodes', 'Pincode Manager'))
 @section('subheading', 'Fields, table columns & Excel columns auto-customize from Setting → Pincode Fields')
 
 @section('actions')

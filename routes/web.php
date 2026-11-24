@@ -46,6 +46,7 @@ Route::middleware('auth')->group(function () {
     Route::delete('/customers/{customer}', [CustomerController::class, 'destroy'])->name('customers.destroy');
     Route::post('/customers/{customer}/assign-operations', [CustomerController::class, 'assignToOperations'])->name('customers.assign-operations');
     Route::post('/customers/{customer}/assign-booking', [CustomerController::class, 'assignToBooking'])->name('customers.assign-booking');
+    Route::post('/customers/{customer}/convert-source', [CustomerController::class, 'convertSource'])->name('customers.convert-source');
     Route::post('/customers/{customer}/activities', [CustomerController::class, 'addActivity'])->name('customers.activities');
     Route::post('/customers/{customer}/auto/{channel}', [CustomerController::class, 'autoAction'])->name('customers.auto');
     Route::post('/customers/{customer}/compose', [CustomerController::class, 'compose'])->name('customers.compose');

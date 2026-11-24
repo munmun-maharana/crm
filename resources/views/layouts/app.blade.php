@@ -1162,7 +1162,87 @@
     </div>
 </div>
 
+{{-- Convert Lead Modal (Name, Phone, Today Date, Source -> creates new lead with Status New) --}}
+<div x-show="convertModalOpen"
+     x-cloak
+     @keydown.escape.window="if (convertModalOpen && !convertSubmitting) convertModalOpen = false"
+     class="fixed inset-0 z-[95] flex items-center justify-center p-4 bg-slate-900/45 backdrop-blur-xs">
+    <div class="w-full max-w-md rounded-2xl bg-white border border-line shadow-2xl overflow-hidden" @click.stop>
+        <div class="px-5 py-3.5 bg-gradient-to-r from-emerald-600 to-teal-600 text-white flex items-center justify-between gap-2">
+            <div class="flex items-center gap-2 min-w-0">
+                <span class="w-8 h-8 rounded-xl bg-white/15 inline-flex items-center justify-center shrink-0">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
+                </span>
+                <div class="min-w-0">
+                    <div class="text-[10.5px] font-bold uppercase tracking-wider text-white/80">Convert Lead</div>
+                    <div class="text-[14px] font-bold leading-tight truncate">Create New Lead (Status: New)</div>
+                </div>
+            </div>
+            <button type="button" @click="if (!convertSubmitting) convertModalOpen = false"
+                    class="w-7 h-7 rounded-lg bg-white/10 hover:bg-white/20 inline-flex items-center justify-center text-white text-sm">✕</button>
+        </div>
+
+        <div class="p-5 space-y-3">
+            <div x-show="convertError"
+                 class="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-[12px] text-rose-700 font-semibold"
+                 x-text="convertError"></div>
+
+            <div>
+                <label class="block text-[11px] font-bold uppercase tracking-wide text-slate-500 mb-1">Name</label>
+                <input type="text" x-model="convertName"
+                       class="w-full rounded-xl border border-line px-3 py-2 text-[13px] font-semibold text-ink focus:outline-none focus:ring-2 focus:ring-emerald-500/20">
+            </div>
+
+            <div>
+                <label class="block text-[11px] font-bold uppercase tracking-wide text-slate-500 mb-1">Phone No</label>
+                <input type="tel" x-model="convertPhone"
+                       class="w-full rounded-xl border border-line px-3 py-2 text-[13px] font-semibold text-ink focus:outline-none focus:ring-2 focus:ring-emerald-500/20">
+            </div>
+
+            <div>
+                <label class="block text-[11px] font-bold uppercase tracking-wide text-slate-500 mb-1">Date</label>
+                <input type="date" x-model="convertDate"
+                       class="w-full rounded-xl border border-line px-3 py-2 text-[13px] font-semibold text-ink focus:outline-none focus:ring-2 focus:ring-emerald-500/20">
+            </div>
+
+            <div>
+                <label class="block text-[11px] font-bold uppercase tracking-wide text-slate-500 mb-1">Source *</label>
+                <select x-model="convertSource"
+                        class="w-full rounded-xl border border-line px-3 py-2 text-[13px] font-semibold text-ink bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20">
+                    <option value="">Select Source</option>
+                    <template x-for="src in convertSourceOptions" :key="src">
+                        <option :value="src" x-text="src"></option>
+                    </template>
+                </select>
+            </div>
+        </div>
+
+        <div class="px-5 py-3 bg-mist/40 border-t border-line flex items-center justify-end gap-2">
+            <button type="button" @click="convertModalOpen = false" :disabled="convertSubmitting"
+                    class="px-4 py-2 rounded-xl border border-line bg-white hover:bg-mist text-slate-700 text-[12.5px] font-semibold transition">
+                Cancel
+            </button>
+            <button type="button" @click="confirmConvertModal()" :disabled="convertSubmitting || !convertSource"
+                    class="inline-flex items-center gap-1.5 px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-[12.5px] font-bold transition shadow-sm disabled:opacity-50">
+                <span x-text="convertSubmitting ? 'Creating…' : 'Submit & Create'"></span>
+            </button>
+        </div>
+    </div>
+</div>
+
 @php
+    $crmSourceField = auth()->check()
+        ? (\App\Models\CrmField::inPipeline('crm')->where('key', 'source')->first()
+            ?: \App\Models\CrmField::inPipeline('crm')->ordered()->get()->first(function ($f) {
+                return str_contains(strtolower((string) $f->key), 'source')
+                    || str_contains(strtolower((string) $f->label), 'source');
+            }))
+        : null;
+    $globalCrmSourceOptions = collect($crmSourceField?->options ?? [])
+        ->map(fn ($o) => trim((string) $o))
+        ->filter()
+        ->values()
+        ->all();
     $globalAssignProducts = \App\Models\Product::active()->ordered()->get()->map(fn ($p) => [
         'id' => (int) $p->id,
         'name' => $p->name,
@@ -1334,6 +1414,72 @@ function crmShell() {
         assignServiceProductIds: [],
         assignServiceDate: '',
         assignServiceError: '',
+        convertModalOpen: false,
+        convertSubmitting: false,
+        convertCustomerId: null,
+        convertName: '',
+        convertPhone: '',
+        convertDate: '',
+        convertSource: '',
+        convertError: '',
+        convertSourceOptions: @json($globalCrmSourceOptions ?? []),
+        openConvertModal(payload) {
+            if (!payload || !payload.id) return;
+            this.convertCustomerId = payload.id;
+            this.convertName = payload.name || '';
+            this.convertPhone = payload.phone || '';
+            const now = new Date();
+            this.convertDate = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+            const curSrc = (payload.source || '').trim();
+            if (curSrc && !this.convertSourceOptions.some(o => o.toLowerCase() === curSrc.toLowerCase())) {
+                this.convertSourceOptions = [curSrc, ...this.convertSourceOptions];
+            }
+            const matched = this.convertSourceOptions.find(o => o.toLowerCase() === curSrc.toLowerCase());
+            this.convertSource = matched || curSrc || '';
+            this.convertError = '';
+            this.convertModalOpen = true;
+        },
+        async confirmConvertModal() {
+            if (!this.convertCustomerId || this.convertSubmitting) return;
+            if (!this.convertSource) {
+                this.convertError = 'Please select a Source.';
+                return;
+            }
+            this.convertSubmitting = true;
+            this.convertError = '';
+            try {
+                const res = await fetch(`{{ url('/customers') }}/${this.convertCustomerId}/convert-source`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content
+                    },
+                    body: JSON.stringify({
+                        name: this.convertName,
+                        phone: this.convertPhone,
+                        date: this.convertDate,
+                        source: this.convertSource
+                    })
+                });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) {
+                    this.convertError = data.message || 'Could not convert lead.';
+                    return;
+                }
+                this.convertModalOpen = false;
+                if (data.new_customer_id) {
+                    window.location.href = `{{ route('customers.index') }}?open=${data.new_customer_id}`;
+                } else {
+                    window.location.reload();
+                }
+            } catch (e) {
+                this.convertError = 'Network error. Please try again.';
+            } finally {
+                this.convertSubmitting = false;
+            }
+        },
         assignServiceFilteredProducts() {
             if (!this.assignServiceSearch.trim()) return this.assignServiceAllProducts;
             const s = this.assignServiceSearch.toLowerCase();

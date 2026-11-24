@@ -1,7 +1,7 @@
 @extends('layouts.app')
 
-@section('title', 'User Activity Analytics')
-@section('heading', $selectedUser ? ('Analytics · ' . $selectedUser->name) : 'User Activity Analytics')
+@section('title', \App\Models\MenuSetting::getLabel('analytics', 'User Activity Analytics'))
+@section('heading', $selectedUser ? (\App\Models\MenuSetting::getLabel('analytics', 'Analytics') . ' · ' . $selectedUser->name) : \App\Models\MenuSetting::getLabel('analytics', 'User Activity Analytics'))
 @section('subheading', 'Every page visit, time spent, option clicked & selection for all non-Admin users (' . $periodLabel . ')')
 
 @section('actions')

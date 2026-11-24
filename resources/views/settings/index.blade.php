@@ -1,7 +1,7 @@
 @extends('layouts.app')
 
-@section('title', 'Setting')
-@section('heading', 'Setting')
+@section('title', \App\Models\MenuSetting::getLabel('settings', 'Setting'))
+@section('heading', \App\Models\MenuSetting::getLabel('settings', 'Setting'))
 @section('subheading', 'CRM fields, note templates, and Operation Team settings')
 
 @section('content')
@@ -36,16 +36,20 @@
                     </div>
                 </div>
                 <div class="flex items-center gap-2">
+                    <button type="button" id="resetSettingsOverviewOrder"
+                            class="hidden px-2.5 py-1.5 rounded-xl bg-white hover:bg-mist border border-indigo-200 text-[11.5px] font-bold text-slate-600 shadow-2xs transition">
+                        Reset Order
+                    </button>
                     <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-indigo-100 text-[12px] font-bold text-slate-700 shadow-2xs">
                         <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
-                        13 Configurable Modules
+                        Drag &amp; Drop to Rearrange
                     </span>
                 </div>
             </div>
         </div>
 
         {{-- Grid of All Menu Buttons --}}
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        <div id="settingsOverviewGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {{-- 1. CRM Fields --}}
             <button type="button" @click="tab = 'fields'"
                     class="group text-left p-5 rounded-2xl border border-line bg-white hover:border-brand/40 hover:shadow-md transition-all flex flex-col justify-between">
@@ -2191,5 +2195,65 @@ function moveMenuRow(btn, direction) {
 }
 
 bindMenuSort('menuSortable', 'reorderStatusMenu');
+
+(function initOverviewCardsSort() {
+    const grid = document.getElementById('settingsOverviewGrid');
+    const resetBtn = document.getElementById('resetSettingsOverviewOrder');
+    if (!grid) return;
+
+    const STORAGE_KEY = 'crm_settings_overview_order_v1';
+    const cards = Array.from(grid.children);
+    const defaultOrder = [];
+
+    cards.forEach((card, idx) => {
+        const heading = card.querySelector('h3');
+        const key = (heading ? heading.textContent.trim() : '') || ('card_' + idx);
+        card.dataset.overviewKey = key;
+        card.style.cursor = 'grab';
+        defaultOrder.push(key);
+    });
+
+    const applyOrder = (orderArr) => {
+        if (!Array.isArray(orderArr) || orderArr.length === 0) return;
+        const map = {};
+        Array.from(grid.children).forEach(el => { map[el.dataset.overviewKey] = el; });
+        orderArr.forEach(k => {
+            if (map[k]) {
+                grid.appendChild(map[k]);
+                delete map[k];
+            }
+        });
+        Object.values(map).forEach(el => grid.appendChild(el));
+    };
+
+    try {
+        const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
+        if (Array.isArray(saved) && saved.length > 0) {
+            applyOrder(saved);
+            if (resetBtn) resetBtn.classList.remove('hidden');
+        }
+    } catch (_) {}
+
+    if (typeof Sortable !== 'undefined') {
+        Sortable.create(grid, {
+            animation: 180,
+            ghostClass: 'opacity-50',
+            chosenClass: 'ring-2',
+            onEnd() {
+                const newOrder = Array.from(grid.children).map(el => el.dataset.overviewKey);
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(newOrder));
+                if (resetBtn) resetBtn.classList.remove('hidden');
+            }
+        });
+    }
+
+    if (resetBtn) {
+        resetBtn.addEventListener('click', () => {
+            localStorage.removeItem(STORAGE_KEY);
+            applyOrder(defaultOrder);
+            resetBtn.classList.add('hidden');
+        });
+    }
+})();
 </script>
 @endpush

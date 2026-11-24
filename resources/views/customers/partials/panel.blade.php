@@ -1003,6 +1003,22 @@
                                     <span>Assigned to Service</span>
                                 </span>
                             </div>
+                        @elseif($customer->isCrm())
+                            @php
+                                $convertPayload = [
+                                    'id' => $customer->id,
+                                    'name' => (string) $customer->name,
+                                    'phone' => (string) ($customer->phone ?? ''),
+                                    'source' => (string) ($customer->fieldValue('source') ?? $customer->source ?? ''),
+                                ];
+                            @endphp
+                            <button type="button"
+                                    data-convert-payload='@json($convertPayload)'
+                                    onclick="Alpine.$data(document.body).openConvertModal(JSON.parse(this.dataset.convertPayload))"
+                                    class="ml-auto inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold shadow-2xs transition">
+                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
+                                <span>Convert</span>
+                            </button>
                         @endif
                     </div>
 

@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', ($pipeline ?? 'crm') === 'operations' ? 'TEAM OPS' : (($pipeline ?? 'crm') === 'call_crm' ? 'CALL CRM' : (($pipeline ?? 'crm') === 'booking' ? 'ASSIGN SERVICE' : 'CRM')))
+@section('title', \App\Models\MenuSetting::getLabel($pipeline ?? 'crm', ($pipeline ?? 'crm') === 'operations' ? 'TEAM OPS' : (($pipeline ?? 'crm') === 'call_crm' ? 'CALL CRM' : (($pipeline ?? 'crm') === 'booking' ? 'ASSIGN SERVICE' : 'CRM'))))
 
 @section('split')
 @php
@@ -752,9 +752,25 @@
                                     <div class="mt-0.5 space-y-0.5 text-[10.5px]" data-fu-list="{{ $c->id }}">
                                         {!! $c->listDateSummaryHtml() !!}
                                     </div>
-                                    <div class="mt-1 flex items-center gap-1.5 min-w-0">
+                                    @php
+                                        $listSourceVal = $c->fieldValue('source') ?: $c->source;
+                                        if (($listSourceVal === null || $listSourceVal === '') && is_array($c->meta)) {
+                                            foreach ($c->meta as $mk => $mv) {
+                                                if (str_contains(strtolower((string) $mk), 'source') && $mv !== null && $mv !== '') {
+                                                    $listSourceVal = is_array($mv) ? implode(', ', $mv) : $mv;
+                                                    break;
+                                                }
+                                            }
+                                        }
+                                    @endphp
+                                    <div class="mt-1 flex flex-wrap items-center gap-1 min-w-0">
                                         <span class="text-[9.5px] font-semibold px-1.5 py-0.2 rounded capitalize shrink-0 {{ $statusTone[strtolower($c->status)] ?? ($statusTone[$c->status] ?? 'bg-mist text-slate-600') }}" data-status-list="{{ $c->id }}">{{ $c->status }}</span>
-                                        <span class="text-[10px] text-slate-400 truncate">{{ trim(($c->source ?: '').' · '.($c->city ?: ''), ' ·') }}</span>
+                                        @if(!empty($listSourceVal))
+                                            <span class="text-[9.5px] font-bold px-1.5 py-0.2 rounded bg-indigo-50 text-indigo-700 border border-indigo-200/80 shrink-0 truncate max-w-[110px]" title="Source: {{ $listSourceVal }}">{{ $listSourceVal }}</span>
+                                        @endif
+                                        @if($c->city)
+                                            <span class="text-[10px] text-slate-400 truncate">{{ $c->city }}</span>
+                                        @endif
                                     </div>
                                     @if(!empty($allActiveProducts) && $allActiveProducts->isNotEmpty())
                                         <div data-prod-list="{{ $c->id }}">

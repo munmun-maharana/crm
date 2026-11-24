@@ -1,7 +1,7 @@
 @extends('layouts.app')
 
-@section('title', 'Users')
-@section('heading', 'Users')
+@section('title', \App\Models\MenuSetting::getLabel('users', 'Users'))
+@section('heading', \App\Models\MenuSetting::getLabel('users', 'Users'))
 @section('subheading', 'Fields from Setting · User Fields tab')
 
 @section('content')

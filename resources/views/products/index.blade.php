@@ -1,7 +1,7 @@
 @extends('layouts.app')
 
-@section('title', 'Product Management')
-@section('heading', 'Product Management')
+@section('title', \App\Models\MenuSetting::getLabel('products', 'Product Management'))
+@section('heading', \App\Models\MenuSetting::getLabel('products', 'Product Management'))
 @section('subheading', 'Store and manage products. Fields, table columns & Excel auto-customize from Setting → Product Fields.')
 
 @section('actions')

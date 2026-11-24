@@ -391,6 +391,80 @@ class CustomerController extends Controller
         return view('requests.index', compact('customers'));
     }
 
+    public function convertSource(Request $request, Customer $customer): JsonResponse
+    {
+        $this->authorizeMapped($request, $customer);
+        abort_unless($request->user()->canAccessCrm(), 403);
+
+        $name = trim((string) $request->input('name', $customer->name)) ?: $customer->name;
+        $phone = trim((string) $request->input('phone', $customer->phone ?? ''));
+        $source = trim((string) $request->input('source', ''));
+        $dateInput = trim((string) $request->input('date', ''));
+
+        if ($source === '') {
+            return response()->json(['ok' => false, 'message' => 'Please select a Source.'], 422);
+        }
+
+        try {
+            $parsedDate = $dateInput !== '' ? \Carbon\Carbon::parse($dateInput) : now();
+        } catch (\Throwable) {
+            $parsedDate = now();
+        }
+        $dateYmd = $parsedDate->toDateString();
+
+        $sourceField = CrmField::inPipeline('crm')->where('key', 'source')->first()
+            ?: CrmField::inPipeline('crm')->ordered()->get()->first(function ($f) {
+                return str_contains(strtolower((string) $f->key), 'source')
+                    || str_contains(strtolower((string) $f->label), 'source');
+            });
+        $sourceKey = $sourceField?->key ?: 'source';
+
+        $statusField = CrmField::inPipeline('crm')->where('key', 'status')->first();
+        $newStatus = collect($statusField?->options ?? [])
+            ->first(fn ($o) => strtolower(trim((string) $o)) === 'new') ?: 'New';
+
+        $meta = [
+            'source' => $source,
+            $sourceKey => $source,
+            'date' => $dateYmd,
+            'converted_from_id' => $customer->id,
+        ];
+
+        $newCustomer = new Customer([
+            'pipeline' => 'crm',
+            'name' => $name,
+            'phone' => $phone !== '' ? $phone : null,
+            'source' => $source,
+            'status' => $newStatus,
+            'assigned_to' => $customer->assigned_to ?: ($request->user()->isAdmin() ? null : $request->user()->id),
+            'meta' => $meta,
+        ]);
+        $newCustomer->created_at = $parsedDate->copy()->setTimeFrom(now());
+        $newCustomer->save();
+
+        CustomerActivity::create([
+            'customer_id' => $customer->id,
+            'user_id' => $request->user()->id,
+            'type' => 'status',
+            'title' => 'Converted to New Lead',
+            'body' => "Created new lead (#{$newCustomer->id}) with Source: {$source}, Status: {$newStatus}.",
+        ]);
+
+        CustomerActivity::create([
+            'customer_id' => $newCustomer->id,
+            'user_id' => $request->user()->id,
+            'type' => 'system',
+            'title' => 'Lead Created (Convert)',
+            'body' => "Converted from #{$customer->id} ({$customer->name}) with Source: {$source}.",
+        ]);
+
+        return response()->json([
+            'ok' => true,
+            'new_customer_id' => $newCustomer->id,
+            'message' => "New lead #{$newCustomer->id} created with Status: {$newStatus}.",
+        ]);
+    }
+
     public function checkPhone(Request $request): JsonResponse
     {
         $raw = trim((string) $request->query('phone', ''));
