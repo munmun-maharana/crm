@@ -2027,8 +2027,10 @@ function crmShell() {
         },
         phoneDuplicateMatches: [],
         _phoneCheckTimer: null,
+        _phoneCheckSeq: 0,
         checkPhoneDuplicate(val, ignoreId = null) {
             clearTimeout(this._phoneCheckTimer);
+            const seq = ++this._phoneCheckSeq;
             const digits = String(val || '').replace(/\D+/g, '');
             if (digits.length < 6) {
                 this.phoneDuplicateMatches = [];
@@ -2041,8 +2043,9 @@ function crmShell() {
                 try {
                     const url = `{{ route('customers.check-phone') }}?phone=${encodeURIComponent(val)}&pipeline=${encodeURIComponent(pipeline)}&ignore_id=${encodeURIComponent(ign)}`;
                     const res = await fetch(url, { headers: { 'Accept': 'application/json' }, credentials: 'same-origin' });
-                    if (!res.ok) return;
+                    if (!res.ok || seq !== this._phoneCheckSeq) return;
                     const data = await res.json();
+                    if (seq !== this._phoneCheckSeq) return;
                     this.phoneDuplicateMatches = Array.isArray(data.matches) ? data.matches : [];
                 } catch (_) {}
             }, 250);

@@ -289,6 +289,11 @@ class Customer extends Model
             ->orderByDesc('start_time');
     }
 
+    public function isCrm(): bool
+    {
+        return ($this->pipeline ?? 'crm') === 'crm';
+    }
+
     public function isOperations(): bool
     {
         return $this->pipeline === 'operations';

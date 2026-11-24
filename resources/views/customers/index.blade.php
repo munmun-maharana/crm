@@ -959,10 +959,10 @@
                                 @change="checkPhoneDuplicate($event.target.value, form.id)"
                                 @blur="checkPhoneDuplicate($event.target.value, form.id)"
                                 class="w-full rounded-lg border border-line px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-brand/20"
-                                :class="phoneDuplicateMatches.length > 0 ? 'border-rose-400 focus:ring-rose-500/20' : ''"
+                                :class="(phoneDuplicateMatches.length > 0 && String(form['{{ $field->key }}'] || '').replace(/\D+/g, '').length >= 6) ? 'border-rose-400 focus:ring-rose-500/20' : ''"
                                 @required($field->required)
                             >
-                            <template x-if="phoneDuplicateMatches.length > 0">
+                            <template x-if="phoneDuplicateMatches.length > 0 && String(form['{{ $field->key }}'] || '').replace(/\D+/g, '').length >= 6">
                                 <div class="mt-1.5 rounded-lg border border-rose-300 bg-rose-50 px-2.5 py-1.5 text-[11.5px] font-semibold text-rose-700 flex items-start gap-1.5">
                                     <span class="shrink-0">⚠</span>
                                     <div class="leading-snug">
