@@ -2096,13 +2096,14 @@ function crmShell() {
         openEditForm(c) {
             this.formMode = 'edit';
             this.phoneDuplicateMatches = [];
-            if (c && c.phone) {
-                this.checkPhoneDuplicate(c.phone, c.id);
-            }
             const newForm = { id: c.id };
+            let resolvedPhone = '';
             (window.CRM_FORM_FIELDS || []).forEach(f => {
                 let val = c[f.key];
-                if ((val === undefined || val === null) && c.meta) val = c.meta[f.key];
+                if ((val === undefined || val === null || String(val).trim() === '') && c.meta) val = c.meta[f.key];
+                if ((val === undefined || val === null || String(val).trim() === '') && (f.type === 'phone' || String(f.key).toLowerCase().includes('phone'))) {
+                    val = c.phone ?? c.meta?.phone ?? c.meta?.phone_no ?? c.meta?.mobile ?? '';
+                }
                 if (val === undefined || val === null || String(val).trim() === '') {
                     if (f.type === 'select' && f.auto_select && Array.isArray(f.options) && f.options.length > 0) {
                         val = f.options[0];
@@ -2117,8 +2118,14 @@ function crmShell() {
                     }
                 }
                 newForm[f.key] = val ?? '';
+                if ((f.type === 'phone' || String(f.key).toLowerCase().includes('phone')) && newForm[f.key]) {
+                    resolvedPhone = String(newForm[f.key]);
+                }
             });
             this.form = newForm;
+            if (resolvedPhone) {
+                this.checkPhoneDuplicate(resolvedPhone, c.id);
+            }
             this.formOpen = true;
             this.$nextTick(() => {
                 const drawer = document.getElementById('customerDrawerForm');

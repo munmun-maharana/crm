@@ -419,6 +419,14 @@ class CustomerController extends Controller
             });
         $sourceKey = $sourceField?->key ?: 'source';
 
+        $phoneField = CrmField::inPipeline('crm')->where('key', 'phone')->first()
+            ?: CrmField::inPipeline('crm')->ordered()->get()->first(function ($f) {
+                return $f->type === 'phone'
+                    || str_contains(strtolower((string) $f->key), 'phone')
+                    || str_contains(strtolower((string) $f->label), 'phone');
+            });
+        $phoneKey = $phoneField?->key ?: 'phone';
+
         $statusField = CrmField::inPipeline('crm')->where('key', 'status')->first();
         $newStatus = collect($statusField?->options ?? [])
             ->first(fn ($o) => strtolower(trim((string) $o)) === 'new') ?: 'New';
@@ -429,6 +437,9 @@ class CustomerController extends Controller
             'date' => $dateYmd,
             'converted_from_id' => $customer->id,
         ];
+        if ($phone !== '') {
+            $meta[$phoneKey] = $phone;
+        }
 
         $newCustomer = new Customer([
             'pipeline' => 'crm',
