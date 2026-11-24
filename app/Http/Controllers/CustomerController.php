@@ -279,8 +279,105 @@ class CustomerController extends Controller
                 ->all();
         }
 
+        $opsAnalytics = null;
+        if ($pipeline === 'operations') {
+            $opsMonthInput = trim($request->string('ops_month')->toString());
+            try {
+                $selectedMonthStart = preg_match('/^\d{4}-\d{2}$/', $opsMonthInput)
+                    ? \Carbon\Carbon::createFromFormat('Y-m', $opsMonthInput)->startOfMonth()
+                    : now()->startOfMonth();
+            } catch (\Throwable) {
+                $selectedMonthStart = now()->startOfMonth();
+            }
+            $lastMonthStart = $selectedMonthStart->copy()->subMonthNoOverflow()->startOfMonth();
+            $thisMonthKey = now()->format('Y-m');
+            $lastMonthKey = $selectedMonthStart->copy()->subMonthNoOverflow()->format('Y-m');
+            $prevRealMonthKey = now()->subMonthNoOverflow()->format('Y-m');
+
+            // Build 6-month window ending at selectedMonthStart (includes Last Month & Selected Month)
+            $trendMonths = [];
+            for ($i = 5; $i >= 0; $i--) {
+                $m = $selectedMonthStart->copy()->subMonthsNoOverflow($i);
+                $trendMonths[$m->format('Y-m')] = [
+                    'key' => $m->format('Y-m'),
+                    'label' => $m->format('M Y'),
+                    'total' => 0,
+                    'success' => 0,
+                    'cancelled' => 0,
+                    'revenue' => 0.0,
+                ];
+            }
+
+            $rangeStart = $selectedMonthStart->copy()->subMonthsNoOverflow(5)->startOfMonth();
+            $rangeEnd = $selectedMonthStart->copy()->endOfMonth();
+
+            $opsRecords = $this->mappedCustomers($request)
+                ->inPipeline('operations')
+                ->whereRaw('COALESCE(follow_up_at, created_at) BETWEEN ? AND ?', [$rangeStart->toDateTimeString(), $rangeEnd->toDateTimeString()])
+                ->get(['id', 'status', 'follow_up_at', 'created_at', 'meta', 'source_customer_id']);
+
+            $slotIds = $opsRecords->map(fn ($r) => (int) data_get($r->meta, 'booking_slot_id', 0))->filter()->unique()->values()->all();
+            $slotsById = ! empty($slotIds)
+                ? \App\Models\BookingSlot::whereIn('id', $slotIds)->get(['id', 'selling_price', 'mrp'])->keyBy('id')
+                : collect();
+
+            foreach ($opsRecords as $rec) {
+                $dt = $rec->follow_up_at ?? $rec->created_at;
+                if (! $dt) {
+                    continue;
+                }
+                $mKey = $dt->format('Y-m');
+                if (! isset($trendMonths[$mKey])) {
+                    continue;
+                }
+
+                $trendMonths[$mKey]['total']++;
+                $stLower = strtolower(trim((string) $rec->status));
+                $isSuccess = in_array($stLower, ['success', 'wash success', 'completed', 'converted'], true);
+                $isCancelled = in_array($stLower, ['cancel', 'cancelled', 'canceled', 'lost'], true);
+
+                if ($isSuccess) {
+                    $trendMonths[$mKey]['success']++;
+                } elseif ($isCancelled) {
+                    $trendMonths[$mKey]['cancelled']++;
+                }
+
+                if (! $isCancelled) {
+                    $sell = $rec->fieldValue('business_selling_price')
+                        ?? $rec->fieldValue('business_sale_price')
+                        ?? $rec->fieldValue('selling_price')
+                        ?? $rec->fieldValue('seal_price')
+                        ?? $rec->fieldValue('sale_price');
+                    if (($sell === null || $sell === '') && ($slotId = (int) data_get($rec->meta, 'booking_slot_id', 0))) {
+                        $slotRow = $slotsById->get($slotId);
+                        if ($slotRow && $slotRow->selling_price !== null) {
+                            $sell = $slotRow->selling_price;
+                        }
+                    }
+                    $trendMonths[$mKey]['revenue'] += (float) (is_numeric($sell) ? $sell : 0);
+                }
+            }
+
+            $selectedKey = $selectedMonthStart->format('Y-m');
+            $selectedStats = $trendMonths[$selectedKey] ?? ['label' => $selectedMonthStart->format('M Y'), 'total' => 0, 'success' => 0, 'cancelled' => 0, 'revenue' => 0.0];
+            $lastStats = $trendMonths[$lastMonthKey] ?? ['label' => $lastMonthStart->format('M Y'), 'total' => 0, 'success' => 0, 'cancelled' => 0, 'revenue' => 0.0];
+
+            $opsAnalytics = [
+                'selected_month' => $selectedKey,
+                'this_month_key' => $thisMonthKey,
+                'prev_real_month_key' => $prevRealMonthKey,
+                'selected' => $selectedStats,
+                'last' => $lastStats,
+                'labels' => array_values(array_map(fn ($m) => $m['label'], $trendMonths)),
+                'totals' => array_values(array_map(fn ($m) => $m['total'], $trendMonths)),
+                'success' => array_values(array_map(fn ($m) => $m['success'], $trendMonths)),
+                'cancelled' => array_values(array_map(fn ($m) => $m['cancelled'], $trendMonths)),
+                'revenue' => array_values(array_map(fn ($m) => round($m['revenue'], 2), $trendMonths)),
+            ];
+        }
+
         return view('customers.index', compact(
-            'customers', 'agents', 'q', 'status', 'filter', 'assignedTo', 'area', 'areaOptions', 'pincodeDirectory', 'formFields', 'tableFields', 'excelFields', 'pipeline', 'listRoute', 'statusOptions', 'statusCards', 'allActiveProducts', 'productCards', 'productPending'
+            'customers', 'agents', 'q', 'status', 'filter', 'assignedTo', 'area', 'areaOptions', 'pincodeDirectory', 'formFields', 'tableFields', 'excelFields', 'pipeline', 'listRoute', 'statusOptions', 'statusCards', 'allActiveProducts', 'productCards', 'productPending', 'opsAnalytics'
         ));
     }
 
@@ -295,6 +392,43 @@ class CustomerController extends Controller
             ->paginate(15);
 
         return view('requests.index', compact('customers'));
+    }
+
+    public function checkPhone(Request $request): JsonResponse
+    {
+        $raw = trim((string) $request->query('phone', ''));
+        $pipeline = trim((string) $request->query('pipeline', 'crm')) ?: 'crm';
+        $ignoreId = $request->integer('ignore_id') ?: null;
+
+        $digits = preg_replace('/\D+/', '', $raw);
+        if (strlen($digits) < 6) {
+            return response()->json(['exists' => false, 'matches' => []]);
+        }
+
+        $lastDigits = strlen($digits) >= 10 ? substr($digits, -10) : $digits;
+
+        $matches = Customer::query()
+            ->inPipeline($pipeline)
+            ->when($ignoreId, fn ($q) => $q->where('id', '!=', $ignoreId))
+            ->where(function ($q) use ($raw, $lastDigits) {
+                $q->where('phone', $raw)
+                    ->orWhereRaw("REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(phone, ''), ' ', ''), '-', ''), '+', ''), '(', ''), ')', '') LIKE ?", ['%' . $lastDigits]);
+            })
+            ->latest('id')
+            ->limit(3)
+            ->get(['id', 'name', 'phone', 'status'])
+            ->map(fn ($c) => [
+                'id' => $c->id,
+                'name' => $c->name ?: 'Customer',
+                'phone' => $c->phone ?: $raw,
+                'status' => ucfirst((string) ($c->status ?: 'New')),
+            ])
+            ->values();
+
+        return response()->json([
+            'exists' => $matches->isNotEmpty(),
+            'matches' => $matches,
+        ]);
     }
 
     public function store(Request $request): RedirectResponse

@@ -1879,8 +1879,31 @@ function crmShell() {
                 });
             }
         },
+        phoneDuplicateMatches: [],
+        _phoneCheckTimer: null,
+        checkPhoneDuplicate(val, ignoreId = null) {
+            clearTimeout(this._phoneCheckTimer);
+            const digits = String(val || '').replace(/\D+/g, '');
+            if (digits.length < 6) {
+                this.phoneDuplicateMatches = [];
+                return;
+            }
+            const pipelineInput = document.querySelector('#customerDrawerForm input[name="pipeline"]');
+            const pipeline = pipelineInput ? pipelineInput.value : 'crm';
+            const ign = ignoreId || (this.form && this.form.id ? this.form.id : '');
+            this._phoneCheckTimer = setTimeout(async () => {
+                try {
+                    const url = `{{ route('customers.check-phone') }}?phone=${encodeURIComponent(val)}&pipeline=${encodeURIComponent(pipeline)}&ignore_id=${encodeURIComponent(ign)}`;
+                    const res = await fetch(url, { headers: { 'Accept': 'application/json' }, credentials: 'same-origin' });
+                    if (!res.ok) return;
+                    const data = await res.json();
+                    this.phoneDuplicateMatches = Array.isArray(data.matches) ? data.matches : [];
+                } catch (_) {}
+            }, 250);
+        },
         openCreateForm() {
             this.formMode = 'create';
+            this.phoneDuplicateMatches = [];
             const newForm = { id: null };
             (window.CRM_FORM_FIELDS || []).forEach(f => {
                 let defaultVal = '';
@@ -1923,6 +1946,10 @@ function crmShell() {
         },
         openEditForm(c) {
             this.formMode = 'edit';
+            this.phoneDuplicateMatches = [];
+            if (c && c.phone) {
+                this.checkPhoneDuplicate(c.phone, c.id);
+            }
             const newForm = { id: c.id };
             (window.CRM_FORM_FIELDS || []).forEach(f => {
                 let val = c[f.key];

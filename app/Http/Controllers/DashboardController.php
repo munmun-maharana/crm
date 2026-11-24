@@ -91,12 +91,46 @@ class DashboardController extends Controller
                 ->count();
         }
 
-        $yearLabels = [];
-        $yearData = [];
-        for ($i = 4; $i >= 0; $i--) {
-            $year = $today->year - $i;
-            $yearLabels[] = (string) $year;
-            $yearData[] = $leads()->whereYear('created_at', $year)->count();
+        $sourceField = CrmField::inPipeline($pipeline)->where('key', 'source')->first()
+            ?: CrmField::inPipeline('crm')->where('key', 'source')->first();
+        $configuredSources = collect($sourceField?->options ?? [])
+            ->map(fn ($o) => trim((string) $o))
+            ->filter()
+            ->values()
+            ->all();
+
+        $sourceCounts = [];
+        $sourceDisplayMap = [];
+        foreach ($configuredSources as $opt) {
+            $k = strtolower($opt);
+            $sourceCounts[$k] = 0;
+            $sourceDisplayMap[$k] = $opt;
+        }
+
+        $leadSources = $leads()->get(['id', 'source', 'meta']);
+        foreach ($leadSources as $leadRow) {
+            $src = trim((string) ($leadRow->source ?: data_get($leadRow->meta, 'source', '')));
+            if ($src === '') {
+                continue;
+            }
+            $k = strtolower($src);
+            if (! array_key_exists($k, $sourceCounts)) {
+                $sourceCounts[$k] = 0;
+                $sourceDisplayMap[$k] = $src;
+            }
+            $sourceCounts[$k]++;
+        }
+
+        $sourceLabels = [];
+        $sourceData = [];
+        foreach ($sourceCounts as $k => $cnt) {
+            $sourceLabels[] = $sourceDisplayMap[$k];
+            $sourceData[] = (int) $cnt;
+        }
+        $sourcePalette = ['#4f46e5', '#0f766e', '#0284c7', '#d97706', '#e11d48', '#7c3aed', '#059669', '#ea580c', '#0891b2', '#334155'];
+        $sourceChartColors = [];
+        foreach ($sourceLabels as $idx => $_) {
+            $sourceChartColors[] = $sourcePalette[$idx % count($sourcePalette)];
         }
 
         $falloffLabels = array_map(
@@ -119,8 +153,9 @@ class DashboardController extends Controller
             'dayData',
             'monthLabels',
             'monthData',
-            'yearLabels',
-            'yearData',
+            'sourceLabels',
+            'sourceData',
+            'sourceChartColors',
             'falloffLabels',
             'falloffData',
             'falloffChartColors',

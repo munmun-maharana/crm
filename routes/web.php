@@ -37,6 +37,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/booking', [CustomerController::class, 'booking'])->name('booking.index');
     Route::get('/operations', [CustomerController::class, 'operations'])->name('operations.index');
     Route::post('/customers', [CustomerController::class, 'store'])->name('customers.store');
+    Route::get('/customers/check-phone', [CustomerController::class, 'checkPhone'])->name('customers.check-phone');
     Route::post('/customers/bulk-map', [CustomerController::class, 'bulkMap'])->name('customers.bulk-map');
     Route::post('/customers/bulk-whatsapp', [CustomerController::class, 'bulkWhatsapp'])->name('customers.bulk-whatsapp');
     Route::post('/customers/bulk-email', [CustomerController::class, 'bulkEmail'])->name('customers.bulk-email');

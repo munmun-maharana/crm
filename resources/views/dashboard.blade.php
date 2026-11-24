@@ -52,11 +52,11 @@
         </div>
         <div class="rounded-2xl border border-indigo-200/80 bg-indigo-50/75 p-4 min-w-0">
             <div class="flex items-center justify-between mb-3">
-                <h2 class="text-sm font-extrabold uppercase tracking-wide text-indigo-950">Yearly leads</h2>
-                <span class="text-[11px] text-indigo-700/80">5 year trend</span>
+                <h2 class="text-sm font-extrabold uppercase tracking-wide text-indigo-950">Source of leads</h2>
+                <span class="text-[11px] text-indigo-700/80">From CRM settings</span>
             </div>
             <div class="h-[230px] relative">
-                <canvas id="yearChart"></canvas>
+                <canvas id="sourceChart"></canvas>
             </div>
         </div>
         <div class="rounded-2xl border border-amber-200/80 bg-amber-50/75 p-4 min-w-0">
@@ -284,9 +284,17 @@ new Chart(document.getElementById('monthChart'), {
     data: { labels: @json($monthLabels), datasets: [{ data: @json($monthData), borderColor: '#0284c7', backgroundColor: 'rgba(2,132,199,.12)', fill: true, tension: .35, pointRadius: 3 }] },
     options: common
 });
-new Chart(document.getElementById('yearChart'), {
+new Chart(document.getElementById('sourceChart'), {
     type: 'bar',
-    data: { labels: @json($yearLabels), datasets: [{ data: @json($yearData), backgroundColor: '#334155', borderRadius: 6, barThickness: 28 }] },
+    data: {
+        labels: @json($sourceLabels),
+        datasets: [{
+            data: @json($sourceData),
+            backgroundColor: @json($sourceChartColors),
+            borderRadius: 6,
+            barThickness: 28
+        }]
+    },
     options: common
 });
 new Chart(document.getElementById('falloffChart'), {

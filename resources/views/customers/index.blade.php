@@ -69,6 +69,10 @@
                         @endforeach
                     </select>
                 @endif
+                <button type="submit" title="Search"
+                        class="h-7 px-2.5 mr-1 rounded-full bg-rose-500 hover:bg-rose-600 text-white text-[11px] font-bold transition shrink-0">
+                    Search
+                </button>
             </div>
             <span id="crmSearchHint" class="text-[11px] text-slate-400 hidden shrink-0">Searching…</span>
         </form>
@@ -396,6 +400,90 @@
                             <div class="mt-0.5 text-lg sm:text-xl font-extrabold text-{{ $card['tone'] }}-700 leading-tight">{{ $card['value'] }}</div>
                         </a>
                     @endforeach
+                </div>
+            @endif
+
+            @if(($pipeline ?? 'crm') === 'operations' && !empty($opsAnalytics))
+                @php
+                    $selM = $opsAnalytics['selected'];
+                    $lstM = $opsAnalytics['last'];
+                    $selMonthVal = $opsAnalytics['selected_month'];
+                    $thisMonthVal = $opsAnalytics['this_month_key'];
+                    $prevRealMonthVal = $opsAnalytics['prev_real_month_key'];
+                @endphp
+                <div class="mb-3.5 rounded-2xl border border-indigo-200/80 bg-white p-3.5 shadow-2xs space-y-3">
+                    {{-- Header + Month Filter (This Month / Last Month / Month Picker) --}}
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                            <h2 class="text-sm font-extrabold text-ink">Team Ops Month-wise Summary &amp; Revenue</h2>
+                            <p class="text-[11px] text-slate-500">
+                                Showing <strong>{{ $selM['label'] }}</strong> vs Last Month (<strong>{{ $lstM['label'] }}</strong>)
+                            </p>
+                        </div>
+                        <form method="GET" action="{{ route($listRoute) }}" class="flex flex-wrap items-center gap-1.5">
+                            @if($q)<input type="hidden" name="q" value="{{ $q }}">@endif
+                            @if($status)<input type="hidden" name="status" value="{{ $status }}">@endif
+                            @if($assignedTo)<input type="hidden" name="assigned_to" value="{{ $assignedTo }}">@endif
+                            <a href="{{ route($listRoute, array_filter(['q' => $q ?: null, 'status' => $status ?: null, 'assigned_to' => $assignedTo ?: null, 'ops_month' => $thisMonthVal])) }}"
+                               class="px-2.5 py-1 rounded-lg text-[11.5px] font-bold border transition {{ $selMonthVal === $thisMonthVal ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-mist/60 text-slate-700 border-line hover:bg-mist' }}">
+                                This Month
+                            </a>
+                            <a href="{{ route($listRoute, array_filter(['q' => $q ?: null, 'status' => $status ?: null, 'assigned_to' => $assignedTo ?: null, 'ops_month' => $prevRealMonthVal])) }}"
+                               class="px-2.5 py-1 rounded-lg text-[11.5px] font-bold border transition {{ $selMonthVal === $prevRealMonthVal ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-mist/60 text-slate-700 border-line hover:bg-mist' }}">
+                                Last Month
+                            </a>
+                            <input type="month" name="ops_month" value="{{ $selMonthVal }}" onchange="this.form.submit()"
+                                   class="h-7 px-2 rounded-lg border border-line bg-white text-[11.5px] font-semibold text-ink">
+                        </form>
+                    </div>
+
+                    {{-- This Month vs Last Month KPI Comparison --}}
+                    <div class="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
+                        <div class="rounded-xl border border-indigo-200 bg-indigo-50/60 px-3 py-2">
+                            <div class="text-[10px] font-bold uppercase tracking-wider text-indigo-700">Total Bookings ({{ $selM['label'] }})</div>
+                            <div class="flex items-baseline justify-between gap-2 mt-0.5">
+                                <span class="text-xl font-extrabold text-indigo-950">{{ number_format($selM['total']) }}</span>
+                                <span class="text-[11px] font-semibold text-slate-500">Last: {{ number_format($lstM['total']) }}</span>
+                            </div>
+                        </div>
+                        <div class="rounded-xl border border-emerald-200 bg-emerald-50/60 px-3 py-2">
+                            <div class="text-[10px] font-bold uppercase tracking-wider text-emerald-700">Success ({{ $selM['label'] }})</div>
+                            <div class="flex items-baseline justify-between gap-2 mt-0.5">
+                                <span class="text-xl font-extrabold text-emerald-950">{{ number_format($selM['success']) }}</span>
+                                <span class="text-[11px] font-semibold text-slate-500">Last: {{ number_format($lstM['success']) }}</span>
+                            </div>
+                        </div>
+                        <div class="rounded-xl border border-rose-200 bg-rose-50/60 px-3 py-2">
+                            <div class="text-[10px] font-bold uppercase tracking-wider text-rose-700">Cancelled ({{ $selM['label'] }})</div>
+                            <div class="flex items-baseline justify-between gap-2 mt-0.5">
+                                <span class="text-xl font-extrabold text-rose-950">{{ number_format($selM['cancelled']) }}</span>
+                                <span class="text-[11px] font-semibold text-slate-500">Last: {{ number_format($lstM['cancelled']) }}</span>
+                            </div>
+                        </div>
+                        <div class="rounded-xl border border-teal-200 bg-teal-50/70 px-3 py-2">
+                            <div class="text-[10px] font-bold uppercase tracking-wider text-teal-700">Total Revenue ({{ $selM['label'] }})</div>
+                            <div class="flex items-baseline justify-between gap-2 mt-0.5">
+                                <span class="text-xl font-extrabold text-teal-950">₹{{ number_format($selM['revenue'], 0) }}</span>
+                                <span class="text-[11px] font-semibold text-slate-500">Last: ₹{{ number_format($lstM['revenue'], 0) }}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {{-- 2 Graphs: Month-wise Bookings (Total / Success / Cancel) & Month-wise Revenue --}}
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                        <div class="rounded-xl border border-line bg-slate-50/50 p-3">
+                            <div class="text-[12px] font-bold text-ink mb-2">Month-wise Bookings (Total · Success · Cancelled)</div>
+                            <div class="h-52">
+                                <canvas id="opsBookingsChart"></canvas>
+                            </div>
+                        </div>
+                        <div class="rounded-xl border border-line bg-slate-50/50 p-3">
+                            <div class="text-[12px] font-bold text-ink mb-2">Month-wise Total Revenue (₹)</div>
+                            <div class="h-52">
+                                <canvas id="opsRevenueChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             @endif
 
@@ -851,9 +939,24 @@
                                 inputmode="tel"
                                 pattern="[0-9+\-\s()]*"
                                 oninput="this.value = this.value.replace(/[^0-9+\-\s()]/g, '')"
+                                @input="checkPhoneDuplicate($event.target.value, form.id)"
+                                @change="checkPhoneDuplicate($event.target.value, form.id)"
+                                @blur="checkPhoneDuplicate($event.target.value, form.id)"
                                 class="w-full rounded-lg border border-line px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-brand/20"
+                                :class="phoneDuplicateMatches.length > 0 ? 'border-rose-400 focus:ring-rose-500/20' : ''"
                                 @required($field->required)
                             >
+                            <template x-if="phoneDuplicateMatches.length > 0">
+                                <div class="mt-1.5 rounded-lg border border-rose-300 bg-rose-50 px-2.5 py-1.5 text-[11.5px] font-semibold text-rose-700 flex items-start gap-1.5">
+                                    <span class="shrink-0">⚠</span>
+                                    <div class="leading-snug">
+                                        <span>This number already exists:</span>
+                                        <template x-for="(m, idx) in phoneDuplicateMatches" :key="m.id">
+                                            <span class="font-bold" x-text="(idx > 0 ? ', ' : ' ') + m.name + ' (' + m.phone + ' · ' + m.status + ')'"></span>
+                                        </template>
+                                    </div>
+                                </div>
+                            </template>
                         @elseif($field->key === 'pincode' || $field->key === 'pin')
                             <input
                                 id="formFieldPincode"
@@ -1096,47 +1199,109 @@ window.PINCODE_DIRECTORY = @json($pincodeDirectory ?? []);
     const hint = document.getElementById('crmSearchHint');
     if (!form || !input) return;
 
-    let timer = null;
     const runSearch = () => {
         if (hint) hint.classList.remove('hidden');
         form.submit();
     };
 
-    input.addEventListener('input', () => {
-        clearTimeout(timer);
-        if (hint) {
-            hint.textContent = 'Wait 3 sec…';
-            hint.classList.remove('hidden');
-        }
-        timer = setTimeout(runSearch, 3000);
-    });
-
     input.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
             e.preventDefault();
-            clearTimeout(timer);
             runSearch();
         }
     });
 
     if (status) {
         status.addEventListener('change', () => {
-            clearTimeout(timer);
             runSearch();
         });
     }
     if (area) {
         area.addEventListener('change', () => {
-            clearTimeout(timer);
             runSearch();
         });
     }
     if (assigned) {
         assigned.addEventListener('change', () => {
-            clearTimeout(timer);
             runSearch();
         });
     }
 })();
 </script>
+@if(($pipeline ?? 'crm') === 'operations' && !empty($opsAnalytics))
+@php
+    $opsLabels = $opsAnalytics['labels'];
+    $opsTotals = $opsAnalytics['totals'];
+    $opsSuccess = $opsAnalytics['success'];
+    $opsCancelled = $opsAnalytics['cancelled'];
+    $opsRevenue = $opsAnalytics['revenue'];
+@endphp
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    if (typeof Chart === 'undefined') return;
+
+    const bkCtx = document.getElementById('opsBookingsChart');
+    if (bkCtx) {
+        new Chart(bkCtx, {
+            type: 'bar',
+            data: {
+                labels: @json($opsLabels),
+                datasets: [
+                    {
+                        label: 'Total Bookings',
+                        data: @json($opsTotals),
+                        backgroundColor: 'rgba(79, 70, 229, 0.78)',
+                        borderRadius: 5,
+                    },
+                    {
+                        label: 'Success',
+                        data: @json($opsSuccess),
+                        backgroundColor: 'rgba(5, 150, 105, 0.85)',
+                        borderRadius: 5,
+                    },
+                    {
+                        label: 'Cancelled',
+                        data: @json($opsCancelled),
+                        backgroundColor: 'rgba(225, 29, 72, 0.80)',
+                        borderRadius: 5,
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false },
+                scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
+            }
+        });
+    }
+
+    const rvCtx = document.getElementById('opsRevenueChart');
+    if (rvCtx) {
+        new Chart(rvCtx, {
+            type: 'line',
+            data: {
+                labels: @json($opsLabels),
+                datasets: [{
+                    label: 'Total Revenue (₹)',
+                    data: @json($opsRevenue),
+                    borderColor: '#0D9488',
+                    backgroundColor: 'rgba(13, 148, 136, 0.16)',
+                    borderWidth: 2.5,
+                    pointRadius: 4,
+                    tension: 0.3,
+                    fill: true,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false },
+                scales: { y: { beginAtZero: true } }
+            }
+        });
+    }
+});
+</script>
+@endif
 @endpush
