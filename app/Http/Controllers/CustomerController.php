@@ -343,18 +343,15 @@ class CustomerController extends Controller
                 }
 
                 if (! $isCancelled) {
-                    $sell = $rec->fieldValue('business_selling_price')
-                        ?? $rec->fieldValue('business_sale_price')
-                        ?? $rec->fieldValue('selling_price')
-                        ?? $rec->fieldValue('seal_price')
-                        ?? $rec->fieldValue('sale_price');
-                    if (($sell === null || $sell === '') && ($slotId = (int) data_get($rec->meta, 'booking_slot_id', 0))) {
+                    $mrpVal = $rec->fieldValue('mrp') ?? $rec->fieldValue('mrp_price');
+                    if (($mrpVal === null || $mrpVal === '') && ($slotId = (int) data_get($rec->meta, 'booking_slot_id', 0))) {
                         $slotRow = $slotsById->get($slotId);
-                        if ($slotRow && $slotRow->selling_price !== null) {
-                            $sell = $slotRow->selling_price;
+                        if ($slotRow && $slotRow->mrp !== null) {
+                            $mrpVal = $slotRow->mrp;
                         }
                     }
-                    $trendMonths[$mKey]['revenue'] += (float) (is_numeric($sell) ? $sell : 0);
+                    $cleanMrp = preg_replace('/[^0-9.\-]/', '', (string) ($mrpVal ?? ''));
+                    $trendMonths[$mKey]['revenue'] += (float) (is_numeric($cleanMrp) ? $cleanMrp : 0);
                 }
             }
 

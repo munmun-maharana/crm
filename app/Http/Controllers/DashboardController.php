@@ -91,8 +91,20 @@ class DashboardController extends Controller
                 ->count();
         }
 
-        $sourceField = CrmField::inPipeline($pipeline)->where('key', 'source')->first()
-            ?: CrmField::inPipeline('crm')->where('key', 'source')->first();
+        $findSourceField = function (string $pipe) {
+            $f = CrmField::inPipeline($pipe)->where('key', 'source')->first();
+            if ($f) {
+                return $f;
+            }
+            return CrmField::inPipeline($pipe)->ordered()->get()->first(function ($item) {
+                $k = strtolower((string) $item->key);
+                $l = strtolower((string) $item->label);
+                return str_contains($k, 'source') || str_contains($l, 'source');
+            });
+        };
+
+        $sourceField = $findSourceField($pipeline) ?: $findSourceField('crm');
+        $sourceFieldKey = $sourceField?->key ?: 'source';
         $configuredSources = collect($sourceField?->options ?? [])
             ->map(fn ($o) => trim((string) $o))
             ->filter()
@@ -109,7 +121,12 @@ class DashboardController extends Controller
 
         $leadSources = $leads()->get(['id', 'source', 'meta']);
         foreach ($leadSources as $leadRow) {
-            $src = trim((string) ($leadRow->source ?: data_get($leadRow->meta, 'source', '')));
+            $src = trim((string) (
+                data_get($leadRow->meta, $sourceFieldKey)
+                ?? $leadRow->source
+                ?? data_get($leadRow->meta, 'source')
+                ?? ''
+            ));
             if ($src === '') {
                 continue;
             }
