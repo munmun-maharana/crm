@@ -551,7 +551,21 @@
                             @if(($pipeline ?? 'crm') === 'booking')
                                 <th class="text-left font-bold px-4 py-2.5 whitespace-nowrap">Call CRM ID</th>
                             @endif
-                            <th class="text-left font-bold px-4 py-2.5 whitespace-nowrap">Date</th>
+                            @php
+                                $curDateSort = ($dateSort ?? 'desc') === 'asc' ? 'asc' : 'desc';
+                                $nextDateSort = $curDateSort === 'desc' ? 'asc' : 'desc';
+                                $dateSortUrl = route($listRoute, array_merge(request()->query(), ['date_sort' => $nextDateSort]));
+                            @endphp
+                            <th class="text-left font-bold px-4 py-2.5 whitespace-nowrap">
+                                <a href="{{ $dateSortUrl }}"
+                                   title="{{ $curDateSort === 'desc' ? 'Sorted: Recent Date First (Click for Oldest First)' : 'Sorted: Oldest Date First (Click for Recent First)' }}"
+                                   class="inline-flex items-center gap-1 hover:text-brand transition">
+                                    <span>Date</span>
+                                    <span class="inline-flex items-center justify-center w-4 h-4 rounded bg-white/90 border border-indigo-200 text-indigo-700 text-[10px] font-extrabold leading-none">
+                                        {{ $curDateSort === 'desc' ? '↓' : '↑' }}
+                                    </span>
+                                </a>
+                            </th>
                             @foreach($tableFields as $field)
                                 <th class="text-left font-bold px-4 py-2.5 whitespace-nowrap">{{ $field->label }}</th>
                             @endforeach

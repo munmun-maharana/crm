@@ -73,6 +73,8 @@ class CustomerController extends Controller
             $status = 'interested';
         }
 
+        $dateSort = strtolower($request->string('date_sort')->toString()) === 'asc' ? 'asc' : 'desc';
+
         $customers = $this->mappedCustomers($request)
             ->inPipeline($pipeline)
             ->with(['assignee', 'products'])
@@ -115,7 +117,9 @@ class CustomerController extends Controller
                             });
                     });
             })
-            ->when($filter !== 'follow_up_today', fn ($query) => $query->latest())
+            ->when($filter !== 'follow_up_today', function ($query) use ($dateSort) {
+                $query->orderByRaw("COALESCE(follow_up_at, created_at) {$dateSort}, id {$dateSort}");
+            })
             ->paginate(15)
             ->withQueryString();
 
@@ -374,13 +378,15 @@ class CustomerController extends Controller
         }
 
         return view('customers.index', compact(
-            'customers', 'agents', 'q', 'status', 'filter', 'assignedTo', 'area', 'areaOptions', 'pincodeDirectory', 'formFields', 'tableFields', 'excelFields', 'pipeline', 'listRoute', 'statusOptions', 'statusCards', 'allActiveProducts', 'productCards', 'productPending', 'opsAnalytics'
+            'customers', 'agents', 'q', 'status', 'filter', 'assignedTo', 'area', 'areaOptions', 'pincodeDirectory', 'formFields', 'tableFields', 'excelFields', 'pipeline', 'listRoute', 'statusOptions', 'statusCards', 'allActiveProducts', 'productCards', 'productPending', 'opsAnalytics', 'dateSort'
         ));
     }
 
     public function requests(Request $request): View
     {
         abort_unless($request->user()->canAccessCrm(), 403);
+        $dateSort = strtolower($request->string('date_sort')->toString()) === 'asc' ? 'asc' : 'desc';
+
         $customers = $this->mappedCustomers($request)
             ->inPipeline('crm')
             ->with('assignee')
