@@ -619,6 +619,25 @@
                                             <span class="text-slate-600">{{ $c->source ?: '—' }}</span>
                                         @elseif($field->key === 'notes')
                                             <span class="text-slate-500 line-clamp-1 max-w-[200px]" title="{{ $c->notes }}">{{ $c->notes ?: '—' }}</span>
+                                        @elseif($field->key === 'label')
+                                            @php
+                                                $lblVal = trim((string) ($c->fieldValue('label') ?? ''));
+                                                if ($lblVal === '') {
+                                                    $lblVal = 'Open';
+                                                }
+                                                $isEngaged = strtolower($lblVal) === 'engaged';
+                                            @endphp
+                                            @if($isEngaged)
+                                                <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-800 border border-amber-300 shadow-2xs">
+                                                    <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                                                    <span>Engaged</span>
+                                                </span>
+                                            @else
+                                                <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-2xs">
+                                                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                                    <span>Open</span>
+                                                </span>
+                                            @endif
                                         @else
                                             @php
                                                 $val = $c->fieldValue($field->key);

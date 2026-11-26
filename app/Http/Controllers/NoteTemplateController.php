@@ -21,16 +21,22 @@ class NoteTemplateController extends Controller
         $data = $request->validate([
             'title' => ['required', 'string', 'max:120'],
             'body' => ['required', 'string'],
+            'status' => ['nullable', 'string', 'max:60'],
         ]);
 
         $max = (int) NoteTemplate::max('sort_order');
 
-        NoteTemplate::create([
+        $template = NoteTemplate::create([
             'title' => trim($data['title']),
             'body' => trim($data['body']),
+            'status' => !empty($data['status']) ? trim($data['status']) : null,
             'sort_order' => $max + 1,
             'is_active' => true,
         ]);
+
+        if ($request->wantsJson()) {
+            return response()->json(['message' => 'Note template added.', 'template' => $template]);
+        }
 
         return back()->with('success', 'Note template added.');
     }
@@ -40,14 +46,20 @@ class NoteTemplateController extends Controller
         $data = $request->validate([
             'title' => ['required', 'string', 'max:120'],
             'body' => ['required', 'string'],
+            'status' => ['nullable', 'string', 'max:60'],
             'is_active' => ['nullable', 'boolean'],
         ]);
 
         $noteTemplate->update([
             'title' => trim($data['title']),
             'body' => trim($data['body']),
+            'status' => !empty($data['status']) ? trim($data['status']) : null,
             'is_active' => $request->boolean('is_active'),
         ]);
+
+        if ($request->wantsJson()) {
+            return response()->json(['message' => 'Template updated.', 'template' => $noteTemplate]);
+        }
 
         return back()->with('success', 'Template updated.');
     }

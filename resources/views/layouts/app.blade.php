@@ -3052,15 +3052,54 @@ function toggleMoreCustomerMessages(btnEl) {
         lbl.textContent = isHidden ? 'View More (' + moreCount + ' more)' : 'Show Less';
     }
 }
-function applyNoteTemplate(form, title, body) {
+function applyNoteTemplate(form, title, body, status) {
     if (!form) return;
     const bodyEl = form.querySelector('[name="body"]');
     const titleEl = form.querySelector('[name="title"]');
+    const statusEl = form.querySelector('[name="status_change"]');
+
     if (bodyEl) {
         bodyEl.value = body || '';
         bodyEl.focus();
     }
-    if (titleEl && title) titleEl.value = title;
+    if (titleEl && title) {
+        titleEl.value = title;
+    }
+
+    let statusToSet = (status || '').trim();
+    if (!statusToSet && (title || body)) {
+        const text = ((title || '') + ' ' + (body || '')).toLowerCase();
+        if (text.includes('call back') || text.includes('callback') || text.includes('follow up') || text.includes('follow-up') || text.includes('visit') || text.includes('when required')) {
+            statusToSet = 'Follow Up';
+        } else if (text.includes('not connected') || text.includes('unreachable') || text.includes('switched off')) {
+            statusToSet = 'Not Connected';
+        } else if (text.includes('rnr') || text.includes('not responding') || text.includes('ringing')) {
+            statusToSet = 'RNR';
+        } else if (text.includes('not interested') || text.includes('declined') || text.includes('rejected')) {
+            statusToSet = 'Not Interested';
+        } else if (text.includes('converted') || text.includes('booked')) {
+            statusToSet = 'Converted';
+        }
+    }
+
+    if (statusToSet && statusEl) {
+        let matched = false;
+        for (let i = 0; i < statusEl.options.length; i++) {
+            if (statusEl.options[i].value.toLowerCase() === statusToSet.toLowerCase()) {
+                statusEl.selectedIndex = i;
+                matched = true;
+                break;
+            }
+        }
+        if (!matched) {
+            statusEl.add(new Option(statusToSet, statusToSet));
+            statusEl.value = statusToSet;
+        }
+        statusEl.dispatchEvent(new Event('change'));
+        if (statusEl.dataset.cid) {
+            handleStatusChangeFollowUp(statusEl.dataset.cid, statusEl.value);
+        }
+    }
 }
 
 function openCrmChannel(url, channel) {

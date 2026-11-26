@@ -625,7 +625,7 @@ class CustomerController extends Controller
             'products',
         ]);
         $formFields = $this->formFieldsFor($request, $customer->pipeline ?? 'crm');
-        $noteTemplates = NoteTemplate::active()->ordered()->get(['id', 'title', 'body']);
+        $noteTemplates = NoteTemplate::active()->ordered()->get(['id', 'title', 'body', 'status']);
         $statusField = CrmField::inPipeline($customer->pipeline ?? 'crm')->where('key', 'status')->first();
         $statusOptions = ! empty($statusField?->options)
             ? $statusField->options
@@ -985,14 +985,8 @@ class CustomerController extends Controller
         ]);
 
         if ($isCallCrm && $isAssignServiceRequested) {
-            if (! $statusChanged || $targetStatus === null || strtolower((string)$targetStatus) === strtolower((string)$oldStatus)) {
-                $targetStatus = 'Engaged';
-                $statusChanged = true;
-                $customerData['status'] = 'Engaged';
-                if ($title === '') {
-                    $title = 'Assigned to Service · '.$oldStatus.' → Engaged';
-                }
-            }
+            $currentMeta['label'] = 'Engaged';
+            $customerData['meta'] = $currentMeta;
         }
 
         if ($statusChanged) {
@@ -1133,39 +1127,47 @@ class CustomerController extends Controller
             $mainCallCrmCustomer = Customer::find($customer->source_customer_id);
             if ($mainCallCrmCustomer && $mainCallCrmCustomer->isCallCrm()) {
                 $lowerTarget = strtolower(trim((string) $targetStatus));
-                if (in_array($lowerTarget, ['success', 'completed', 'done'], true)) {
-                    // Success -> Call CRM status becomes 'Existing'
+                if (in_array($lowerTarget, ['success', 'completed', 'done', 'converted'], true)) {
+                    // Success -> Call CRM status becomes 'Existing' AND label reset to 'Open'
+                    $mainMeta = is_array($mainCallCrmCustomer->meta) ? $mainCallCrmCustomer->meta : [];
+                    $mainMeta['label'] = 'Open';
                     $mainCallCrmCustomer->update([
                         'status' => 'Existing',
+                        'meta' => $mainMeta,
                         'last_contact_at' => now(),
                     ]);
                     CustomerActivity::create([
                         'customer_id' => $mainCallCrmCustomer->id,
                         'user_id' => $request->user()->id,
                         'type' => 'status',
-                        'title' => 'Service Completed · Status → Existing',
-                        'body' => 'Service #' . $customer->id . ' completed successfully. Call CRM status updated to Existing.',
+                        'title' => 'Service Completed · Status → Existing (Label → Open)',
+                        'body' => 'Service #' . $customer->id . ' completed successfully. Call CRM status updated to Existing and Label reset to Open.',
                         'meta' => [
                             'status_from' => $mainCallCrmCustomer->status,
                             'status_to' => 'Existing',
+                            'label' => 'Open',
                             'service_id' => $customer->id,
                         ],
                     ]);
                 } elseif (in_array($lowerTarget, ['cancelled', 'cancel', 'lost'], true)) {
-                    // Cancelled -> Call CRM status reverts to 'Pending'
+                    // Cancelled -> Call CRM status reverts to 'Pending' AND label reset to 'Open'
+                    $mainMeta = is_array($mainCallCrmCustomer->meta) ? $mainCallCrmCustomer->meta : [];
+                    $mainMeta['label'] = 'Open';
                     $mainCallCrmCustomer->update([
                         'status' => 'Pending',
+                        'meta' => $mainMeta,
                         'last_contact_at' => now(),
                     ]);
                     CustomerActivity::create([
                         'customer_id' => $mainCallCrmCustomer->id,
                         'user_id' => $request->user()->id,
                         'type' => 'status',
-                        'title' => 'Service Cancelled · Status → Pending',
-                        'body' => 'Service #' . $customer->id . ' was cancelled. Reason: ' . ($body ?: 'No reason provided') . '. Call CRM status reverted to Pending.',
+                        'title' => 'Service Cancelled · Status → Pending (Label → Open)',
+                        'body' => 'Service #' . $customer->id . ' was cancelled. Reason: ' . ($body ?: 'No reason provided') . '. Call CRM status reverted to Pending and Label reset to Open.',
                         'meta' => [
                             'status_from' => $mainCallCrmCustomer->status,
                             'status_to' => 'Pending',
+                            'label' => 'Open',
                             'service_id' => $customer->id,
                         ],
                     ]);
@@ -1326,7 +1328,7 @@ class CustomerController extends Controller
                     'customer' => $customer,
                     'formFields' => $formFields,
                     'statusOptions' => $statusOptions,
-                    'noteTemplates' => NoteTemplate::active()->ordered()->get(['id', 'title', 'body']),
+                    'noteTemplates' => NoteTemplate::active()->ordered()->get(['id', 'title', 'body', 'status']),
                     'pincodeDirectory' => $this->getPincodeDirectory(),
                 ])->render(),
             ]);
@@ -1364,7 +1366,7 @@ class CustomerController extends Controller
             'html' => view('customers.partials.panel', [
                 'customer' => $customer,
                 'formFields' => $formFields,
-                'noteTemplates' => NoteTemplate::active()->ordered()->get(['id', 'title', 'body']),
+                'noteTemplates' => NoteTemplate::active()->ordered()->get(['id', 'title', 'body', 'status']),
             ])->render(),
         ]);
     }
@@ -1455,7 +1457,7 @@ class CustomerController extends Controller
             'html' => view('customers.partials.panel', [
                 'customer' => $customer,
                 'formFields' => $formFields,
-                'noteTemplates' => NoteTemplate::active()->ordered()->get(['id', 'title', 'body']),
+                'noteTemplates' => NoteTemplate::active()->ordered()->get(['id', 'title', 'body', 'status']),
             ])->render(),
         ]);
     }
@@ -1576,7 +1578,7 @@ class CustomerController extends Controller
                 'html' => view('customers.partials.panel', [
                     'customer' => $customer,
                     'formFields' => $formFields,
-                    'noteTemplates' => NoteTemplate::active()->ordered()->get(['id', 'title', 'body']),
+                    'noteTemplates' => NoteTemplate::active()->ordered()->get(['id', 'title', 'body', 'status']),
                 ])->render(),
             ]);
         }
@@ -1641,8 +1643,9 @@ class CustomerController extends Controller
         $copy->products()->sync($pids);
 
         $oldStatus = $customer->status;
+        $cMeta['label'] = 'Engaged';
         $customer->update([
-            'status' => 'Engaged',
+            // Keep customer's status unchanged, set label to Engaged
             'meta' => $cMeta,
             'last_contact_at' => now(),
         ]);
@@ -1657,10 +1660,10 @@ class CustomerController extends Controller
         CustomerActivity::create([
             'customer_id' => $customer->id,
             'user_id' => $request->user()->id,
-            'type' => 'status',
+            'type' => 'system',
             'title' => $isFirstAssign ? 'Assigned to Service' : 'Multi-Assigned to Service',
-            'body' => "Assigned to Service (#{$copy->id}) with product(s): {$productNamesStr}. Status: Engaged.",
-            'meta' => ['products' => $metaProductsPayload],
+            'body' => "Assigned to Service (#{$copy->id}) with product(s): {$productNamesStr}. Label set to Engaged.",
+            'meta' => ['products' => $metaProductsPayload, 'label' => 'Engaged'],
         ]);
 
         CustomerActivity::create([
@@ -1691,7 +1694,7 @@ class CustomerController extends Controller
                 'html' => view('customers.partials.panel', [
                     'customer' => $customer,
                     'formFields' => $formFields,
-                    'noteTemplates' => NoteTemplate::active()->ordered()->get(['id', 'title', 'body']),
+                    'noteTemplates' => NoteTemplate::active()->ordered()->get(['id', 'title', 'body', 'status']),
                     'pincodeDirectory' => $this->getPincodeDirectory(),
                 ])->render(),
             ]);

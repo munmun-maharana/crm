@@ -424,6 +424,9 @@ class Customer extends Model
         }
 
         $val = data_get($this->meta, $key);
+        if ($key === 'label' && ($val === null || $val === '')) {
+            return 'Open';
+        }
         if ($val === null || $val === '') {
             if (in_array($key, ['phone_no', 'mobile', 'contact', 'contact_no'], true)) {
                 return $this->phone;

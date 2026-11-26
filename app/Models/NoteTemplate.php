@@ -9,6 +9,7 @@ class NoteTemplate extends Model
     protected $fillable = [
         'title',
         'body',
+        'status',
         'sort_order',
         'is_active',
     ];

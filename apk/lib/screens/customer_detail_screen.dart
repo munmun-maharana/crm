@@ -381,6 +381,10 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
   void _applyNoteTemplate(NoteTemplate template) {
     _titleController.text = template.title;
     _bodyController.text = template.body;
+    if (template.status != null && template.status!.trim().isNotEmpty) {
+      _newStatus = template.status!.trim();
+      _handleStatusChange(_newStatus!);
+    }
     setState(() {});
   }
 

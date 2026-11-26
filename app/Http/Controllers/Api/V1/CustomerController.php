@@ -174,7 +174,7 @@ class CustomerController extends Controller
                 'price' => $p->price,
             ])->values(),
             'agents' => User::orderBy('name')->get(['id', 'name', 'role'])->map(fn ($u) => ['id' => $u->id, 'name' => $u->name, 'role' => $u->role])->values(),
-            'note_templates' => NoteTemplate::active()->ordered()->get(['id', 'title', 'body']),
+            'note_templates' => NoteTemplate::active()->ordered()->get(['id', 'title', 'body', 'status']),
             'permissions' => [
                 'can_assign_users' => $user->canAssignUsers(),
                 'can_bulk_map' => $user->canBulkMap(),
@@ -231,7 +231,7 @@ class CustomerController extends Controller
             'available_products' => ($customer->isCallCrm() || $customer->isBooking())
                 ? \App\Models\Product::active()->ordered()->get(['id', 'name', 'code', 'price', 'category', 'unit'])->values()
                 : [],
-            'note_templates' => NoteTemplate::active()->ordered()->get(['id', 'title', 'body']),
+            'note_templates' => NoteTemplate::active()->ordered()->get(['id', 'title', 'body', 'status']),
             'activities' => $customer->activities->sortByDesc('id')->map(fn ($a) => $this->activityPayload($a))->values(),
             'operation_setting' => $isOps ? null : OperationSetting::current()->only(['status', 'title', 'body']),
             'permissions' => [

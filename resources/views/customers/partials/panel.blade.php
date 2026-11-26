@@ -261,12 +261,16 @@
                         <svg class="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M21 12c0 4.418-4.03 8-9 8a9.86 9.86 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
                     </button>
                     @if($customer->isCallCrm())
-                        @if($customer->bookingCopy)
-                            <span title="Assigned to Service"
-                                  class="h-7 inline-flex items-center justify-center px-2 rounded-md bg-emerald-100/90 text-emerald-800 text-[10px] font-bold whitespace-nowrap">
-                                Assigned to Service
-                            </span>
-                        @endif
+                        @php
+                            $custLabel = trim((string) ($customer->fieldValue('label') ?? ''));
+                            if ($custLabel === '') $custLabel = 'Open';
+                            $isLabelEngaged = strtolower($custLabel) === 'engaged';
+                        @endphp
+                        <span title="Label: {{ $custLabel }}"
+                              class="h-7 inline-flex items-center justify-center gap-1 px-2.5 rounded-md text-[11px] font-bold whitespace-nowrap {{ $isLabelEngaged ? 'bg-amber-100 text-amber-800 border border-amber-300' : 'bg-emerald-100 text-emerald-800 border border-emerald-300' }}">
+                            <span class="w-1.5 h-1.5 rounded-full {{ $isLabelEngaged ? 'bg-amber-500' : 'bg-emerald-500' }}"></span>
+                            <span>{{ $custLabel }}</span>
+                        </span>
                     @endif
                     @if($customer->isBooking() && $customer->source_customer_id)
                         <span title="Source: Call CRM #{{ $customer->source_customer_id }}"
@@ -1056,14 +1060,45 @@
                                 </button>
                             </div>
                         @endif
-                        {{-- Section 1: Status + Internal Message + Note (Soft Violet Tint) --}}
-                        <div class="rounded-lg bg-violet-50/60 p-2 space-y-1.5">
+                        {{-- Section 1: Interaction & Call Outcome (Quick Notes, Status, Title, Note, Follow-up) --}}
+                        <div class="rounded-lg bg-violet-50/70 border border-violet-200/80 p-2 space-y-1.5">
+                            @php $noteTemplates = $noteTemplates ?? collect(); @endphp
+                            @if($noteTemplates->isNotEmpty())
+                                <div class="space-y-1">
+                                    <div class="flex items-center justify-between gap-1">
+                                        <span class="text-[9.5px] font-extrabold uppercase tracking-wider text-violet-700 flex items-center gap-1">
+                                            <svg class="w-3 h-3 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                                            <span>Quick Notes</span>
+                                        </span>
+                                        <span class="text-[9px] text-violet-500 font-medium">Click to set note & status</span>
+                                    </div>
+                                    <div class="flex items-center gap-1.5 overflow-x-auto whitespace-nowrap crm-scroll py-0.5 max-w-full">
+                                        @foreach($noteTemplates as $tpl)
+                                            <button type="button"
+                                                    title="{{ $tpl->body }}{{ $tpl->status ? ' [Sets status: ' . $tpl->status . ']' : '' }}"
+                                                    data-tpl-title="{{ $tpl->title }}"
+                                                    data-tpl-body="{{ $tpl->body }}"
+                                                    data-tpl-status="{{ $tpl->status ?? '' }}"
+                                                    onclick="applyNoteTemplate(this.closest('form'), this.dataset.tplTitle, this.dataset.tplBody, this.dataset.tplStatus)"
+                                                    class="shrink-0 inline-flex items-center gap-1 rounded-full border border-violet-300 bg-white hover:border-violet-600 hover:bg-violet-600 hover:text-white px-2.5 py-0.5 text-[10.5px] font-semibold text-violet-900 shadow-2xs transition group cursor-pointer">
+                                                <span>{{ $tpl->title }}</span>
+                                                @if(!empty($tpl->status))
+                                                    <span class="px-1.5 py-0.2 rounded-full text-[8.5px] font-bold bg-violet-100 text-violet-700 group-hover:bg-white group-hover:text-violet-800 border border-violet-200">
+                                                        {{ $tpl->status }}
+                                                    </span>
+                                                @endif
+                                            </button>
+                                        @endforeach
+                                    </div>
+                                </div>
+                            @endif
+
                             <div class="flex items-center gap-1.5">
                                 <div class="relative shrink-0">
                                     <select name="status_change"
                                             data-cid="{{ $customer->id }}"
                                             onchange="handleStatusChangeFollowUp(this.dataset.cid, this.value)"
-                                            class="h-7 appearance-none rounded-md border border-violet-200 bg-white hover:bg-white focus:bg-white focus:border-brand focus:ring-2 focus:ring-brand/20 pl-2 pr-6 text-[11.5px] font-medium text-ink outline-none transition">
+                                            class="h-7.5 appearance-none rounded-md border border-violet-300 bg-white hover:bg-white focus:bg-white focus:border-brand focus:ring-2 focus:ring-brand/20 pl-2.5 pr-6 text-[11.5px] font-semibold text-ink outline-none transition">
                                         <option value="">Status</option>
                                         @php $matchedExisting = false; @endphp
                                         @foreach($statusOptions as $s)
@@ -1081,30 +1116,75 @@
                                 </div>
 
                                 <input name="title" placeholder="Internal message / short title…"
-                                       class="h-7 flex-1 min-w-0 rounded-md border border-violet-200 bg-white px-2.5 text-[11.5px] outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 transition">
+                                       class="h-7.5 flex-1 min-w-0 rounded-md border border-violet-300 bg-white px-2.5 text-[11.5px] outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 transition">
                             </div>
 
                             <textarea name="body" id="activityBody-{{ $customer->id }}" rows="2" placeholder="What happened / note…"
                                       @keydown.enter.exact="if(!$event.shiftKey) { $event.preventDefault(); $el.closest('form').requestSubmit(); }"
-                                      class="w-full rounded-md border border-violet-200 bg-white px-2.5 py-1 text-[11.5px] leading-snug outline-none resize-y min-h-[46px]
+                                      class="w-full rounded-md border border-violet-300 bg-white px-2.5 py-1 text-[11.5px] leading-snug outline-none resize-y min-h-[46px]
                                              focus:bg-white focus:border-brand focus:ring-2 focus:ring-brand/20 transition"></textarea>
 
-                            @php $noteTemplates = $noteTemplates ?? collect(); @endphp
-                            @if($noteTemplates->isNotEmpty())
-                                <div class="flex items-center gap-1 overflow-x-auto whitespace-nowrap crm-scroll py-0.5 max-w-full">
-                                    <span class="shrink-0 text-[9px] font-extrabold uppercase tracking-wider text-violet-500 mr-0.5">Quick notes:</span>
-                                    @foreach($noteTemplates as $tpl)
-                                        <button type="button"
-                                                title="{{ $tpl->body }}"
-                                                data-tpl-title="{{ $tpl->title }}"
-                                                data-tpl-body="{{ $tpl->body }}"
-                                                onclick="applyNoteTemplate(this.closest('form'), this.dataset.tplTitle, this.dataset.tplBody)"
-                                                class="shrink-0 inline-flex items-center rounded-full border border-violet-200 bg-white hover:border-brand hover:bg-brand-soft hover:text-brand px-2 py-0.5 text-[10px] font-medium text-slate-600 transition">
-                                            {{ $tpl->title }}
-                                        </button>
-                                    @endforeach
+                            {{-- Follow-up controls right under note in the interaction block --}}
+                            <div class="rounded-md border border-violet-200/90 bg-white/90 p-1.5 flex items-center justify-between gap-1.5 flex-wrap">
+                                <div class="inline-flex flex-wrap items-center gap-1.5 max-w-full">
+                                    <label class="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10.5px] font-bold cursor-pointer transition
+                                                  has-[:checked]:bg-amber-100 has-[:checked]:text-amber-900 text-slate-700 hover:bg-slate-100">
+                                        <input type="checkbox" name="follow_up" value="1" id="followUpCheck-{{ $customer->id }}"
+                                               data-cid="{{ $customer->id }}"
+                                               class="w-3.5 h-3.5 rounded border-line text-amber-600 focus:ring-amber-500/30"
+                                               @checked($customer->follow_up)
+                                               onchange="toggleFollowUpFields(this.dataset.cid, this.checked)">
+                                        <span>Follow up</span>
+                                    </label>
+                                    <div id="followUpFields-{{ $customer->id }}"
+                                         class="{{ $customer->follow_up ? 'flex' : 'hidden' }} items-center gap-1 flex-wrap"
+                                         style="{{ $customer->follow_up ? 'display: flex;' : 'display: none;' }}">
+                                        <div class="inline-flex items-center rounded border border-line bg-white overflow-hidden">
+                                            <button type="button"
+                                                    data-cid="{{ $customer->id }}"
+                                                    onclick="shiftFollowUpDate(this.dataset.cid, -1)"
+                                                    title="Previous day"
+                                                    class="px-1.5 py-0.5 bg-mist/60 hover:bg-brand-soft hover:text-brand text-slate-700 font-bold text-[11px] border-r border-line transition">‹</button>
+                                            <input type="date" name="follow_up_date" id="followUpDate-{{ $customer->id }}"
+                                                   value="{{ $customer->follow_up && $customer->follow_up_at ? $customer->follow_up_at->format('Y-m-d') : ($customer->follow_up_at?->format('Y-m-d') ?: now()->addDay()->format('Y-m-d')) }}"
+                                                   title="Follow-up date"
+                                                   class="bg-white px-1.5 py-0.5 text-[10.5px] outline-none focus:bg-brand-soft/20">
+                                            <button type="button"
+                                                    data-cid="{{ $customer->id }}"
+                                                    onclick="shiftFollowUpDate(this.dataset.cid, 1)"
+                                                    title="Next day"
+                                                    class="px-1.5 py-0.5 bg-mist/60 hover:bg-brand-soft hover:text-brand text-slate-700 font-bold text-[11px] border-l border-line transition">›</button>
+                                        </div>
+                                        <label class="inline-flex items-center gap-1 rounded px-1 py-0.5 text-[10.5px] font-semibold cursor-pointer transition
+                                                      has-[:checked]:bg-brand-soft has-[:checked]:text-brand text-slate-700 hover:bg-slate-100">
+                                            <input type="checkbox" name="follow_up_time_on" value="1" id="followUpTimeOn-{{ $customer->id }}"
+                                                   data-cid="{{ $customer->id }}"
+                                                   class="w-3.5 h-3.5 rounded border-line text-brand focus:ring-brand/30"
+                                                   @checked($customer->follow_up && $customer->follow_up_has_time)
+                                                   onchange="toggleFollowUpTime(this.dataset.cid, this.checked)">
+                                            <span>Time</span>
+                                        </label>
+                                        <div id="followUpTimeWrap-{{ $customer->id }}"
+                                             class="{{ ($customer->follow_up && $customer->follow_up_has_time) ? 'inline-flex' : 'hidden' }} items-center rounded border border-line bg-white overflow-hidden"
+                                             style="{{ ($customer->follow_up && $customer->follow_up_has_time) ? 'display: inline-flex;' : 'display: none;' }}">
+                                            <button type="button"
+                                                    data-cid="{{ $customer->id }}"
+                                                    onclick="shiftFollowUpTime(this.dataset.cid, -30)"
+                                                    title="Previous 30 min"
+                                                    class="px-1.5 py-0.5 bg-mist/60 hover:bg-brand-soft hover:text-brand text-slate-700 font-bold text-[11px] border-r border-line transition">‹</button>
+                                            <input type="time" name="follow_up_time" id="followUpTime-{{ $customer->id }}"
+                                                   value="{{ ($customer->follow_up && $customer->follow_up_has_time) ? $customer->follow_up_at?->format('H:i') : '' }}"
+                                                   title="Follow-up time"
+                                                   class="bg-white px-1.5 py-0.5 text-[10.5px] outline-none focus:bg-brand-soft/20">
+                                            <button type="button"
+                                                    data-cid="{{ $customer->id }}"
+                                                    onclick="shiftFollowUpTime(this.dataset.cid, 30)"
+                                                    title="Next 30 min"
+                                                    class="px-1.5 py-0.5 bg-mist/60 hover:bg-brand-soft hover:text-brand text-slate-700 font-bold text-[11px] border-l border-line transition">›</button>
+                                        </div>
+                                    </div>
                                 </div>
-                            @endif
+                            </div>
                         </div>
 
                         {{-- Section 2: Update Fields in a Clean 2-Column Grid (Soft Emerald Tint) --}}
@@ -1356,74 +1436,13 @@
                             </div>
                         @endif
 
-                        {{-- Section 3: Bottom Footer Bar: Left = Follow up controls | Right = Post Update button (Soft Amber Tint) --}}
-                        <div class="mt-auto rounded-lg bg-amber-50/60 p-1.5 flex items-center justify-between gap-1.5 flex-wrap">
-                            <div class="inline-flex flex-wrap items-center gap-1 rounded-lg bg-white/90 p-0.5 max-w-full">
-                                <label class="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10.5px] font-semibold cursor-pointer transition
-                                              has-[:checked]:bg-amber-100 has-[:checked]:text-amber-900 text-slate-600 hover:bg-white">
-                                    <input type="checkbox" name="follow_up" value="1" id="followUpCheck-{{ $customer->id }}"
-                                           data-cid="{{ $customer->id }}"
-                                           class="w-3.5 h-3.5 rounded border-line text-amber-600 focus:ring-amber-500/30"
-                                           @checked($customer->follow_up)
-                                           onchange="toggleFollowUpFields(this.dataset.cid, this.checked)">
-                                    Follow up
-                                </label>
-                                <div id="followUpFields-{{ $customer->id }}"
-                                     class="{{ $customer->follow_up ? 'flex' : 'hidden' }} items-center gap-1 flex-wrap"
-                                     style="{{ $customer->follow_up ? 'display: flex;' : 'display: none;' }}">
-                                    <div class="inline-flex items-center rounded border border-line bg-white overflow-hidden">
-                                        <button type="button"
-                                                data-cid="{{ $customer->id }}"
-                                                onclick="shiftFollowUpDate(this.dataset.cid, -1)"
-                                                title="Previous day"
-                                                class="px-1.5 py-0.5 bg-mist/60 hover:bg-brand-soft hover:text-brand text-slate-700 font-bold text-[11px] border-r border-line transition">‹</button>
-                                        <input type="date" name="follow_up_date" id="followUpDate-{{ $customer->id }}"
-                                               value="{{ $customer->follow_up && $customer->follow_up_at ? $customer->follow_up_at->format('Y-m-d') : ($customer->follow_up_at?->format('Y-m-d') ?: now()->addDay()->format('Y-m-d')) }}"
-                                               title="Follow-up date"
-                                               class="bg-white px-1.5 py-0.5 text-[10.5px] outline-none focus:bg-brand-soft/20">
-                                        <button type="button"
-                                                data-cid="{{ $customer->id }}"
-                                                onclick="shiftFollowUpDate(this.dataset.cid, 1)"
-                                                title="Next day"
-                                                class="px-1.5 py-0.5 bg-mist/60 hover:bg-brand-soft hover:text-brand text-slate-700 font-bold text-[11px] border-l border-line transition">›</button>
-                                    </div>
-                                    <label class="inline-flex items-center gap-1 rounded px-1 py-0.5 text-[10.5px] font-semibold cursor-pointer transition
-                                                  has-[:checked]:bg-brand-soft has-[:checked]:text-brand text-slate-600 hover:bg-white">
-                                        <input type="checkbox" name="follow_up_time_on" value="1" id="followUpTimeOn-{{ $customer->id }}"
-                                               data-cid="{{ $customer->id }}"
-                                               class="w-3.5 h-3.5 rounded border-line text-brand focus:ring-brand/30"
-                                               @checked($customer->follow_up && $customer->follow_up_has_time)
-                                               onchange="toggleFollowUpTime(this.dataset.cid, this.checked)">
-                                        Time
-                                    </label>
-                                    <div id="followUpTimeWrap-{{ $customer->id }}"
-                                         class="{{ ($customer->follow_up && $customer->follow_up_has_time) ? 'inline-flex' : 'hidden' }} items-center rounded border border-line bg-white overflow-hidden"
-                                         style="{{ ($customer->follow_up && $customer->follow_up_has_time) ? 'display: inline-flex;' : 'display: none;' }}">
-                                        <button type="button"
-                                                data-cid="{{ $customer->id }}"
-                                                onclick="shiftFollowUpTime(this.dataset.cid, -30)"
-                                                title="Previous 30 min"
-                                                class="px-1.5 py-0.5 bg-mist/60 hover:bg-brand-soft hover:text-brand text-slate-700 font-bold text-[11px] border-r border-line transition">‹</button>
-                                        <input type="time" name="follow_up_time" id="followUpTime-{{ $customer->id }}"
-                                               value="{{ ($customer->follow_up && $customer->follow_up_has_time) ? $customer->follow_up_at?->format('H:i') : '' }}"
-                                               title="Follow-up time"
-                                               class="bg-white px-1.5 py-0.5 text-[10.5px] outline-none focus:bg-brand-soft/20">
-                                        <button type="button"
-                                                data-cid="{{ $customer->id }}"
-                                                onclick="shiftFollowUpTime(this.dataset.cid, 30)"
-                                                title="Next 30 min"
-                                                class="px-1.5 py-0.5 bg-mist/60 hover:bg-brand-soft hover:text-brand text-slate-700 font-bold text-[11px] border-l border-line transition">›</button>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="w-full sm:w-auto ml-auto inline-flex items-center gap-1.5 flex-wrap justify-end">
-                                <button type="submit"
-                                        class="h-9 inline-flex items-center justify-center gap-2 rounded-xl bg-brand hover:bg-brand-dark text-white text-[13px] font-bold px-5 shadow-sm shadow-brand/20 transition whitespace-nowrap">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
-                                    <span>Post Update</span>
-                                </button>
-                            </div>
+                        {{-- Section 4: Action Footer --}}
+                        <div class="mt-auto pt-1.5 flex items-center justify-end">
+                            <button type="submit"
+                                    class="h-9 inline-flex items-center justify-center gap-2 rounded-xl bg-brand hover:bg-brand-dark text-white text-[13px] font-bold px-5 shadow-sm shadow-brand/20 transition cursor-pointer">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
+                                <span>Post Update</span>
+                            </button>
                         </div>
                     </div>
                 </form>

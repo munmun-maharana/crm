@@ -828,11 +828,27 @@
                 <p class="text-[11px] text-slate-400 mb-3">Title shows as chip · body goes into the note</p>
                 <form method="POST" action="{{ route('note-templates.store') }}" class="space-y-2.5">
                     @csrf
-                    <input name="title" required maxlength="120" placeholder="Title * e.g. Not at Sir"
-                           class="w-full rounded-lg border border-line px-3 py-2 text-[13px]">
-                    <textarea name="body" required rows="4" placeholder="Note text * e.g. Customer not responding the call"
-                              class="w-full rounded-lg border border-line px-3 py-2 text-[13px]"></textarea>
-                    <button class="w-full rounded-lg bg-brand hover:bg-brand-dark text-white font-semibold py-2 text-[13px] transition">
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Title *</label>
+                        <input name="title" required maxlength="120" placeholder="e.g. Call Back Later"
+                               class="w-full rounded-lg border border-line px-3 py-2 text-[13px]">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Set Status (Optional)</label>
+                        <select name="status" class="w-full rounded-lg border border-line px-3 py-2 text-[13px] bg-white">
+                            <option value="">-- No Status Change --</option>
+                            @foreach(['Follow Up', 'Cool Follow Up', 'Pending', 'Interested', 'Converted', 'Not Interested', 'Hold', 'RNR', 'Not Connected', 'Completed', 'Engaged', 'Existing'] as $optSt)
+                                <option value="{{ $optSt }}">{{ $optSt }}</option>
+                            @endforeach
+                        </select>
+                        <p class="text-[10px] text-slate-400 mt-0.5">Clicking this quick note will also set the customer's status</p>
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Note Body *</label>
+                        <textarea name="body" required rows="3" placeholder="e.g. Customer requested to call back later"
+                                  class="w-full rounded-lg border border-line px-3 py-2 text-[13px]"></textarea>
+                    </div>
+                    <button class="w-full rounded-lg bg-brand hover:bg-brand-dark text-white font-semibold py-2 text-[13px] transition cursor-pointer">
                         Save template
                     </button>
                 </form>
@@ -848,9 +864,19 @@
                             @csrf @method('PUT')
                             <div class="flex items-start gap-2">
                                 <div class="flex-1 min-w-0 space-y-2">
-                                    <input name="title" value="{{ $t->title }}" required
-                                           class="w-full rounded-lg border border-line px-3 py-1.5 text-[13px] font-semibold">
-                                    <textarea name="body" required rows="2"
+                                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                        <input name="title" value="{{ $t->title }}" required placeholder="Title"
+                                               class="w-full rounded-lg border border-line px-3 py-1.5 text-[13px] font-semibold">
+                                        <select name="status" class="w-full rounded-lg border border-line px-3 py-1.5 text-[12px] bg-white">
+                                            <option value="">-- No Status Change --</option>
+                                            @foreach(['Follow Up', 'Cool Follow Up', 'Pending', 'Interested', 'Converted', 'Not Interested', 'Hold', 'RNR', 'Not Connected', 'Completed', 'Engaged', 'Existing'] as $optSt)
+                                                <option value="{{ $optSt }}" @selected(strtolower(trim((string)$t->status)) === strtolower(trim($optSt)))>
+                                                    Status: {{ $optSt }}
+                                                </option>
+                                            @endforeach
+                                        </select>
+                                    </div>
+                                    <textarea name="body" required rows="2" placeholder="Note body"
                                               class="w-full rounded-lg border border-line px-3 py-1.5 text-[13px]">{{ $t->body }}</textarea>
                                     <label class="inline-flex items-center gap-2 text-[12px] text-slate-600">
                                         <input type="checkbox" name="is_active" value="1" @checked($t->is_active)
@@ -860,7 +886,7 @@
                                 </div>
                                 <div class="flex items-center gap-1.5 shrink-0 pt-0.5">
                                     <button type="submit" title="Save"
-                                            class="w-8 h-8 inline-flex items-center justify-center rounded-lg border border-line text-brand hover:bg-brand-soft">
+                                            class="w-8 h-8 inline-flex items-center justify-center rounded-lg border border-line text-brand hover:bg-brand-soft cursor-pointer">
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
                                     </button>
                                 </div>

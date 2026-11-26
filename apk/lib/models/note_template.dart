@@ -2,6 +2,7 @@ class NoteTemplate {
   final int id;
   final String title;
   final String body;
+  final String? status;
   final int sortOrder;
   final bool isActive;
 
@@ -9,6 +10,7 @@ class NoteTemplate {
     required this.id,
     required this.title,
     required this.body,
+    this.status,
     this.sortOrder = 0,
     this.isActive = true,
   });
@@ -18,6 +20,7 @@ class NoteTemplate {
       id: json['id'] as int? ?? 0,
       title: json['title']?.toString() ?? '',
       body: json['body']?.toString() ?? '',
+      status: json['status']?.toString(),
       sortOrder: json['sort_order'] as int? ?? 0,
       isActive: json['is_active'] != false,
     );

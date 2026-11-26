@@ -40,7 +40,7 @@ class SettingsController extends Controller
                 'products' => $this->fieldsPayload(CrmField::inPipeline('products')->ordered()->get()),
             ],
             'crm_field_keys' => $crmFields->map(fn ($f) => ['key' => $f->key, 'label' => $f->label])->values(),
-            'note_templates' => NoteTemplate::ordered()->get(['id', 'title', 'body', 'sort_order', 'is_active']),
+            'note_templates' => NoteTemplate::ordered()->get(['id', 'title', 'body', 'status', 'sort_order', 'is_active']),
             'operation_setting' => OperationSetting::current()->only(['status', 'title', 'body']),
             'operation_statuses' => $opStatuses,
             'whatsapp_setting' => WhatsappSetting::current()->only(['phone', 'message_template']),

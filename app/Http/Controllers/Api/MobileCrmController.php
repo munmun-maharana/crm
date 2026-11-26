@@ -49,7 +49,7 @@ class MobileCrmController extends Controller
                 : [],
             'statuses' => $this->statuses(),
             'activity_types' => ['note', 'call', 'whatsapp', 'email', 'sms'],
-            'note_templates' => NoteTemplate::active()->ordered()->get(['id', 'title', 'body']),
+            'note_templates' => NoteTemplate::active()->ordered()->get(['id', 'title', 'body', 'status']),
             'pipeline' => $pipeline,
         ]);
     }
