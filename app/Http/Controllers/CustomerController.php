@@ -118,7 +118,17 @@ class CustomerController extends Controller
                     });
             })
             ->when($filter !== 'follow_up_today', function ($query) use ($dateSort) {
-                $query->orderByRaw("COALESCE(follow_up_at, created_at) {$dateSort}, id {$dateSort}");
+                if ($dateSort === 'asc') {
+                    $query->orderByRaw('COALESCE(follow_up_at, created_at) ASC, id ASC');
+                } else {
+                    $todayEnd = now()->endOfDay()->toDateTimeString();
+                    $query->orderByRaw(
+                        "CASE WHEN COALESCE(follow_up_at, created_at) <= ? THEN 0 ELSE 1 END ASC, " .
+                        "CASE WHEN COALESCE(follow_up_at, created_at) <= ? THEN COALESCE(follow_up_at, created_at) END DESC, " .
+                        "CASE WHEN COALESCE(follow_up_at, created_at) > ? THEN COALESCE(follow_up_at, created_at) END ASC, id DESC",
+                        [$todayEnd, $todayEnd, $todayEnd]
+                    );
+                }
             })
             ->paginate(15)
             ->withQueryString();
