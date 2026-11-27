@@ -1061,32 +1061,27 @@
                             </div>
                         @endif
                         {{-- Section 1: Interaction & Call Outcome (Quick Notes, Status, Title, Note, Follow-up) --}}
-                        <div class="rounded-lg bg-violet-50/70 border border-violet-200/80 p-2 space-y-1.5">
+                        <div class="rounded-xl bg-indigo-50 border border-indigo-200 p-2.5 space-y-2 shadow-2xs">
                             @php $noteTemplates = $noteTemplates ?? collect(); @endphp
                             @if($noteTemplates->isNotEmpty())
                                 <div class="space-y-1">
                                     <div class="flex items-center justify-between gap-1">
-                                        <span class="text-[9.5px] font-extrabold uppercase tracking-wider text-violet-700 flex items-center gap-1">
-                                            <svg class="w-3 h-3 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                                        <span class="text-[9.5px] font-extrabold uppercase tracking-wider text-indigo-800 flex items-center gap-1">
+                                            <svg class="w-3 h-3 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
                                             <span>Quick Notes</span>
                                         </span>
-                                        <span class="text-[9px] text-violet-500 font-medium">Click to set note & status</span>
+                                        <span class="text-[9px] text-indigo-500 font-medium">Click to set note & status</span>
                                     </div>
                                     <div class="flex items-center gap-1.5 overflow-x-auto whitespace-nowrap crm-scroll py-0.5 max-w-full">
                                         @foreach($noteTemplates as $tpl)
                                             <button type="button"
-                                                    title="{{ $tpl->body }}{{ $tpl->status ? ' [Sets status: ' . $tpl->status . ']' : '' }}"
+                                                    title="{{ $tpl->body }}"
                                                     data-tpl-title="{{ $tpl->title }}"
                                                     data-tpl-body="{{ $tpl->body }}"
                                                     data-tpl-status="{{ $tpl->status ?? '' }}"
                                                     onclick="applyNoteTemplate(this.closest('form'), this.dataset.tplTitle, this.dataset.tplBody, this.dataset.tplStatus)"
-                                                    class="shrink-0 inline-flex items-center gap-1 rounded-full border border-violet-300 bg-white hover:border-violet-600 hover:bg-violet-600 hover:text-white px-2.5 py-0.5 text-[10.5px] font-semibold text-violet-900 shadow-2xs transition group cursor-pointer">
+                                                    class="shrink-0 inline-flex items-center rounded-full border border-indigo-300 bg-white hover:border-indigo-600 hover:bg-indigo-600 hover:text-white px-2.5 py-0.5 text-[10.5px] font-semibold text-indigo-900 shadow-2xs transition cursor-pointer">
                                                 <span>{{ $tpl->title }}</span>
-                                                @if(!empty($tpl->status))
-                                                    <span class="px-1.5 py-0.2 rounded-full text-[8.5px] font-bold bg-violet-100 text-violet-700 group-hover:bg-white group-hover:text-violet-800 border border-violet-200">
-                                                        {{ $tpl->status }}
-                                                    </span>
-                                                @endif
                                             </button>
                                         @endforeach
                                     </div>
@@ -1098,7 +1093,7 @@
                                     <select name="status_change"
                                             data-cid="{{ $customer->id }}"
                                             onchange="handleStatusChangeFollowUp(this.dataset.cid, this.value)"
-                                            class="h-7.5 appearance-none rounded-md border border-violet-300 bg-white hover:bg-white focus:bg-white focus:border-brand focus:ring-2 focus:ring-brand/20 pl-2.5 pr-6 text-[11.5px] font-semibold text-ink outline-none transition">
+                                            class="h-7.5 appearance-none rounded-md border border-indigo-200 bg-white focus:border-brand focus:ring-2 focus:ring-brand/20 pl-2.5 pr-6 text-[11.5px] font-semibold text-ink outline-none transition">
                                         <option value="">Status</option>
                                         @php $matchedExisting = false; @endphp
                                         @foreach($statusOptions as $s)
@@ -1116,16 +1111,16 @@
                                 </div>
 
                                 <input name="title" placeholder="Internal message / short title…"
-                                       class="h-7.5 flex-1 min-w-0 rounded-md border border-violet-300 bg-white px-2.5 text-[11.5px] outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 transition">
+                                       class="h-7.5 flex-1 min-w-0 rounded-md border border-indigo-200 bg-white px-2.5 text-[11.5px] outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 transition">
                             </div>
 
                             <textarea name="body" id="activityBody-{{ $customer->id }}" rows="2" placeholder="What happened / note…"
                                       @keydown.enter.exact="if(!$event.shiftKey) { $event.preventDefault(); $el.closest('form').requestSubmit(); }"
-                                      class="w-full rounded-md border border-violet-300 bg-white px-2.5 py-1 text-[11.5px] leading-snug outline-none resize-y min-h-[46px]
-                                             focus:bg-white focus:border-brand focus:ring-2 focus:ring-brand/20 transition"></textarea>
+                                      class="w-full rounded-md border border-indigo-200 bg-white px-2.5 py-1 text-[11.5px] leading-snug outline-none resize-y min-h-[46px]
+                                             focus:border-brand focus:ring-2 focus:ring-brand/20 transition"></textarea>
 
                             {{-- Follow-up controls right under note in the interaction block --}}
-                            <div class="rounded-md border border-violet-200/90 bg-white/90 p-1.5 flex items-center justify-between gap-1.5 flex-wrap">
+                            <div class="rounded-lg border border-indigo-200 bg-white p-1.5 flex items-center justify-between gap-1.5 flex-wrap">
                                 <div class="inline-flex flex-wrap items-center gap-1.5 max-w-full">
                                     <label class="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10.5px] font-bold cursor-pointer transition
                                                   has-[:checked]:bg-amber-100 has-[:checked]:text-amber-900 text-slate-700 hover:bg-slate-100">
