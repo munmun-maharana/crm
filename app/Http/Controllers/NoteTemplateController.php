@@ -26,12 +26,20 @@ class NoteTemplateController extends Controller
 
         $max = (int) NoteTemplate::max('sort_order');
 
+        $showCrm = $request->boolean('show_in_crm');
+        $showCallCrm = $request->boolean('show_in_call_crm');
+        if (! $showCrm && ! $showCallCrm) {
+            $showCrm = true;
+        }
+
         $template = NoteTemplate::create([
             'title' => trim($data['title']),
             'body' => trim($data['body']),
             'status' => !empty($data['status']) ? trim($data['status']) : null,
             'sort_order' => $max + 1,
             'is_active' => true,
+            'show_in_crm' => $showCrm,
+            'show_in_call_crm' => $showCallCrm,
         ]);
 
         if ($request->wantsJson()) {
@@ -50,11 +58,16 @@ class NoteTemplateController extends Controller
             'is_active' => ['nullable', 'boolean'],
         ]);
 
+        $showCrm = $request->boolean('show_in_crm');
+        $showCallCrm = $request->boolean('show_in_call_crm');
+
         $noteTemplate->update([
             'title' => trim($data['title']),
             'body' => trim($data['body']),
             'status' => !empty($data['status']) ? trim($data['status']) : null,
-            'is_active' => $request->boolean('is_active'),
+            'is_active' => $showCrm || $showCallCrm,
+            'show_in_crm' => $showCrm,
+            'show_in_call_crm' => $showCallCrm,
         ]);
 
         if ($request->wantsJson()) {

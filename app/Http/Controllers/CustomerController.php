@@ -641,7 +641,7 @@ class CustomerController extends Controller
             'products',
         ]);
         $formFields = $this->formFieldsFor($request, $customer->pipeline ?? 'crm');
-        $noteTemplates = NoteTemplate::active()->ordered()->get(['id', 'title', 'body', 'status']);
+        $noteTemplates = NoteTemplate::active()->forPipeline($customer->pipeline ?? 'crm')->ordered()->get(['id', 'title', 'body', 'status']);
         $statusField = CrmField::inPipeline($customer->pipeline ?? 'crm')->where('key', 'status')->first();
         $statusOptions = ! empty($statusField?->options)
             ? $statusField->options
@@ -1344,7 +1344,7 @@ class CustomerController extends Controller
                     'customer' => $customer,
                     'formFields' => $formFields,
                     'statusOptions' => $statusOptions,
-                    'noteTemplates' => NoteTemplate::active()->ordered()->get(['id', 'title', 'body', 'status']),
+                    'noteTemplates' => NoteTemplate::active()->forPipeline($customer->pipeline ?? 'crm')->ordered()->get(['id', 'title', 'body', 'status']),
                     'pincodeDirectory' => $this->getPincodeDirectory(),
                 ])->render(),
             ]);
@@ -1382,7 +1382,7 @@ class CustomerController extends Controller
             'html' => view('customers.partials.panel', [
                 'customer' => $customer,
                 'formFields' => $formFields,
-                'noteTemplates' => NoteTemplate::active()->ordered()->get(['id', 'title', 'body', 'status']),
+                'noteTemplates' => NoteTemplate::active()->forPipeline($customer->pipeline ?? 'crm')->ordered()->get(['id', 'title', 'body', 'status']),
             ])->render(),
         ]);
     }
@@ -1473,7 +1473,7 @@ class CustomerController extends Controller
             'html' => view('customers.partials.panel', [
                 'customer' => $customer,
                 'formFields' => $formFields,
-                'noteTemplates' => NoteTemplate::active()->ordered()->get(['id', 'title', 'body', 'status']),
+                'noteTemplates' => NoteTemplate::active()->forPipeline($customer->pipeline ?? 'crm')->ordered()->get(['id', 'title', 'body', 'status']),
             ])->render(),
         ]);
     }
@@ -1594,7 +1594,7 @@ class CustomerController extends Controller
                 'html' => view('customers.partials.panel', [
                     'customer' => $customer,
                     'formFields' => $formFields,
-                    'noteTemplates' => NoteTemplate::active()->ordered()->get(['id', 'title', 'body', 'status']),
+                    'noteTemplates' => NoteTemplate::active()->forPipeline($customer->pipeline ?? 'crm')->ordered()->get(['id', 'title', 'body', 'status']),
                 ])->render(),
             ]);
         }
@@ -1710,7 +1710,7 @@ class CustomerController extends Controller
                 'html' => view('customers.partials.panel', [
                     'customer' => $customer,
                     'formFields' => $formFields,
-                    'noteTemplates' => NoteTemplate::active()->ordered()->get(['id', 'title', 'body', 'status']),
+                    'noteTemplates' => NoteTemplate::active()->forPipeline($customer->pipeline ?? 'crm')->ordered()->get(['id', 'title', 'body', 'status']),
                     'pincodeDirectory' => $this->getPincodeDirectory(),
                 ])->render(),
             ]);

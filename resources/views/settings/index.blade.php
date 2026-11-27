@@ -822,12 +822,48 @@
     </div>
 
     <div x-show="tab === 'notes'" x-cloak>
-        <div class="grid grid-cols-1 xl:grid-cols-3 gap-4">
-            <div class="rounded-xl border border-sky-200/80 bg-sky-50/75 p-4 h-fit">
+        @php
+            $ntCrmStatuses = $crmNoteStatuses ?? [];
+            $ntCallCrmStatuses = $callCrmNoteStatuses ?? [];
+        @endphp
+        <div class="grid grid-cols-1 xl:grid-cols-3 gap-4"
+             x-data="{
+                crmStatuses: @js($ntCrmStatuses),
+                callCrmStatuses: @js($ntCallCrmStatuses),
+                mergedStatuses(inCrm, inCallCrm, currentVal = '') {
+                    const list = [];
+                    const seen = new Set();
+                    const add = (arr) => (arr || []).forEach(s => {
+                        const k = String(s).trim().toLowerCase();
+                        if (k && !seen.has(k)) { seen.add(k); list.push(String(s).trim()); }
+                    });
+                    if (inCrm) add(this.crmStatuses);
+                    if (inCallCrm) add(this.callCrmStatuses);
+                    if (!inCrm && !inCallCrm) { add(this.crmStatuses); add(this.callCrmStatuses); }
+                    const cur = String(currentVal || '').trim();
+                    if (cur && !seen.has(cur.toLowerCase())) list.unshift(cur);
+                    return list;
+                }
+             }">
+            <div class="rounded-xl border border-sky-200/80 bg-sky-50/75 p-4 h-fit"
+                 x-data="{ addCrm: true, addCallCrm: false, addStatus: '' }">
                 <h3 class="text-sm font-semibold mb-1 text-sky-950">Add template</h3>
                 <p class="text-[11px] text-slate-400 mb-3">Title shows as chip · body goes into the note</p>
                 <form method="POST" action="{{ route('note-templates.store') }}" class="space-y-2.5">
                     @csrf
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Show in CRM *</label>
+                        <div class="flex flex-wrap items-center gap-3 rounded-lg border border-line bg-white px-3 py-2 text-[12px] font-semibold">
+                            <label class="inline-flex items-center gap-1.5 cursor-pointer text-indigo-800">
+                                <input type="checkbox" name="show_in_crm" value="1" x-model="addCrm" class="rounded border-line text-brand">
+                                <span>CRM</span>
+                            </label>
+                            <label class="inline-flex items-center gap-1.5 cursor-pointer text-sky-800">
+                                <input type="checkbox" name="show_in_call_crm" value="1" x-model="addCallCrm" class="rounded border-line text-brand">
+                                <span>Call CRM</span>
+                            </label>
+                        </div>
+                    </div>
                     <div>
                         <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Title *</label>
                         <input name="title" required maxlength="120" placeholder="e.g. Call Back Later"
@@ -835,13 +871,13 @@
                     </div>
                     <div>
                         <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Set Status (Optional)</label>
-                        <select name="status" class="w-full rounded-lg border border-line px-3 py-2 text-[13px] bg-white">
+                        <select name="status" x-model="addStatus" class="w-full rounded-lg border border-line px-3 py-2 text-[13px] bg-white">
                             <option value="">-- No Status Change --</option>
-                            @foreach(['Follow Up', 'Cool Follow Up', 'Pending', 'Interested', 'Converted', 'Not Interested', 'Hold', 'RNR', 'Not Connected', 'Completed', 'Engaged', 'Existing'] as $optSt)
-                                <option value="{{ $optSt }}">{{ $optSt }}</option>
-                            @endforeach
+                            <template x-for="optSt in mergedStatuses(addCrm, addCallCrm, addStatus)" :key="optSt">
+                                <option :value="optSt" x-text="optSt"></option>
+                            </template>
                         </select>
-                        <p class="text-[10px] text-slate-400 mt-0.5">Clicking this quick note will also set the customer's status</p>
+                        <p class="text-[10px] text-slate-400 mt-0.5">Shows statuses from the selected CRM(s) above</p>
                     </div>
                     <div>
                         <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Note Body *</label>
@@ -859,7 +895,12 @@
                     {{ $templates->count() }} template{{ $templates->count() === 1 ? '' : 's' }}
                 </div>
                 @forelse($templates as $t)
-                    <div class="border-b border-line last:border-b-0 px-4 py-3 hover:bg-mist/30">
+                    @php
+                        $tShowCrm = (bool) ($t->show_in_crm ?? true);
+                        $tShowCallCrm = (bool) ($t->show_in_call_crm ?? false);
+                    @endphp
+                    <div class="border-b border-line last:border-b-0 px-4 py-3 hover:bg-mist/30"
+                         x-data="{ rowCrm: @js($tShowCrm), rowCallCrm: @js($tShowCallCrm), rowStatus: @js((string) ($t->status ?? '')) }">
                         <form method="POST" action="{{ route('note-templates.update', $t) }}" class="space-y-2">
                             @csrf @method('PUT')
                             <div class="flex items-start gap-2">
@@ -867,22 +908,27 @@
                                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                         <input name="title" value="{{ $t->title }}" required placeholder="Title"
                                                class="w-full rounded-lg border border-line px-3 py-1.5 text-[13px] font-semibold">
-                                        <select name="status" class="w-full rounded-lg border border-line px-3 py-1.5 text-[12px] bg-white">
+                                        <select name="status" x-model="rowStatus" class="w-full rounded-lg border border-line px-3 py-1.5 text-[12px] bg-white">
                                             <option value="">-- No Status Change --</option>
-                                            @foreach(['Follow Up', 'Cool Follow Up', 'Pending', 'Interested', 'Converted', 'Not Interested', 'Hold', 'RNR', 'Not Connected', 'Completed', 'Engaged', 'Existing'] as $optSt)
-                                                <option value="{{ $optSt }}" @selected(strtolower(trim((string)$t->status)) === strtolower(trim($optSt)))>
-                                                    Status: {{ $optSt }}
-                                                </option>
-                                            @endforeach
+                                            <template x-for="optSt in mergedStatuses(rowCrm, rowCallCrm, rowStatus)" :key="optSt">
+                                                <option :value="optSt" :selected="rowStatus.toLowerCase() === optSt.toLowerCase()" x-text="'Status: ' + optSt"></option>
+                                            </template>
                                         </select>
                                     </div>
                                     <textarea name="body" required rows="2" placeholder="Note body"
                                               class="w-full rounded-lg border border-line px-3 py-1.5 text-[13px]">{{ $t->body }}</textarea>
-                                    <label class="inline-flex items-center gap-2 text-[12px] text-slate-600">
-                                        <input type="checkbox" name="is_active" value="1" @checked($t->is_active)
-                                               class="rounded border-line text-brand">
-                                        Show in CRM
-                                    </label>
+                                    <div class="flex flex-wrap items-center gap-4 text-[12px] font-semibold">
+                                        <label class="inline-flex items-center gap-1.5 text-indigo-800 cursor-pointer">
+                                            <input type="checkbox" name="show_in_crm" value="1" x-model="rowCrm"
+                                                   class="rounded border-line text-brand">
+                                            <span>Show in CRM</span>
+                                        </label>
+                                        <label class="inline-flex items-center gap-1.5 text-sky-800 cursor-pointer">
+                                            <input type="checkbox" name="show_in_call_crm" value="1" x-model="rowCallCrm"
+                                                   class="rounded border-line text-brand">
+                                            <span>Show in Call CRM</span>
+                                        </label>
+                                    </div>
                                 </div>
                                 <div class="flex items-center gap-1.5 shrink-0 pt-0.5">
                                     <button type="submit" title="Save"

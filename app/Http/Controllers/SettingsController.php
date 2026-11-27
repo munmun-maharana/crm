@@ -54,6 +54,8 @@ class SettingsController extends Controller
         $bookingSlotSetting = BookingSlotSetting::current();
         $whatsappSetting = WhatsappSetting::current();
         $statuses = $this->statusOptions();
+        $crmNoteStatuses = $this->pipelineStatusOptions('crm');
+        $callCrmNoteStatuses = $this->pipelineStatusOptions('call_crm');
         $opFields = CrmField::inPipeline('operations')->ordered()->get();
         $userFields = CrmField::inPipeline('users')->ordered()->get();
         $pincodeFields = CrmField::inPipeline('pincodes')->ordered()->get();
@@ -72,6 +74,8 @@ class SettingsController extends Controller
             'bookingSlotSetting',
             'whatsappSetting',
             'statuses',
+            'crmNoteStatuses',
+            'callCrmNoteStatuses',
             'opFields',
             'userFields',
             'pincodeFields',
@@ -97,5 +101,21 @@ class SettingsController extends Controller
         $defaults = ['new', 'interested', 'contacted', 'converted', 'lost', 'request'];
 
         return array_values(array_unique(array_merge($defaults, $fromField)));
+    }
+
+    private function pipelineStatusOptions(string $pipeline): array
+    {
+        $field = CrmField::inPipeline($pipeline)->where('key', 'status')->first();
+        $fromField = collect($field?->options ?? [])
+            ->map(fn ($o) => trim((string) $o))
+            ->filter()
+            ->values()
+            ->all();
+
+        if (! empty($fromField)) {
+            return array_values(array_unique($fromField));
+        }
+
+        return ['New', 'Follow Up', 'Pending', 'Interested', 'Converted', 'Not Interested', 'Hold'];
     }
 }
