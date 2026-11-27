@@ -68,6 +68,10 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
 
     for (final f in _fields) {
       dynamic initialVal = widget.customer?.getMetaValue(f.key);
+      if ((initialVal == null || initialVal.toString().trim().isEmpty) &&
+          (f.type == 'phone' || f.key.toLowerCase().contains('phone'))) {
+        initialVal = widget.customer?.phone;
+      }
 
       if (initialVal == null || initialVal.toString().isEmpty) {
         if (!isEdit) {

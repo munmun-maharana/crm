@@ -295,48 +295,15 @@ class _HomeShellState extends State<HomeShell> {
             onPressed: () => Scaffold.of(ctx).openDrawer(),
           ),
         ),
-        title: Row(
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: AppTheme.primarySoft,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(5),
-                    child: Image.asset('assets/icons/app_icon.png', width: 22, height: 22, fit: BoxFit.cover),
-                  ),
-                  const SizedBox(width: 6),
-                  RichText(
-                    text: const TextSpan(
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.textMain),
-                      children: [
-                        TextSpan(text: 'Pulse'),
-                        TextSpan(text: 'CRM', style: TextStyle(color: AppTheme.primary)),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(tabs[safeIndex].label, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                  Text(
-                    '${user?['name'] ?? ""} • ${user?['role_label'] ?? ""}',
-                    style: const TextStyle(fontSize: 11, color: AppTheme.textMuted),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ),
+            Text(tabs[safeIndex].label, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15.5)),
+            Text(
+              '${user?['name'] ?? ""} • ${user?['role_label'] ?? ""}',
+              style: const TextStyle(fontSize: 11, color: AppTheme.textMuted),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ],
         ),
@@ -361,31 +328,66 @@ class _HomeShellState extends State<HomeShell> {
         index: safeIndex,
         children: tabs.map((t) => t.page).toList(),
       ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: safeIndex,
-        onDestinationSelected: (idx) {
-          setState(() {
-            _selectedIndex = idx;
-            _targetFilter = null;
-            _targetStatus = null;
-          });
-          // If switching to/from settings, refresh menu names & positions
-          if (tabs[idx].key == 'settings' || (safeIndex < tabs.length && tabs[safeIndex].key == 'settings')) {
-            _refreshMenuData();
-          }
-        },
-        backgroundColor: Colors.white,
-        indicatorColor: AppTheme.primarySoft,
-        labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-        destinations: tabs
-            .map(
+      bottomNavigationBar: Builder(
+        builder: (navCtx) {
+          final hasMore = tabs.length > 5;
+          final bottomTabs = hasMore ? tabs.take(4).toList() : tabs;
+          final bottomSelectedIndex = hasMore
+              ? (safeIndex < 4 ? safeIndex : 4)
+              : safeIndex;
+
+          final destinations = <NavigationDestination>[
+            ...bottomTabs.map(
               (t) => NavigationDestination(
-                icon: Icon(t.icon),
-                selectedIcon: Icon(t.selectedIcon, color: AppTheme.primary),
+                icon: Icon(t.icon, size: 20),
+                selectedIcon: Icon(t.selectedIcon, size: 20, color: AppTheme.primary),
                 label: t.label,
               ),
-            )
-            .toList(),
+            ),
+            if (hasMore)
+              const NavigationDestination(
+                icon: Icon(Icons.menu_rounded, size: 20),
+                selectedIcon: Icon(Icons.menu_open_rounded, size: 20, color: AppTheme.primary),
+                label: 'More',
+              ),
+          ];
+
+          return NavigationBarTheme(
+            data: NavigationBarThemeData(
+              labelTextStyle: WidgetStateProperty.resolveWith((states) {
+                final selected = states.contains(WidgetState.selected);
+                return TextStyle(
+                  fontSize: 10.5,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                  color: selected ? AppTheme.primary : AppTheme.textMuted,
+                  overflow: TextOverflow.ellipsis,
+                );
+              }),
+            ),
+            child: NavigationBar(
+              height: 58,
+              selectedIndex: bottomSelectedIndex,
+              onDestinationSelected: (idx) {
+                if (hasMore && idx == 4) {
+                  Scaffold.of(navCtx).openDrawer();
+                  return;
+                }
+                setState(() {
+                  _selectedIndex = idx;
+                  _targetFilter = null;
+                  _targetStatus = null;
+                });
+                if (tabs[idx].key == 'settings' || (safeIndex < tabs.length && tabs[safeIndex].key == 'settings')) {
+                  _refreshMenuData();
+                }
+              },
+              backgroundColor: Colors.white,
+              indicatorColor: AppTheme.primarySoft,
+              labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+              destinations: destinations,
+            ),
+          );
+        },
       ),
     ),
     );

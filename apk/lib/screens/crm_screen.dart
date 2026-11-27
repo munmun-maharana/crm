@@ -265,6 +265,21 @@ class _CrmScreenState extends State<CrmScreen> {
                             _onSearch('');
                           },
                         ),
+                      InkWell(
+                        onTap: () => _onSearch(_searchController.text),
+                        borderRadius: BorderRadius.circular(6),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFE11D48),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: const Text(
+                            'Search',
+                            style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -509,9 +524,9 @@ class _CrmScreenState extends State<CrmScreen> {
                         : RefreshIndicator(
                             onRefresh: () => _fetchCustomers(page: _currentPage),
                             child: ListView.separated(
-                              padding: const EdgeInsets.all(12),
+                              padding: const EdgeInsets.all(8),
                               itemCount: _customers.length,
-                              separatorBuilder: (_, __) => const SizedBox(height: 8),
+                              separatorBuilder: (_, __) => const SizedBox(height: 6),
                               itemBuilder: (context, index) {
                                 final c = _customers[index];
                                 final isSelected = _selectedIds.contains(c.id);
@@ -535,7 +550,7 @@ class _CrmScreenState extends State<CrmScreen> {
                                     },
                                     onLongPress: () => _toggleSelect(c.id),
                                     child: Padding(
-                                      padding: const EdgeInsets.all(12),
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                                       child: Row(
                                         crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
@@ -554,11 +569,26 @@ class _CrmScreenState extends State<CrmScreen> {
                                                     Expanded(
                                                       child: Text(
                                                         c.name,
-                                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
                                                         maxLines: 1,
                                                         overflow: TextOverflow.ellipsis,
                                                       ),
                                                     ),
+                                                    if ((c.source ?? '').trim().isNotEmpty) ...[
+                                                      Container(
+                                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                        decoration: BoxDecoration(
+                                                          color: AppTheme.indigoSoft,
+                                                          borderRadius: BorderRadius.circular(5),
+                                                          border: Border.all(color: AppTheme.indigoBorder),
+                                                        ),
+                                                        child: Text(
+                                                          c.source!.trim(),
+                                                          style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: AppTheme.indigoText),
+                                                        ),
+                                                      ),
+                                                      const SizedBox(width: 4),
+                                                    ],
                                                     Container(
                                                       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                                                       decoration: BoxDecoration(
@@ -568,7 +598,7 @@ class _CrmScreenState extends State<CrmScreen> {
                                                       ),
                                                       child: Text(
                                                         (c.status ?? 'New').toUpperCase(),
-                                                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.statusText(c.status)),
+                                                        style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: AppTheme.statusText(c.status)),
                                                       ),
                                                     ),
                                                   ],

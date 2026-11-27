@@ -378,6 +378,14 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
     }
   }
 
+  void _handleStatusChange(String status) {
+    final lower = status.toLowerCase();
+    if (lower.contains('follow') || lower == 'hold' || lower == 'pending') {
+      _followUp = true;
+      _followUpDate ??= DateTime.now().add(const Duration(days: 1));
+    }
+  }
+
   void _applyNoteTemplate(NoteTemplate template) {
     _titleController.text = template.title;
     _bodyController.text = template.body;

@@ -111,57 +111,58 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return RefreshIndicator(
       onRefresh: _loadDashboard,
       child: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(12),
         children: [
           // Quick WhatsApp bar
           if (_whatsappPhone != null && _whatsappPhone!.isNotEmpty) ...[
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
                 color: const Color(0xFFDCFCE7),
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(10),
                 border: Border.all(color: const Color(0xFF86EFAC)),
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.chat, color: Color(0xFF15803D), size: 20),
-                  const SizedBox(width: 10),
+                  const Icon(Icons.chat, color: Color(0xFF15803D), size: 18),
+                  const SizedBox(width: 8),
                   const Expanded(
                     child: Text(
-                      'Official WhatsApp Support & Alerts',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF166534)),
+                      'WhatsApp Support & Alerts',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5, color: Color(0xFF166534)),
                     ),
                   ),
                   ElevatedButton(
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF16A34A),
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      minimumSize: const Size(0, 30),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     ),
                     onPressed: _openWhatsApp,
-                    child: const Text('Open WhatsApp', style: TextStyle(fontSize: 12)),
+                    child: const Text('Open', style: TextStyle(fontSize: 11.5)),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 10),
           ],
 
           // Status Cards Grid
           const Text(
             'PIPELINE OVERVIEW',
-            style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 0.8, color: AppTheme.textMuted),
+            style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, letterSpacing: 0.8, color: AppTheme.textMuted),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
 
           GridView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             itemCount: _statusCards.length,
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              crossAxisSpacing: 10,
-              mainAxisSpacing: 10,
-              childAspectRatio: 1.8,
+              crossAxisCount: 3,
+              crossAxisSpacing: 8,
+              mainAxisSpacing: 8,
+              childAspectRatio: 1.45,
             ),
             itemBuilder: (context, index) {
               final card = _statusCards[index];
@@ -184,12 +185,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 onTap: () {
                   widget.onNavigateToCrm?.call(filter, status);
                 },
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(10),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                   decoration: BoxDecoration(
                     color: bg,
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(10),
                     border: Border.all(color: border),
                   ),
                   child: Column(
@@ -199,18 +200,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       Text(
                         label,
                         style: TextStyle(
-                          fontSize: 11.5,
+                          fontSize: 10.5,
                           fontWeight: FontWeight.bold,
                           color: textCol.withValues(alpha: 0.9),
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 2),
                       Text(
                         value,
                         style: TextStyle(
-                          fontSize: 22,
+                          fontSize: 18,
                           fontWeight: FontWeight.w800,
                           color: textCol,
                         ),
@@ -221,12 +222,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
               );
             },
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 12),
 
           // Analytics / Trends Chart Card
           Card(
             child: Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(12),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
