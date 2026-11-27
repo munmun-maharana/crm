@@ -1364,19 +1364,50 @@
                             $availableProducts = $showProductSelector
                                 ? \App\Models\Product::active()->ordered()->get()
                                 : collect();
+                            $productFieldLabels = $showProductSelector
+                                ? \App\Models\CrmField::inPipeline('products')->ordered()->pluck('label', 'key')->all()
+                                : [];
                             $assignedBookingProductIds = $showProductSelector ? $customer->assignedBookingProductIds() : [];
                             $initialSelectedProductIds = $customer->isBooking()
                                 ? $assignedBookingProductIds
                                 : [];
-                            $availableProductsForJs = $availableProducts->map(fn ($p) => [
-                                'id' => (int) $p->id,
-                                'name' => $p->name,
-                                'code' => $p->code ?? '',
-                                'price' => (float) $p->price,
-                                'formatted_price' => $p->formattedPrice(),
-                                'category' => $p->category ?? '',
-                                'already_assigned' => in_array((int) $p->id, $assignedBookingProductIds, true),
-                            ])->values();
+                            $availableProductsForJs = $availableProducts->map(function ($p) use ($assignedBookingProductIds, $productFieldLabels) {
+                                $details = [];
+                                if (trim((string) ($p->code ?? '')) !== '') {
+                                    $details[] = ['label' => 'Code', 'value' => (string) $p->code];
+                                }
+                                if ((float) ($p->price ?? 0) > 0) {
+                                    $details[] = ['label' => 'Price', 'value' => $p->formattedPrice()];
+                                }
+                                if (trim((string) ($p->category ?? '')) !== '') {
+                                    $details[] = ['label' => 'Category', 'value' => (string) $p->category];
+                                }
+                                if (trim((string) ($p->unit ?? '')) !== '') {
+                                    $details[] = ['label' => 'Unit', 'value' => (string) $p->unit];
+                                }
+                                if (trim((string) ($p->description ?? '')) !== '') {
+                                    $details[] = ['label' => 'Description', 'value' => (string) $p->description];
+                                }
+                                foreach ((array) ($p->meta ?? []) as $mk => $mv) {
+                                    if (strtolower((string) $mk) === 'status' || $mv === null || $mv === '' || (is_array($mv) && empty($mv))) {
+                                        continue;
+                                    }
+                                    $valStr = is_array($mv) ? implode(', ', $mv) : (string) $mv;
+                                    $lbl = $productFieldLabels[$mk] ?? ucwords(str_replace(['_', '-'], ' ', (string) $mk));
+                                    $details[] = ['label' => $lbl, 'value' => $valStr];
+                                }
+
+                                return [
+                                    'id' => (int) $p->id,
+                                    'name' => $p->name,
+                                    'code' => $p->code ?? '',
+                                    'price' => (float) $p->price,
+                                    'formatted_price' => $p->formattedPrice(),
+                                    'category' => $p->category ?? '',
+                                    'already_assigned' => in_array((int) $p->id, $assignedBookingProductIds, true),
+                                    'details' => $details,
+                                ];
+                            })->values();
                         @endphp
                         @if($showProductSelector && $availableProducts->isNotEmpty())
                             <div class="rounded-lg border border-cyan-200/80 bg-cyan-50/50 p-1.5 space-y-1"
@@ -1385,6 +1416,7 @@
                                      assignedIds: @js($assignedBookingProductIds),
                                      products: @js($availableProductsForJs),
                                      selected: @js($initialSelectedProductIds),
+                                     hoveredProduct: null,
                                      toggle(id) {
                                          id = Number(id);
                                          if (this.selected.includes(id)) {
@@ -1403,6 +1435,8 @@
                                 <div class="grid grid-cols-2 sm:grid-cols-3 gap-1 max-h-36 overflow-y-auto crm-scroll p-0.5">
                                     <template x-for="p in products" :key="p.id">
                                         <label class="relative flex items-center gap-1.5 px-2 py-1 rounded-md border cursor-pointer select-none transition min-w-0"
+                                               @mouseenter="hoveredProduct = p"
+                                               @mouseleave="if (hoveredProduct && hoveredProduct.id === p.id) hoveredProduct = null"
                                                :class="selected.includes(p.id)
                                                     ? 'border-cyan-500 bg-cyan-100/90 text-cyan-950 shadow-2xs ring-1 ring-cyan-500/20'
                                                     : 'border-slate-200/90 bg-white hover:border-cyan-300 hover:bg-cyan-50/30 text-slate-700'">
@@ -1414,20 +1448,43 @@
                                                    :checked="selected.includes(p.id)"
                                                    @change="toggle(p.id)"
                                                    class="w-3.5 h-3.5 rounded border-slate-300 text-cyan-600 focus:ring-cyan-500/20 shrink-0">
-                                            <div class="min-w-0 flex-1 flex items-center justify-between gap-1">
-                                                <span class="font-bold text-[11px] truncate" x-text="p.name"></span>
-                                                <template x-if="p.price > 0">
-                                                    <span class="font-extrabold text-[9.5px] text-emerald-700 shrink-0" x-text="p.formatted_price"></span>
-                                                </template>
-                                                @if($customer->isCallCrm())
-                                                    <template x-if="p.already_assigned">
-                                                        <span class="shrink-0 px-1 py-0.2 rounded bg-emerald-100 text-emerald-800 text-[8.5px] font-bold" title="Already assigned to Service">✓</span>
-                                                    </template>
-                                                @endif
+                                            <div class="min-w-0 flex-1">
+                                                <span class="font-bold text-[11px] truncate block" x-text="p.name"></span>
                                             </div>
                                         </label>
                                     </template>
                                 </div>
+
+                                {{-- Top-Right Corner Hover Product Details Card --}}
+                                <template x-if="hoveredProduct">
+                                    <div class="fixed top-4 right-4 z-[9999] w-60 max-w-[85vw] rounded-xl border border-cyan-300 bg-white shadow-xl overflow-hidden pointer-events-none">
+                                        <div class="px-3 py-2 bg-gradient-to-r from-cyan-600 to-teal-600 text-white flex items-center justify-between gap-1.5">
+                                            <div class="min-w-0">
+                                                <div class="text-[8.5px] font-bold uppercase tracking-wider text-cyan-100">Product Details</div>
+                                                <div class="text-[12px] font-extrabold truncate" x-text="hoveredProduct.name"></div>
+                                            </div>
+                                            <template x-if="hoveredProduct.price > 0">
+                                                <span class="shrink-0 px-1.5 py-0.5 rounded bg-white/20 text-white text-[10.5px] font-extrabold"
+                                                      x-text="hoveredProduct.formatted_price"></span>
+                                            </template>
+                                        </div>
+                                        <div class="p-2.5 space-y-1 text-[11px] max-h-64 overflow-y-auto">
+                                            <template x-if="hoveredProduct.details && hoveredProduct.details.length > 0">
+                                                <div class="divide-y divide-slate-100">
+                                                    <template x-for="(d, idx) in hoveredProduct.details" :key="idx">
+                                                        <div class="py-1 flex items-start justify-between gap-2">
+                                                            <span class="text-[10.5px] font-bold uppercase tracking-wide text-slate-500 shrink-0" x-text="d.label"></span>
+                                                            <span class="text-[11.5px] font-semibold text-ink text-right break-words" x-text="d.value"></span>
+                                                        </div>
+                                                    </template>
+                                                </div>
+                                            </template>
+                                            <template x-if="!hoveredProduct.details || hoveredProduct.details.length === 0">
+                                                <div class="text-slate-400 text-[11px] py-1">No additional details available.</div>
+                                            </template>
+                                        </div>
+                                    </div>
+                                </template>
                             </div>
                         @endif
 
