@@ -382,7 +382,7 @@
                       data-initial-fu="{{ $customer->follow_up ? '1' : '0' }}"
                       data-initial-fu-date="{{ $customer->follow_up_at?->format('Y-m-d') }}"
                       data-initial-fu-time="{{ $customer->follow_up_has_time ? $customer->follow_up_at?->format('H:i') : '' }}"
-                      class="h-full flex flex-col rounded-xl border border-indigo-200/90 bg-indigo-50/55 shadow-xs overflow-hidden"
+                      class="h-full flex flex-col rounded-xl border border-indigo-200 bg-indigo-50 shadow-xs overflow-hidden"
                       onsubmit="event.preventDefault(); Alpine.$data(document.body).openPostUpdateConfirm(this)">
                     @csrf
                     <input type="hidden" name="type" value="status">
@@ -489,7 +489,7 @@
                                                    type="tel" inputmode="tel" pattern="[0-9+\-\s()]*"
                                                    oninput="this.value = this.value.replace(/[^0-9+\-\s()]/g, '')"
                                                    placeholder="{{ $uf->label }}"
-                                                   class="w-full rounded-lg border border-line bg-white px-2.5 py-1.5 text-[12px] outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 transition">
+                                                   class="w-full rounded-lg border border-indigo-300 bg-white shadow-2xs px-2.5 py-1.5 text-[12px] font-semibold text-ink outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/20 transition">
                                         @elseif($uf->key === 'pincode' || $uf->key === 'pin')
                                             <div class="relative" x-data="pincodeAutocomplete({
                                                 initialPin: '{{ addslashes($ufVal ?? '') }}',
@@ -580,7 +580,7 @@
                                                    type="number" step="any" inputmode="decimal"
                                                    oninput="this.value = this.value.replace(/[^0-9.\-]/g, '')"
                                                    placeholder="{{ $uf->label }}"
-                                                   class="w-full rounded-lg border border-line bg-white px-2.5 py-1.5 text-[12px] outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 transition">
+                                                   class="w-full rounded-lg border border-indigo-300 bg-white shadow-2xs px-2.5 py-1.5 text-[12px] font-semibold text-ink outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/20 transition">
                                         @elseif($uf->type === 'date')
                                             <div class="flex items-center gap-1">
                                                 <button type="button"
@@ -619,7 +619,7 @@
                                                    data-initial-value="{{ (string) $rawInitVal }}"
                                                    type="{{ $uf->type === 'email' ? 'email' : 'text' }}"
                                                    placeholder="{{ $uf->label }}"
-                                                   class="w-full rounded-lg border border-line bg-white px-2.5 py-1.5 text-[12px] outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 transition">
+                                                   class="w-full rounded-lg border border-indigo-300 bg-white shadow-2xs px-2.5 py-1.5 text-[12px] font-semibold text-ink outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/20 transition">
                                         @endif
                                     </div>
                                 @endforeach
@@ -642,7 +642,7 @@
                       data-customer-name="{{ $customer->name }}"
                       data-pipeline="booking"
                       data-is-call-crm="0"
-                      class="h-full flex flex-col rounded-xl border border-indigo-200/90 bg-indigo-50/55 shadow-xs overflow-hidden"
+                      class="h-full flex flex-col rounded-xl border border-indigo-200 bg-indigo-50 shadow-xs overflow-hidden"
                       x-data="{
                           curStatus: '{{ strtolower(trim((string) $customer->status)) }}',
                           activeAction: null,
@@ -990,7 +990,7 @@
                       data-initial-fu="{{ $customer->follow_up ? '1' : '0' }}"
                       data-initial-fu-date="{{ $customer->follow_up_at?->format('Y-m-d') }}"
                       data-initial-fu-time="{{ $customer->follow_up_has_time ? $customer->follow_up_at?->format('H:i') : '' }}"
-                      class="h-full flex flex-col rounded-xl border border-indigo-200/90 bg-indigo-50/55 shadow-xs overflow-hidden"
+                      class="h-full flex flex-col rounded-xl border border-indigo-200 bg-indigo-50 shadow-xs overflow-hidden"
                       onsubmit="event.preventDefault(); Alpine.$data(document.body).openPostUpdateConfirm(this)">
                     @csrf
                     <div class="h-8 shrink-0 px-2.5 flex items-center justify-between gap-1.5 bg-indigo-100/80 border-b border-indigo-200/80">
@@ -1061,7 +1061,7 @@
                             </div>
                         @endif
                         {{-- Section 1: Interaction & Call Outcome (Quick Notes, Status, Title, Note, Follow-up) --}}
-                        <div class="rounded-xl bg-indigo-50 border border-indigo-200 p-2.5 space-y-2 shadow-2xs">
+                        <div class="space-y-2">
                             @php $noteTemplates = $noteTemplates ?? collect(); @endphp
                             @if($noteTemplates->isNotEmpty())
                                 <div class="space-y-1">
@@ -1182,9 +1182,9 @@
                             </div>
                         </div>
 
-                        {{-- Section 2: Update Fields in a Clean 2-Column Grid (Soft Emerald Tint) --}}
+                        {{-- Section 2: Update Fields in a Clean 2-Column Grid --}}
                         @if($updateFields->isNotEmpty())
-                            <div class="rounded-lg bg-emerald-50/50 p-2 grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                            <div class="pt-2 border-t border-indigo-200/70 grid grid-cols-1 sm:grid-cols-2 gap-2">
                                 @foreach($updateFields as $uf)
                                     @php
                                         $rawInitVal = $customer->fieldValue($uf->key);
@@ -1198,13 +1198,13 @@
                                         }
                                     @endphp
                                     <div>
-                                        <label class="block text-[9.5px] font-bold uppercase tracking-wider text-slate-500 mb-0.5">{{ $uf->label }}</label>
+                                        <label class="block text-[9.5px] font-extrabold uppercase tracking-wider text-indigo-950 mb-0.5">{{ $uf->label }}</label>
                                         @if($uf->type === 'select')
                                             <div class="relative">
                                                 <select name="update_fields[{{ $uf->key }}]"
                                                         data-field-label="{{ $uf->label }}"
                                                         data-initial-value="{{ (string) $rawInitVal }}"
-                                                        class="w-full appearance-none rounded-lg border border-line bg-mist/50 hover:bg-white focus:bg-white focus:border-brand focus:ring-2 focus:ring-brand/20 pl-2.5 pr-7 py-1.5 text-[12px] font-medium text-ink outline-none transition">
+                                                        class="w-full appearance-none rounded-lg border border-indigo-300 bg-white shadow-2xs focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/20 pl-2.5 pr-7 py-1.5 text-[12px] font-semibold text-ink outline-none transition">
                                                     @unless(($uf->auto_select ?? false) && !empty($uf->options))
                                                         <option value="">Select {{ $uf->label }}</option>
                                                     @endunless
@@ -1221,7 +1221,7 @@
                                                    type="tel" inputmode="tel" pattern="[0-9+\-\s()]*"
                                                    oninput="this.value = this.value.replace(/[^0-9+\-\s()]/g, '')"
                                                    placeholder="{{ $uf->label }}"
-                                                   class="w-full rounded-lg border border-line bg-white px-2.5 py-1.5 text-[12px] outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 transition">
+                                                   class="w-full rounded-lg border border-indigo-300 bg-white shadow-2xs px-2.5 py-1.5 text-[12px] font-semibold text-ink outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/20 transition">
                                         @elseif($uf->key === 'pincode' || $uf->key === 'pin')
                                             <div class="relative" x-data="pincodeAutocomplete({
                                                 initialPin: '{{ addslashes($ufVal ?? '') }}',
@@ -1312,7 +1312,7 @@
                                                    type="number" step="any" inputmode="decimal"
                                                    oninput="this.value = this.value.replace(/[^0-9.\-]/g, '')"
                                                    placeholder="{{ $uf->label }}"
-                                                   class="w-full rounded-lg border border-line bg-white px-2.5 py-1.5 text-[12px] outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 transition">
+                                                   class="w-full rounded-lg border border-indigo-300 bg-white shadow-2xs px-2.5 py-1.5 text-[12px] font-semibold text-ink outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/20 transition">
                                         @elseif($uf->type === 'date')
                                             <div class="flex items-center gap-1">
                                                 <button type="button"
@@ -1351,7 +1351,7 @@
                                                    data-initial-value="{{ (string) $rawInitVal }}"
                                                    type="{{ $uf->type === 'email' ? 'email' : 'text' }}"
                                                    placeholder="{{ $uf->label }}"
-                                                   class="w-full rounded-lg border border-line bg-white px-2.5 py-1.5 text-[12px] outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 transition">
+                                                   class="w-full rounded-lg border border-indigo-300 bg-white shadow-2xs px-2.5 py-1.5 text-[12px] font-semibold text-ink outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/20 transition">
                                         @endif
                                     </div>
                                 @endforeach
